@@ -55,6 +55,7 @@ class Store:
             p['rooms'].append(r);p['map_confirmed']=False;p['map_revision']+=1;p['updated']=now();self.save();return r
     def invalidate(self,pid,room):
         room['revision']+=1;room['approved_image_id']=None;room['approved_video_id']=None
+        if room.get('view_approvals'):room['view_approvals']={}
         self.project(pid)['updated']=now()
     def asset(self,aid):
         if aid not in self.db['assets']:raise ValueError('Asset not found')
@@ -71,6 +72,7 @@ class Store:
                 extra['source_scopes']={aid:capture(self.asset(aid)) for aid in extra.get('plan_ids',[])}
             for job in self.db['jobs'].values():
                 if job['project_id']==pid and job['kind']==kind and job.get('room_id')==room_id and job['status'] in ('queued','waiting','running'):
+                    if kind in ('image','video') and job.get('view_id')!=extra.get('view_id'):continue
                     if kind in ('plan_setup','vision_study','raster_reconstruction') and job.get('plan_id')!=extra.get('plan_id'):continue
                     if scoped and job.get('source_scope',{}).get('key')!=extra['source_scope']['key']:continue
                     if kind=='component_download' and job.get('component_id')!=extra.get('component_id'):continue
@@ -81,12 +83,13 @@ class Store:
         with self.lock:
             j=self.db['jobs'][jid];j.update(fields);j['updated']=now();self.save();return j
 
-def assert_image_gate(project,room):
-    if not project['map_confirmed']:raise ValueError('Confirm the room map before generating images.')
+def assert_image_gate(project,room,store=None):
+    from interior_style import map_ready
+    if not map_ready(store,project,room):raise ValueError('Confirm the room map before generating images.')
     if not room.get('anchor_id') and not room.get('bbox'):raise ValueError('Mark this room on the floor plan, or upload a room reference first.')
 
-def approved_image(store,project,room):
-    aid=room.get('approved_image_id')
+def approved_image(store,project,room,view_id=None):
+    aid=room.get('view_approvals',{}).get(view_id,{}).get('approved_image_id') if view_id else room.get('approved_image_id')
     if not aid:raise ValueError('Approve a room image before generating video.')
     a=store.asset(aid)
     if a.get('approved_revision')!=room['revision'] or a.get('room_id')!=room['id']:

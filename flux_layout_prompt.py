@@ -16,13 +16,17 @@ SOURCES=[
 def compile_prompt(project,room,refs,plan,lighting='',packed=False,projection=None):
     from placement_map import current_layout
     layout=current_layout(room) or room.get('furniture_layout',{});heading=math.radians(layout.get('camera_heading',0))
-    camera=plan.get('floor_cameras',{}).get(room['id'])
+    from interior_style import camera_for
+    camera=camera_for(plan,room)
     if camera:
         dx=(camera['target'][0]-camera['position'][0])*plan['width'];dy=(camera['target'][1]-camera['position'][1])*plan['height']
         heading=math.atan2(dx,-dy)
     items={v['asset_id']:v for v in layout.get('items',[])}
     subjects=[];roles=[{'image':1,'role':'Layout authority: camera view, wall openings, furniture centres, facing and depth ordering.'}]
     for index,ref in enumerate(refs,2):
+        if ref.get('surface_target'):
+            roles.append({'image':2 if packed else index,'role':f"Finish reference for {ref['surface_target']} only; preserve the layout and all geometry.",**({'product_board_tile':index-1} if packed else {})})
+            continue
         item=items[ref['id']];x,y=item['x']-.5,item['y']-.5
         if camera:
             rb=room['bbox'];x=(rb[0]+item['x']*rb[2]-camera['position'][0])*plan['width'];y=(rb[1]+item['y']*rb[3]-camera['position'][1])*plan['height']

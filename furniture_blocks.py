@@ -28,7 +28,8 @@ def clean(items):
             n=v.get(field)
             if type(n) not in (int,float) or not math.isfinite(n):raise ValueError('Enter valid block sizes and positions.')
             row[field]=float(n)
-        if not all(0<=row[k]<=1 for k in ('x','y')) or not all(.005<=row[k]<=1 for k in ('width','depth')):raise ValueError('Block positions and proportions must fit the plan.')
+        minimum=.00001 if kind in ('decor','light') else .005
+        if not all(0<=row[k]<=1 for k in ('x','y')) or not all(minimum<=row[k]<=1 for k in ('width','depth')):raise ValueError('Block positions and proportions must fit the plan.')
         row['angle']%=360
         for axis in ('flip_x','flip_y'):
             if type(v.get(axis,False)) is not bool:raise ValueError('Invalid mirror setting.')
@@ -38,6 +39,9 @@ def clean(items):
         row['seat_count']=seats if kind=='sofa' else None
         row['asset_id']=str(v['asset_id']) if v.get('asset_id') else None
         row['prompt']=str(v.get('prompt',''))[:2000]
+        row['variant']=str(v.get('variant',''))[:240]
+        row['dimension_status']=v.get('dimension_status','reviewed' if v.get('physical_size') else 'estimated')
+        if row['dimension_status'] not in ('missing','estimated','extracted','reviewed'):raise ValueError('Choose a dimension review status.')
         product_url=v.get('product_url','')
         if not isinstance(product_url,str):raise ValueError('Enter a valid product URL.')
         product_url=product_url.strip()
@@ -312,10 +316,13 @@ def request(store,pid,rid,data):
     from placement_map import room_dimensions
     from shared_floor import build as build_scene
     # The editing viewer composes every level; generation cameras remain floor-local.
+    import construction_scope as scope
+    selection=scope.current(store.asset(room['plan_id']))
     floors={}
     for candidate in store.project(pid)['rooms']:
         if candidate.get('plan_id')==room['plan_id'] and candidate.get('bbox'):
-            floors.setdefault(candidate['floor'],candidate)
+            if not selection or candidate['floor']==selection['floor']:
+                floors.setdefault(candidate['floor'],candidate)
     floors[room['floor']]=room
     preview_floors=[{'room_id':r['id'],'scene':build_scene(store,r,preview_items=items if r['id']==rid else None)} for r in floors.values()]
     return {'items':items,'issues':issues,'revision':room['revision'],'basis':basis(store,room),'room_dimensions':room_dimensions(store,room) or __import__('scene_scale').dimensions(store,room),

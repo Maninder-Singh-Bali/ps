@@ -6,7 +6,8 @@ from plan_area import summarize, bounds
 def active_references(store,room):
     blocks=room.get('block_layout',{}).get('items',[])
     linked={v.get('asset_id') for v in blocks}
-    return [store.asset(a) for a in room.get('references',[]) if store.asset(a).get('enabled',True) and (not blocks or a in linked)]
+    surfaces={aid for v in room.get('surfaces',{}).values() for aid in v.get('image_ids',[])}
+    return [store.asset(a) for a in room.get('references',[]) if a not in surfaces and store.asset(a).get('enabled',True) and (not blocks or a in linked)]
 
 
 def current_layout(room):

@@ -19,6 +19,32 @@ class SceneControlTests(unittest.TestCase):
  def test_native_mask_and_exact_composite_route(self):
   j,g=self.image();self.assertEqual(g['21']['inputs']['latent_image'],['307',0]);self.assertEqual(g['300']['inputs']['top'],4);self.assertEqual(g['300']['inputs']['bottom'],4);self.assertEqual(g['308']['inputs']['destination'],['300',0]);self.assertFalse(g['308']['inputs']['resize_source']);self.assertEqual(g['23']['inputs']['image'],['308',0]);self.assertEqual(sampling_plan(g)['21']['total'],3)
   self.assertEqual(j['scene_manifest']['content']['anchor']['id'],self.a['id']);self.assertTrue((self.root/'scene-manifest.json').exists())
+ def test_single_edit_reference_preserves_assignments_and_uses_mask(self):
+  from unittest.mock import patch
+  ids=[]
+  for name in ('table','sofa'):
+   path=self.root/(name+'.png');Image.new('RGB',(1400,1400),'white').save(path)
+   a=register_asset(self.st,self.p['id'],path,'reference',self.r['id'],category=name);ids.append(a['id'])
+  self.r['references']=ids[:]
+  self.r['scene_control']=self.control(reference_id=ids[0])
+  job=self.st.new_job(self.p['id'],'image',self.r['id'],input_revision=self.r['revision'])
+  with patch('engine.create_guide') as guide:
+   g,_=self.engine.build_image(job,self.root);guide.assert_not_called()
+  self.assertEqual(self.r['references'],ids)
+  self.assertEqual(job['source_assets'],[ids[0],self.a['id']])
+  self.assertEqual(g['100']['inputs']['image'],'table.png')
+  self.assertEqual(g['103']['inputs']['latent'],['102',0])
+  self.assertEqual(g['16']['inputs']['positive'],['103',0])
+  self.assertEqual(g['307']['inputs']['mask'],['306',0])
+  self.assertEqual(g['21']['inputs']['latent_image'],['307',0])
+  self.assertEqual(g['308']['inputs']['mask'],['306',0])
+  with self.assertRaises(ValueError):self.control(reference_id=self.a['id'])
+ def test_context_edit_is_explicitly_crop_and_composite(self):
+  self.r['scene_control']=self.control(context_crop=True)
+  j=self.st.new_job(self.p['id'],'image',self.r['id'],input_revision=self.r['revision']);g,_=self.engine.build_image(j,self.root)
+  self.assertEqual(g['21']['inputs']['latent_image'],['20',0]);self.assertNotIn('307',g)
+  self.assertEqual(g['330']['class_type'],'ImageCompositeMasked');self.assertEqual(g['23']['inputs']['image'],['330',0])
+  self.assertEqual(g['10']['inputs']['pixels'],['320',0]);self.assertFalse(j['context_edit']['resized'])
  def test_changed_file_and_scene_rejected(self):
   original=scene_snapshot(self.st,self.p,self.r);self.r['notes']='Move the chair'
   with self.assertRaises(ValueError):assert_scene(self.st,self.p,self.r,original)

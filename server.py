@@ -302,6 +302,9 @@ class Handler(BaseHTTPRequestHandler):
             if p['rooms']:raise ValueError('Your room map already contains edits. Create a new project to analyze another floor plan.')
             return st.new_job(pid,'analysis',plan_ids=p['floor_plans'][:],input_revision=p['map_revision'])
         if len(s)==4 and s[3]=='confirm-map':
+            if d.get('plan_id'):
+                from interior_style import confirm_selected_map
+                return confirm_selected_map(st,p,d['plan_id'])
             if not p['rooms']:raise ValueError('Add at least one room or section.')
             plan_reading.assert_reviewed(st,p)
             for r in p['rooms']:
@@ -330,6 +333,9 @@ class Handler(BaseHTTPRequestHandler):
             st.save();return r
         if len(s)!=6:raise ValueError('Unknown room action.')
         action=s[5]
+        if action=='surfaces' and method=='POST':
+            from interior_style import save_surfaces
+            return save_surfaces(st,pid,r,d)
         if action=='prepare-edit' and method=='POST':
             mode=d.get('mode','region')
             if mode not in ('region','structure','reference'):raise ValueError('Choose an edit mode.')
@@ -375,6 +381,9 @@ class Handler(BaseHTTPRequestHandler):
                 for k in ['category','placement','enabled']:
                     if k in d:a[k]=bool(d[k]) if k=='enabled' else str(d[k])[:1000]
             st.invalidate(pid,r);st.save();return r
+        if action in ('generate-image','generate-video'):
+            from interior_style import view_context
+            r=view_context(r,d.get('view_id'))
         if action=='generate-image':
             if r.get('plan_id'):
                 health=plan_health.inspect(st,pid,r['plan_id'])
@@ -382,32 +391,35 @@ class Handler(BaseHTTPRequestHandler):
                     result=plan_health.apply(st,pid,r['plan_id'],health['fingerprint'])
                     raise ValueError(result['message'])
             if r.get('furniture_layout',{}).get('items') and not current_layout(r):raise ValueError('The room boundary changed. Reopen and save its furniture placement map before generating.')
-            assert_image_gate(p,r);scene_control.clean_control(st,p,r,r.get('scene_control',{}))
+            assert_image_gate(p,r,st);scene_control.clean_control(st,p,r,r.get('scene_control',{}))
             check=plan_preflight.assert_ready(st,p,r)
-            return st.new_job(pid,'image',r['id'],input_revision=r['revision'],scene_ticket=scene_control.scene_snapshot(st,p,r),plan_check=check)
+            return st.new_job(pid,'image',r['id'],input_revision=r['revision'],view_id=r.get('_view_id'),view_revision=r.get('camera_views',{}).get(r.get('_view_id'),{}).get('revision'),scene_ticket=scene_control.scene_snapshot(st,p,r),plan_check=check)
         if action=='generate-video':
-            if not p['map_confirmed']:raise ValueError('Confirm the room map first.')
-            a=approved_image(st,p,r);duration=int(d.get('duration',5));motion=d.get('motion','still')
+            from interior_style import map_ready
+            if not map_ready(st,p,r):raise ValueError('Confirm the selected room map first.')
+            a=approved_image(st,p,r,r.get('_view_id'));duration=int(d.get('duration',5));motion=d.get('motion','still')
             if duration not in (5,8) or motion not in ('still','push','slide'):raise ValueError('Choose a supported duration and camera movement.')
-            return st.new_job(pid,'video',r['id'],input_revision=r['revision'],source_image_id=a['id'],duration=duration,motion=motion,
+            return st.new_job(pid,'video',r['id'],input_revision=r['revision'],source_image_id=a['id'],duration=duration,motion=motion,view_id=r.get('_view_id'),view_revision=a.get('view_revision'),
                 scene_ticket=scene_control.scene_snapshot(st,p,r),source_image_identity=scene_control.file_identity(st,a['id']))
         if action in ['approve-image','reject-image','approve-video','reject-video']:
             kind=action.split('-')[1];aid=d['asset_id']
             if aid not in r['images' if kind=='image' else 'videos']:raise ValueError('This output does not belong to the room.')
             a=st.asset(aid)
+            approval=r.setdefault('view_approvals',{}).setdefault(a['view_id'],{}) if a.get('view_id') else r
             if a.get('input_revision')!=r['revision']:raise ValueError('References changed since this version. Generate an updated image before approving.')
             if action.startswith('approve'):
                 source_job=st.db['jobs'].get(a.get('job_id'),{})
                 if source_job.get('scene_manifest'):scene_control.assert_scene(st,p,r,source_job['scene_manifest'])
                 scene_control.file_identity(st,a['id'])
-                if not p['map_confirmed']:raise ValueError('Confirm the room map before approving outputs.')
-                if kind=='video' and a.get('source_image_id')!=r.get('approved_image_id'):raise ValueError('This video uses an older image approval.')
-                a['status']='approved';a['approved_revision']=r['revision'];a['approved_at']=now();r['approved_'+kind+'_id']=aid
-                if kind=='image':r['approved_video_id']=None
+                from interior_style import map_ready
+                if not map_ready(st,p,r):raise ValueError('Confirm the selected room map before approving outputs.')
+                if kind=='video' and a.get('source_image_id')!=approval.get('approved_image_id'):raise ValueError('This video uses an older image approval.')
+                a['status']='approved';a['approved_revision']=r['revision'];a['approved_at']=now();approval['approved_'+kind+'_id']=aid
+                if kind=='image':approval['approved_video_id']=None
             else:
                 a['status']='rejected';a['review_note']=str(d.get('reason','Needs revision'))[:2000]
-                if r.get('approved_'+kind+'_id')==aid:r['approved_'+kind+'_id']=None
-                if kind=='image':r['approved_video_id']=None
+                if approval.get('approved_'+kind+'_id')==aid:approval['approved_'+kind+'_id']=None
+                if kind=='image':approval['approved_video_id']=None
             st.save();return a
         raise ValueError('Unknown room action.')
     def import_image(self,pid,d):

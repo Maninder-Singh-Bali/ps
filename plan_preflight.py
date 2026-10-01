@@ -34,7 +34,8 @@ def report(store,project,room):
     def add(key,level,text):rows.append({'id':key,'level':level,'message':text})
     anchor=room.get('anchor_id') or (room.get('scene_control',{}).get('source_id') if room.get('scene_control',{}).get('mode') in ('region','structure') else None)
     if room.get('block_layout',{}).get('items') and room.get('scene_control',{}).get('mode','reference')=='reference':anchor=None
-    if not project.get('map_confirmed'):add('map','blocked','Review and confirm this project’s room map first.')
+    from interior_style import map_ready,selected_map_ready
+    if not map_ready(store,project,room):add('map','blocked','Review and confirm this project’s room map first.')
     else:add('map','pass','Room map is confirmed for the current inputs.')
     if not room.get('plan_id') or not room.get('bbox'):
         add('plan','warning' if anchor else 'blocked','No floor-plan section is available. A room photo can guide appearance, but plan correspondence cannot be checked.')
@@ -42,7 +43,7 @@ def report(store,project,room):
     plan=store.asset(room['plan_id']);b=room['bbox'];study=plan.get('plan_reading',{})
     import furniture_blocks
     for n,message in enumerate(furniture_blocks.readiness(store,room)):add('block-'+str(n),'blocked',message)
-    if not study.get('reviewed'):add('study','warning' if anchor else 'blocked','Review the architectural plan study before generating from this drawing.')
+    if not study.get('reviewed') and not selected_map_ready(store,project,room):add('study','warning' if anchor else 'blocked','Review the architectural plan study before generating from this drawing.')
     else:add('study','pass','The saved architectural study has been reviewed.')
     relevant=[]
     from plan_reading import overlap
@@ -71,11 +72,18 @@ def report(store,project,room):
             add('connection-'+feature['id'],'blocked',f"Shared feature {feature['label']} does not touch both {owner['name']} and {other['name']} on the plan.");continue
         if feature.get('review_status')=='confirmed':
             add('connection-'+feature['id'],'pass',f"{owner['name']} ↔ {other['name']}: {feature['label']} uses one shared position and type. Output correspondence still needs review.")
-    # A reviewed opening must never be contradicted by a manually drawn solid wall.
+    # Validate the same opening-cut geometry that the shared scene renders.
+    # A raw host-wall span is not a blockage when its mapped opening cuts it.
+    from shared_floor import applies
+    features=plan.get('drawing',{}).get('features',[])
+    if applies(store,room):
+        from drawing_scene import load,cut_walls
+        features=cut_walls(load(store,plan)[0])
+    # A reviewed opening must never be contradicted by a remaining solid wall.
     for feature in relevant:
         if feature.get('review_status')!='confirmed' or feature.get('kind') not in ('door','window','sliding_door'):continue
         box=feature['bbox'];bounds=[box[0]*plan['width'],box[1]*plan['height'],(box[0]+box[2])*plan['width'],(box[1]+box[3])*plan['height']]
-        if any(line_in_box(w['points'],bounds)>.5 for w in plan.get('drawing',{}).get('features',[]) if w['kind']=='wall'):
+        if any(line_in_box(w['points'],bounds)>.5 for w in features if w['kind']=='wall'):
             add('meaning-'+feature.get('id','opening'),'blocked',f"{feature.get('label','Opening')} is identified as {feature['kind'].replace('_',' ')}, but the drawing puts a solid wall through it. Correct the shared drawing before rendering.")
     from placement_map import active_references
     layout=current_layout(room);refs=active_references(store,room)
@@ -94,7 +102,6 @@ def report(store,project,room):
             if any(not inside(p,poly) for p in corners):add('footprint-'+ref['id'],'blocked',name+' extends beyond the room boundary at the entered dimensions.')
     if not dims:add('scale','warning','Only proportions are known. Enter measured dimensions to check furniture size and clearance.')
     elif any(a['id'] in items and not items[a['id']].get('size') for a in refs):add('sizes','warning','Enter furniture width and depth to check its full footprint; markers only describe centres.')
-    features=plan.get('drawing',{}).get('features',[])
     def in_section(f):
         x=sum(p[0] for p in f['points'])/(2*plan['width']);y=sum(p[1] for p in f['points'])/(2*plan['height'])
         return b[0]-1e-6<=x<=b[0]+b[2]+1e-6 and b[1]-1e-6<=y<=b[1]+b[3]+1e-6

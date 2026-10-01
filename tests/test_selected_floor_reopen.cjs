@@ -11,12 +11,14 @@ async function reopen(confirmed, selectedRoom = null) {
     assets:{a:{id:'a',project_id:'p',construction_selection:{confirmed,floor:'Selected floor'}}},jobs:{}};
   const c = {pid:'p',rid:selectedRoom,planId:null,state:null,pollBusy:false,
     lastSignature:'',drawMode:false,modalType:'',window:{},
-    document:{activeElement:{tagName:'BODY'}}, localStorage:{setItem(){}},
+    document:{activeElement:{tagName:'BODY'}}, localStorage:{setItem(){},getItem(){return JSON.stringify({roomId:selectedRoom})}},
     fetch:async()=>({ok:true,json:async()=>data}),renderShell(){},renderMain(){},updateJobs(){},
     toast(message){throw Error(message)}};
   c.P=()=>c.state?.projects[c.pid]; c.R=()=>c.P()?.rooms.find(r=>r.id===c.rid);
   c.A=id=>c.state?.assets[id];
-  vm.createContext(c);vm.runInContext(refresh,c);await c.refreshState(true);return c;
+  vm.createContext(c);
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../static/workspace-selection.js'),'utf8'),c);
+  vm.runInContext(refresh,c);await c.refreshState(true);return c;
 }
 (async()=>{
   assert.equal((await reopen(true)).rid,'reviewed');

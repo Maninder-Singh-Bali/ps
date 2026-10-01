@@ -6,6 +6,7 @@ import requests
 import project_storage
 import render_progress
 from placement_map import create_guide, spatial_instructions, current_layout, room_dimensions, create_product_board
+from interior_style import view_context
 from PIL import Image
 from store import uid, now, assert_image_gate, approved_image
 from scene_sun import lighting_instruction
@@ -71,12 +72,17 @@ class Engine:
             w,h=im.size;coords=(int(box[0]*w),int(box[1]*h),int((box[0]+box[2])*w),int((box[1]+box[3])*h))
             p=folder/'room_plan_reference.png';im.crop(coords).save(p);return p
     def build_image(self,job,folder):
-        p=self.store.project(job['project_id']);room=self.store.room(p['id'],job['room_id']);assert_image_gate(p,room)
+        p=self.store.project(job['project_id']);room=view_context(self.store.room(p['id'],job['room_id']),job.get('view_id'));assert_image_gate(p,room,self.store)
         if room['revision']!=job['input_revision']:raise ValueError('Room inputs changed while this image was queued. Generate again with the updated references.')
         scene=scene_control.assert_scene(self.store,p,room,job.get('scene_ticket'))
         control=scene_control.clean_control(self.store,p,room,room.get('scene_control',{}))
         from placement_map import active_references
-        refs=active_references(self.store,room)
+        object_refs=active_references(self.store,room)
+        from interior_style import surface_references
+        refs=object_refs+surface_references(self.store,room)
+        if control.get('reference_id'):
+            refs=[a for a in refs if a['id']==control['reference_id']]
+            if not refs:raise ValueError('The selected edit reference is no longer assigned to this scene.')
         surface_cleanup=control['mode']=='region' and bool(re.search(r'\b(remove|erase|clean)\b.{0,100}\b(text|writing|lettering|letters|watermarks?)\b',control.get('instruction',''),re.I))
         if surface_cleanup:refs=[]
         if len(refs)>6:raise ValueError('Use up to six active product references per image. You can keep more uploaded and disable unused ones.')
@@ -87,7 +93,7 @@ class Engine:
         if control['mode']=='reference' and room.get('block_layout',{}).get('items'):anchor=None
         primary=Path(anchor['path']) if anchor else self.plan_crop(room,folder)
         from perspective_layout import create as create_perspective_layout
-        perspective=create_perspective_layout(self.store,room,refs,folder) if not anchor else None
+        perspective=create_perspective_layout(self.store,room,object_refs,folder) if not anchor else None
         if perspective:
             primary=perspective[0]
             job['layout_guide_id']=register_asset(self.store,p['id'],primary,'layout_guide',room['id'],job_id=job['id'])['id']
@@ -114,8 +120,8 @@ class Engine:
             descriptions.append(f"Image {i+2}: {a.get('category','furniture')} product reference only. Placement: {a.get('placement') or 'Use a plausible placement within the selected room without blocking circulation.'} Preserve this product's visible silhouette and materials; do not import its photographed room.")
         if packed:
             descriptions=["Image 2 is a labelled product-reference sheet, not the output composition. Use the product design in each numbered tile and ignore its photographed background. "+' '.join(f"Product {i+1}: {a.get('category','furniture')}. {a.get('placement','')}" for i,a in enumerate(refs))]
-        guide=None if perspective or surface_cleanup else create_guide(self.store,room,refs,folder,packed)
-        constraints=spatial_instructions(self.store,room,refs,packed,edit_existing=bool(anchor)) if guide or perspective else ''
+        guide=None if perspective or surface_cleanup or (anchor and control['mode']!='reference') else create_guide(self.store,room,object_refs,folder,packed)
+        constraints=spatial_instructions(self.store,room,object_refs,packed,edit_existing=bool(anchor)) if guide or perspective else ''
         if guide:
             path,instructions=guide;key=200
             g[str(key)]={'class_type':'LoadImage','inputs':{'image':self.upload(path)}}
@@ -157,9 +163,13 @@ class Engine:
             (folder/'layout-prompt-preparation.json').write_text(json.dumps(preparation,indent=2),encoding='utf8')
         else:
             prompt+='\n'+architectural_instruction(plan,room)
+        if room.get('surfaces') and not surface_cleanup:
+            prompt+='\nSurface assignments (appearance only, never add geometry): '+json.dumps(room['surfaces'],ensure_ascii=False)
         if surface_cleanup:
             prompt='Edit image 1. '+control['instruction']+' The edited patch is a continuous clean unmarked surface matching the surrounding material and illumination. Preserve the rest of this photograph exactly.'
             job['surface_cleanup']={'reference_count':1,**scene_control.focus_surface_graph(g,control)}
+        elif control['mode']=='region' and control.get('context_crop'):
+            job['context_edit']=scene_control.focus_surface_graph(g,control)
         g['6']['inputs']['text']=prompt;g['16']['inputs'].update(positive=pos,negative=neg)
         g['17']['inputs']['noise_seed']=p['seed'];g['24']['inputs']['filename_prefix']='Pixeloid_Studio/'+job['id']+'/Image';g['25']['inputs']['filename_prefix']='Pixeloid_Studio/'+job['id']+'/Raw1920x1088'
         job['seed']=p['seed'];job['source_assets']=[a['id'] for a in refs]+([anchor['id']] if anchor else [room['plan_id']])+([room['plan_id']] if guide else []);job['prompt']=prompt
@@ -168,7 +178,7 @@ class Engine:
             preservation=control,workflow_sha256=scene_control.digest(g))
         return g,'24'
     def build_video(self,job,folder):
-        p=self.store.project(job['project_id']);room=self.store.room(p['id'],job['room_id']);a=approved_image(self.store,p,room)
+        p=self.store.project(job['project_id']);room=view_context(self.store.room(p['id'],job['room_id']),job.get('view_id'));a=approved_image(self.store,p,room,job.get('view_id'))
         if room['revision']!=job['input_revision'] or a['id']!=job['source_image_id']:raise ValueError('Image approval changed while the video was queued. Review and queue it again.')
         scene=scene_control.assert_scene(self.store,p,room,job.get('scene_ticket'))
         source_identity=scene_control.file_identity(self.store,a['id'])
@@ -316,7 +326,7 @@ class Engine:
         p=self.store.project(job['project_id']);room=self.store.room(p['id'],job['room_id'])
         if job['kind']!='reference' and room['revision']!=job['input_revision']:raise RuntimeError('Output was preserved, but room references changed during rendering. It cannot be approved as current.')
         if job['kind']=='video':
-            current=approved_image(self.store,p,room)
+            current=approved_image(self.store,p,room,job.get('view_id'))
             if current['id']!=job['source_image_id']:raise RuntimeError('Output preserved; its source approval changed during rendering.')
             from video_checks import inspect
             job['video_check']=inspect(path,current['path'],job['duration'])
@@ -342,8 +352,9 @@ class Engine:
                 job['consistency_check']=qa
                 (folder/'consistency-check.json').write_text(json.dumps(qa,indent=2),encoding='utf8')
                 if not qa['outside_exact_match']:raise RuntimeError('The protected background pixel check failed. Output preserved for inspection; it cannot be approved.')
-        (folder/'resolution-provenance.json').write_text(json.dumps({'sampling_width':1920,'sampling_height':1088,'output_width':1920,'output_height':1080,'crop_top':4,'crop_bottom':4,'output_upscaler':False,'source_conditioning_may_be_resized':True,'workflow':'workflow.api.json','seed':job['seed']},indent=2),encoding='utf8')
-        a=register_asset(self.store,p['id'],path,'reference_candidate' if job['kind']=='reference' else job['kind'],room['id'],input_revision=job['input_revision'],job_id=job['id'],seed=job['seed'],status='review',source_image_id=job.get('source_image_id'),native_sampling=[1920,1088],output_upscaled=False,duration=job.get('duration'),reference_purpose=job.get('reference_purpose'),reference_prompt=job.get('reference_prompt'),reference_anchor_id=job.get('reference_anchor_id'),category=job.get('category','Furniture'))
+        sampling=(job.get('context_edit') or job.get('surface_cleanup') or {}).get('context',[0,0,1920,1088])[2:]
+        (folder/'resolution-provenance.json').write_text(json.dumps({'sampling_width':sampling[0],'sampling_height':sampling[1],'protected_composite':sampling!=[1920,1088],'output_width':1920,'output_height':1080,'crop_top':4,'crop_bottom':4,'output_upscaler':False,'source_conditioning_may_be_resized':True,'workflow':'workflow.api.json','seed':job['seed']},indent=2),encoding='utf8')
+        a=register_asset(self.store,p['id'],path,'reference_candidate' if job['kind']=='reference' else job['kind'],room['id'],input_revision=job['input_revision'],job_id=job['id'],seed=job['seed'],status='review',view_id=job.get('view_id'),view_revision=job.get('view_revision'),source_image_id=job.get('source_image_id'),native_sampling=sampling,output_upscaled=False,duration=job.get('duration'),reference_purpose=job.get('reference_purpose'),reference_prompt=job.get('reference_prompt'),reference_anchor_id=job.get('reference_anchor_id'),category=job.get('category','Furniture'))
         with self.store.lock:
             room.setdefault('reference_candidates' if job['kind']=='reference' else 'images' if job['kind']=='image' else 'videos',[]).append(a['id']);self.store.save()
         self.store.update_job(job['id'],status='completed',stage='Ready for review',progress=100,eta=None,result_asset_id=a['id'],finished=now())

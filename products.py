@@ -125,9 +125,9 @@ def parse_listing(text,url):
     offers=[o for o in offers if isinstance(o,dict)];offer=offers[0] if offers else {}
     picture=product.get('image') or parser.meta.get('og:image','')
     pictures=picture if isinstance(picture,list) else [picture]
-    images=list(dict.fromkeys(u for v in pictures if (u:=safe_link(v.get('url','') if isinstance(v,dict) else v,url))))[:8]
+    images=list(dict.fromkeys(u for v in pictures if (u:=safe_link((v.get('contentUrl') or v.get('url','')) if isinstance(v,dict) else v,url))))[:8]
     if isinstance(picture,list):picture=picture[0] if picture else ''
-    if isinstance(picture,dict):picture=picture.get('url','')
+    if isinstance(picture,dict):picture=picture.get('contentUrl') or picture.get('url','')
     brand=product.get('brand') or ''
     if isinstance(brand,dict):brand=brand.get('name','')
     availability=str(offer.get('availability','')).split('/')[-1]

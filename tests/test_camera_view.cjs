@@ -39,6 +39,10 @@ async function flush(){const pending=[...timers.values()];timers.clear();for(con
  await action('fit-plan');await animate();assert.equal(svg.attributes.viewBox,'0 0 100 100');
  let prevented=false;svg.onwheel({deltaY:-150,deltaMode:0,clientX:25,clientY:30,preventDefault(){prevented=true}});await animate();assert.ok(prevented);assert.ok(Number(svg.attributes.viewBox.split(' ')[2])<100);
  assert.equal(requests.length,countBefore);await action('preview');assert.equal(JSON.stringify(requests.at(-1).data),cameraBefore);
+ // A save/refresh must capture the visible controls even before a change event.
+ element('#camera-target-height').value='1.1';element('#camera-fov').value='90';
+ await action('preview');assert.equal(requests.at(-1).data.target_height,1.1);assert.equal(requests.at(-1).data.horizontal_fov,90);
+ await action('save');assert.equal(requests.at(-1).data.target_height,1.1);assert.equal(requests.at(-1).data.horizontal_fov,90);
  console.log('Camera zoom/pan: controls, smooth wheel, fit, and unchanged camera payload passed');
  console.log('Camera UI: incomplete-view feedback, drag completion, pending aim refresh/save, and timer race passed');
  await sandbox.window.openCameraView('project','room',{view:[10,20,30,40]});

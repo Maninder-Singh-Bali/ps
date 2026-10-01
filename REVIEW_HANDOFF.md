@@ -1,8 +1,33 @@
 # Pixeloid Studio — external review handoff
 
-Tested source checkpoint, 1 October 2026. Start here when reviewing this repository with ChatGPT or another code-review tool.
+Tested source checkpoint, 2 October 2026. Start here when reviewing this repository with ChatGPT or another code-review tool.
 
-## Current checkpoint: apartment construction selection
+## Current checkpoint: lightweight planner and bounded product fidelity
+
+The dashboard now uses Plan → Style → Views → Video. Existing scene records remain authoritative. Object product/variant/dimension fields, a separate Surfaces panel, named per-room cameras, view-linked output history and per-view approvals reuse the saved project. Missing/estimated dimensions remain explicit. Selected-room generation retains architectural checks and validates active-room plus actually visible neighbouring fixture placements; hidden unrelated fixtures remain unapproved. Original Studio and private projects are preserved.
+
+**Conditioning decision: useful local table improvement, not reliable whole-room product fidelity.** The untouched rejected image remained the baseline. Exactly two table experiments used the same camera, placements, product and seed. A standalone product reference plus latent noise mask/composite restored transparent glass but retained an unwanted object. Native context-crop generation plus protected compositing restored glass/support detail and removed that object. The latter is explicitly not masked sampler conditioning. Outside the selected rectangle, 1,903,056 pixels matched exactly by compositing. Inside it, dimensions, reflection and occlusion accuracy still need visual review.
+
+Actual installed graph: FLUX.2 Klein 4B FP8, Qwen3 4B encoder, FLUX2 VAE, four Euler steps, CFG 1. Baseline product-board preprocessing reduced each square reference to about 375×372 effective pixels; standalone reference processing supplied 1024×1024. ReferenceLatent has no object-ID/spatial-binding input. Prompt labels are soft guidance; auxiliary depth/normal/segmentation exports are QA only. Guide-appearance competition remains an unisolated hypothesis.
+
+| Experiment | Click to saved output | Job lifecycle | ComfyUI execution | Result |
+| --- | ---: | ---: | ---: | --- |
+| Table: standalone reference + latent mask/composite | 178.47 s | 162.28 s | 138.17 s | Glass improved; unwanted object remained |
+| Table: context crop + composite | 49.20 s | 33.90 s | 12.57 s | Useful glass/support improvement; unwanted object removed |
+| Artwork transfer | Not instrumented | 31.35 s | 12.04 s | Failed: unrelated miniature interior detail and seam |
+| Pendant transfer | Not instrumented | 31.47 s | 12.05 s | Partial feature match; visible ceiling seam |
+
+These intervals overlap. First recorded setup marker to first table click was 198.13 seconds of agent setup/development, not total investigation or measured human effort. The saved-scene baseline previously took 97.98 seconds click-to-save and 45.99 seconds ComfyUI. RTX A4000 16 GB was used; peak VRAM was not measured in this phase. Exact all-click counts and active human correction time were not instrumented.
+
+All scene placements, polygons, surfaces, references, cameras and other rooms compared equal before/after this phase. The agent selected references, drew edit rectangles, supplied instructions and submitted renders through the dashboard; preparation, local execution, exterior pixel checks and linked saving were automatic. All versions remain. No user approval or video was generated. The right-side sofa was already cropped by the camera. Further sofa editing was withheld because a rectangle covering it also includes the corrected foreground table; object-shaped occlusion protection is missing. Floor tile module, veining and seamlessness remain unverified. Artwork identity/aspect fidelity and pendant lighting consistency failed. A replacement model is not yet verified or proposed for installation.
+
+Reopening now restores project, plan/floor, room and camera with per-project storage, validated fallback and a notice for unavailable selections. Dashboard reload and cross-project switching retained each project's own room/camera. Historical-version job diagnostics now follow the selected output rather than a later completed render. Context-crop provenance now reports actual sampled patch dimensions separately from the composed 1920×1080 output; earlier private outputs retain their original metadata, with the discrepancy explained in the evidence package. Remaining limitation: changing edit controls advances the room revision, so otherwise useful historical versions become outdated and cannot be approved as current. Do not weaken scene checks to conceal that limitation.
+
+Validation: 111 relevant Python tests passed together in 20.569 seconds; all 24 JavaScript suites passed, including six workspace-selection cases and selected-floor reopening. The latter test harness was updated to load the new selection module. Eight scene-control tests passed again after the provenance fix. Commands: `python run_tests.py test_scene_control.py`, `python run_tests.py test_interior_planner.py`, `python run_tests.py test_plan_preflight.py`, `python run_tests.py test_products.py`, `python run_tests.py test_furniture_blocks.py`, `python run_tests.py test_shared_floor_health.py`, `python run_tests.py test_studio.py`; `node tests/test_workspace_selection.cjs`; `node tests/test_camera_view.cjs`. Existing configured Node/sharp is required by placement-guide tests. These checks do not certify product identity or video fidelity.
+
+Private comparison images, product associations, workflow graphs, timings and preservation checks are packaged separately, never committed here. The separate real-DXF investigation remains queued: reproduce outline/hatch duplication, door-host opening interpretation and multi-stroke window grouping using native layers/geometry, then verify any general fix on a second real DXF. No redraw, model download, detector rerun or apartment-wide cleanup was performed in this fidelity phase.
+
+## Previous checkpoint: apartment construction selection
 
 See [CONSTRUCTION_SELECTION_EVALUATION.md](CONSTRUCTION_SELECTION_EVALUATION.md). A private typical-floor PDF now has a saved apartment-only draft with an editable selection, retained open-to-sky void, 2.50 m walls, twelve zones and nine source-visible fixture proxies. All selected floor faces exclude neighbouring areas. The source remains intact, and isolated-service restart preserved the saved scene. This required substantial manual architectural correction; automatic native-path semantics remain inadequate. Tests: 354 Python tests exercised across existing runtimes and 23 JavaScript suites passed. Private drawings, evidence, site information and models are excluded from publication.
 

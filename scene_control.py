@@ -37,11 +37,20 @@ def clean_control(store, project, room, data):
         if im.size != (1920, 1080):
             raise ValueError('Protected edits need a 1920 × 1080 master. This mode never enlarges a smaller source.')
     out = {'mode': mode, 'source_id': source, 'instruction': str(data.get('instruction', '')).strip()[:2500]}
+    reference_id = data.get('reference_id')
+    if reference_id:
+        if reference_id not in room.get('references', []):
+            raise ValueError('Choose an assigned product reference from this room.')
+        reference = store.asset(reference_id)
+        if reference.get('project_id') != project['id'] or reference.get('room_id') != room['id'] or not reference.get('enabled', True):
+            raise ValueError('The edit reference must be an enabled reference belonging to this room.')
+        out['reference_id'] = reference_id
     strength = float(data.get('denoise', .5 if mode == 'structure' else 1.0))
     if not math.isfinite(strength) or strength not in (.25, .5, .75, 1.0):
         raise ValueError('Choose a supported edit strength.')
     out['denoise'] = strength
     if mode == 'region':
+        out['context_crop'] = data.get('context_crop') is True
         box = data.get('region')
         if not isinstance(box, list) or len(box) != 4 or not all(isinstance(v, (float, int)) and math.isfinite(v) for v in box):
             raise ValueError('Draw an edit area on the room image.')
@@ -56,6 +65,7 @@ def clean_control(store, project, room, data):
 
 
 def scene_snapshot(store, project, room):
+    from interior_style import camera_for
     plan = store.asset(room['plan_id']) if room.get('plan_id') else {}
     drawing = plan.get('drawing', {})
     refs = [store.asset(aid) for aid in room['references'] if store.asset(aid).get('enabled', True)]
@@ -71,7 +81,7 @@ def scene_snapshot(store, project, room):
         'construction_selection': copy.deepcopy(plan.get('construction_selection')),
         'construction_selection_revision': plan.get('construction_selection_revision',0),
         'plan_reading': copy.deepcopy(plan.get('plan_reading', {})),
-        'floor_camera': copy.deepcopy(plan.get('floor_cameras',{}).get(room['id'])),
+        'floor_camera': copy.deepcopy(camera_for(plan,room)),
         'floor_sections': [{k:copy.deepcopy(r.get(k)) for k in ('id','floor','bbox','area_polygon','furniture_layout','block_layout','references')} for r in project['rooms'] if r.get('plan_id')==room.get('plan_id') and r.get('floor')==room.get('floor')],
         'floor_products': [{**file_identity(store,aid),'enabled':store.asset(aid).get('enabled',True),'category':store.asset(aid).get('category')} for r in project['rooms'] if r.get('plan_id')==room.get('plan_id') and r.get('floor')==room.get('floor') for aid in r.get('references',[])],
         'measurements': [{k: copy.deepcopy(v) for k,v in m.items() if k!='updated'} for m in project.get('measurements',[]) if m.get('plan_id')==room.get('plan_id') and m.get('floor')==room.get('floor')],
@@ -81,10 +91,15 @@ def scene_snapshot(store, project, room):
     if plan.get('raster_geometry'):
         content['raster_geometry']={k:copy.deepcopy(plan['raster_geometry'].get(k)) for k in ('source_sha256','pipeline_key','walls','uncertain_spans','openings','regions')}
         content['raster_corrections']=copy.deepcopy(plan.get('raster_corrections',{}))
+    if room.get('surfaces'):content['surfaces']=copy.deepcopy(room['surfaces'])
+    if room.get('_view_id'):content['view_id']=room['_view_id']
     return {'version': 1, 'fingerprint': digest(content), 'content': content}
 
 
 def assert_scene(store, project, room, expected):
+    if expected and expected.get('content',{}).get('view_id'):
+        from interior_style import view_context
+        room=view_context(room,expected['content']['view_id'])
     current = scene_snapshot(store, project, room)
     if expected and expected['fingerprint'] != current['fingerprint']:
         raise ValueError('The master scene or references changed. Generate a new version from the current room before continuing.')

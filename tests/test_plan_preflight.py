@@ -53,6 +53,12 @@ class Checks(unittest.TestCase):
  def test_shared_opening_cannot_be_solid_wall_in_drawing(self):
   self.shared();self.a['drawing']['features'].append({'kind':'wall','points':[[50,0],[50,100]]})
   self.assertIn('meaning-shared',self.codes())
+ def test_shared_mapped_opening_uses_rendered_host_wall_cut(self):
+  self.shared();self.a['drawing']['features']=[{'id':'host','kind':'wall','points':[[50,0],[50,100]]},
+   {'id':'glazing','kind':'sliding_door','points':[[50,20],[50,80]]}]
+  self.assertNotIn('blocked-opening',self.codes());self.assertNotIn('meaning-shared',self.codes())
+  self.a['drawing']['features'][1]['points']=[[50,20],[50,40]]
+  self.assertIn('meaning-shared',self.codes()) # A partial cut must not approve the rest.
  def test_shared_feature_must_touch_both_sections(self):
   f,_=self.shared();f['bbox']=[.1,.2,.02,.6];self.assertIn('connection-shared',self.codes())
  def test_independent_crops_cannot_claim_matching_coordinates(self):

@@ -3,18 +3,19 @@
 (() => {
  let mountedKey=null,mode='blocks',opening=0;const hiddenFloors=new Set();
  const key=()=>`${pid}:${planId}`;
- const candidates=()=>P()?.rooms.filter(r=>r.plan_id===planId&&r.bbox)||[];
+ const candidates=()=>P()?.rooms.filter(r=>r.plan_id===planId&&r.bbox&&(tab!=='references'||!A(planId)?.construction_selection?.confirmed||r.floor===A(planId).construction_selection.floor))||[];
  const pending=()=>mode==='camera'?window.CameraEditor?.pending():window.FurnitureEditor?.pending();
  function planView(floor=null){const a=A(planId),rs=candidates().filter(r=>!floor||r.floor===floor);if(!rs.length)return [0,0,a.width,a.height];const x=Math.min(...rs.map(r=>r.bbox[0]))*a.width,y=Math.min(...rs.map(r=>r.bbox[1]))*a.height,right=Math.max(...rs.map(r=>r.bbox[0]+r.bbox[2]))*a.width,bottom=Math.max(...rs.map(r=>r.bbox[1]+r.bbox[3]))*a.height,pad=Math.min(a.width,a.height)*.035;return [x-pad,y-pad,right-x+pad*2,bottom-y+pad*2]}
- function canRender(){return tab==='plan'&&!drawMode&&!!planId&&candidates().length>0}
+ function canRender(){return ['plan','references'].includes(tab)&&!drawMode&&!!planId&&candidates().length>0}
  function sectionDetails(){const r=R();if(!r)return '';return `<details class="inline-section-details"><summary>Section details</summary><form id="room-form" class="room-edit"><label class="field"><span>Name</span><input name="name" value="${esc(r.name)}" required></label><label class="field"><span>Floor</span><input name="floor" value="${esc(r.floor)}" required></label><label class="field"><span>Type</span><select name="kind">${['room','circulation','outdoor'].map(k=>`<option ${k===r.kind?'selected':''}>${k}</option>`).join('')}</select></label><div class="actions">${btn('Save','save-room','','small')}${btn('Remove','delete-room','','small danger')}</div></form></details>`}
  const floorName=f=>f==='Lower floor'?'Ground floor':f==='Upper floor'?'First floor':f;
  function floorGroups(){return [...new Set(candidates().map(r=>r.floor))].map(f=>`<section class="floor-section-group"><div class="floor-group-heading"><button type="button" class="floor-section-heading ${R()?.floor===f?'active':''}" data-workspace-floor="${esc(f)}" aria-pressed="${R()?.floor===f}">${esc(floorName(f))}<span>${candidates().filter(r=>r.floor===f).length}</span></button><button type="button" class="floor-visibility" data-floor-visibility="${esc(f)}" aria-label="${hiddenFloors.has(f)?'Show':'Hide'} ${esc(floorName(f))}" title="${hiddenFloors.has(f)?'Show':'Hide'} ${esc(floorName(f))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>${hiddenFloors.has(f)?'<path d="M3 3l18 18"/>':''}</svg></button></div>${candidates().filter(r=>r.floor===f).map(r=>`<button type="button" class="floor-room ${r.id===rid?'selected':''}" data-action="room" data-id="${r.id}">${esc(r.name)}</button>`).join('')}</section>`).join('')}
  function markup(){
   if(!candidates().some(r=>r.id===rid))rid=candidates()[0].id;
-  return `<div class="inline-plan-heading"><h1>Floor plan</h1><select id="plan-select" class="control" aria-label="Floor plan page">${P().floor_plans.map((id,i)=>`<option value="${id}" ${id===planId?'selected':''}>Page ${i+1} · ${esc(A(id).display_name||A(id).name)}</option>`).join('')}</select><div class="actions">${btn('Select area to construct','construction-area','','small')}${btn('Upload plan','upload-plan','','small')}<details class="inline-more"><summary class="btn small">Plan options</summary><div>${btn('Area & sections','plan-areas','','small')}${btn('Detect objects','structure-check','','small')}${btn('North & sunlight','refine-drawing','','small')}${btn(P().map_confirmed?'Map confirmed ✓':'Confirm map','confirm-map',P().map_confirmed?'disabled':'','small')}</div></details></div></div><div class="inline-plan-grid"><section id="plan-editor-inline" class="panel" aria-label="Plan editing workspace"><div class="empty">Building 3D from the plan…</div></section><aside class="panel inline-sections"><div class="panel-head"><h2>Sections</h2>${btn('+','add-room','aria-label="Add section"','small')}</div><div id="inline-room-list" class="room-list">${floorGroups()}</div><div id="inline-section-details">${sectionDetails()}</div></aside></div>`;
+  return `<div class="inline-plan-heading"><h1>${tab==='references'?'Style':'Plan'}</h1><select id="plan-select" class="control" aria-label="Floor plan page">${P().floor_plans.map((id,i)=>`<option value="${id}" ${id===planId?'selected':''}>Page ${i+1} · ${esc(A(id).display_name||A(id).name)}</option>`).join('')}</select><div class="actions">${tab==='references'?'<button class="btn small" data-surfaces-open>Surfaces</button>':btn('Select area to construct','construction-area','','small')}${btn('Upload plan','upload-plan','','small')}<details class="inline-more"><summary class="btn small">Advanced</summary><div>${btn('Area & sections','plan-areas','','small')}${btn('Detect objects','structure-check','','small')}${btn('North & sunlight','refine-drawing','','small')}${btn(A(planId)?.construction_selection?.confirmed?'Confirm selected shell':P().map_confirmed?'Map confirmed ✓':'Confirm map','confirm-map','','small')}</div></details></div></div><div class="inline-plan-grid"><section id="plan-editor-inline" class="panel" aria-label="Plan editing workspace"><div class="empty">Building 3D from the plan…</div></section><aside class="panel inline-sections"><div class="panel-head"><h2>Sections</h2>${btn('+','add-room','aria-label="Add section"','small')}</div><div id="inline-room-list" class="room-list">${floorGroups()}</div><div id="inline-section-details">${sectionDetails()}</div></aside></div>`;
  }
  function syncSections(){
+  window.WorkspaceSelection?.remember();
   const list=$('#inline-room-list');if(!list)return;
   const signature=JSON.stringify([rid,[...hiddenFloors],P().rooms.map(r=>[r.id,r.name,r.floor,r.kind,!!r.bbox])]);
   if(list.dataset.signature!==signature){list.innerHTML=floorGroups();list.dataset.signature=signature;if(!$('#inline-section-details')?.contains(document.activeElement))$('#inline-section-details').innerHTML=sectionDetails()}
@@ -27,7 +28,7 @@
   try{await openFurnitureBlocks(pid,rid,{inline:true,view:planView(R()?.floor)})}catch(err){if(ticket===opening){$('#plan-editor-inline').innerHTML=`<div class="empty">${esc(err.message)} ${btn('Retry','furniture-blocks','','small')}</div>`;toast(err.message)}}
  }
  function show(title,body,footer,type){
-  const host=$('#plan-editor-inline');if(!host||tab!=='plan'||!['blocks','camera'].includes(type))return false;
+  const host=$('#plan-editor-inline');if(!host||!['plan','references'].includes(tab)||!['blocks','camera'].includes(type))return false;
   mode=type;modalType=type;host.dataset.mode=type;
   host.innerHTML=`<div class="inline-editor-top"></div><div class="inline-editor-body">${body}</div><div class="inline-editor-footer">${footer}</div>`;
   const top=host.querySelector('.inline-editor-top'),modes=host.querySelector('.workspace-modes');if(modes)top.append(modes);
@@ -40,6 +41,8 @@
    top.insertBefore(toolbar,save||null);
   }
   const inspector=host.querySelector('.block-inspector');if(inspector){
+   const feedback=inspector.querySelector('#block-feedback');if(feedback){feedback.classList.add('inline-placement-feedback');host.querySelector('.block-left-panel')?.append(feedback)}
+   const review=inspector.querySelector('.block-review');if(review){review.lastChild.textContent=' Placement checked';top.insertBefore(review,save||null)}
    const dock=host.querySelector('.block-left-panel'),props=inspector.querySelector('.block-object-properties'),transform=inspector.querySelector('.block-transform-panel'),wall=inspector.querySelector('#block-wall-properties');
    const controls=document.createElement('div');controls.className='inline-selection-controls';
    if(wall)controls.append(wall);
@@ -77,7 +80,7 @@
  }
  async function selectFloor(floor){const first=candidates().find(r=>r.floor===floor);if(!first)return;await select(first.id);if(mode==='blocks')FurnitureEditor.fitFloor();}
  document.addEventListener('click',e=>{
-  if(!$('#plan-editor-inline')||tab!=='plan')return;
+  if(!$('#plan-editor-inline')||!['plan','references'].includes(tab))return;
   const visibility=e.target.closest('[data-floor-visibility]');if(visibility){toggleFloor(visibility.dataset.floorVisibility).catch(err=>toast(err.message));return}
   const floor=e.target.closest('[data-workspace-floor]');if(floor){selectFloor(floor.dataset.workspaceFloor).catch(err=>toast(err.message));return}
   const row=e.target.closest('[data-action="room"]');if(row){e.preventDefault();e.stopImmediatePropagation();select(row.dataset.id).catch(err=>toast(err.message));return}
@@ -92,5 +95,5 @@
  },true);
  window.addEventListener('beforeunload',e=>{if($('#plan-editor-inline')&&pending()){e.preventDefault();e.returnValue=''}});
  document.querySelector('#modal').addEventListener('close',()=>{if($('#plan-editor-inline')){modalType=mode;syncSections();if(mode==='blocks'&&!pending())window.FurnitureEditor?.reload()?.catch(err=>toast(err.message))}});
- window.InlinePlan={applyFloorVisibility,floorVisible:f=>!hiddenFloors.has(f),canRender,markup,preserve,reset,mount,show,select,syncSections,planView,active:()=>!!$('#plan-editor-inline'),mode:()=>mode};
+ window.InlinePlan={applyFloorVisibility,floorVisible:f=>!hiddenFloors.has(f)&&(!A(planId)?.construction_selection?.confirmed||f===A(planId).construction_selection.floor),canRender,markup,preserve,reset,mount,show,select,syncSections,planView,active:()=>!!$('#plan-editor-inline'),mode:()=>mode};
 })();

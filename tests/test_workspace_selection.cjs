@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict');
+const {resolve}=require('../static/workspace-selection.js');
+const project={floor_plans:['p'],rooms:[{id:'ground',plan_id:'p',floor:'Ground',camera_views:{a:{},b:{}}},{id:'upper',plan_id:'p',floor:'First',camera_views:{c:{}}}]};
+const assets={p:{construction_selection:{confirmed:true,floor:'First'}}};
+assert.deepEqual(resolve(project,assets,{planId:'p',roomId:'ground',floor:'Ground',cameraId:'b'}),{planId:'p',roomId:'ground',floor:'Ground',cameraId:'b',changed:false});
+assert.equal(resolve(project,assets,{}).roomId,'upper');
+let v=resolve(project,assets,{planId:'p',roomId:'deleted',floor:'Ground',cameraId:'deleted'});assert.equal(v.roomId,'ground');assert.equal(v.cameraId,'a');assert.equal(v.changed,true);
+v=resolve(project,assets,{planId:'p',roomId:'upper',floor:'First',cameraId:'b'});assert.equal(v.cameraId,'c');assert.equal(v.changed,true);
+const other={floor_plans:['q'],rooms:[{id:'other',plan_id:'q',floor:'Other',camera_views:{z:{}}}]};
+v=resolve(other,{}, {planId:'p',roomId:'ground',floor:'Ground',cameraId:'b'});assert.equal(v.planId,'q');assert.equal(v.roomId,'other');assert.equal(v.cameraId,'z');
+assert.equal(resolve({floor_plans:[],rooms:[]},{},{}).roomId,null);
+console.log('Workspace selection: 6 cases passed');

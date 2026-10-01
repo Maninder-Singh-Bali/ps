@@ -3,6 +3,7 @@ import math,copy,json,hashlib
 from pathlib import Path
 import numpy as np
 from placement_map import current_layout,room_dimensions
+from interior_style import camera_for
 
 
 def sections(store,room):
@@ -50,7 +51,7 @@ def readiness(store,room):
     b=floor_bounds(store,room)
     def on_floor(f):return all(b[0]-.003<=v[0]/plan['width']<=b[2]+.003 and b[1]-.003<=v[1]/plan['height']<=b[3]+.003 for v in f['points'])
     if not any(f['kind']=='wall' and on_floor(f) for f in architecture):issues.append('Trace the actual walls on this floor in Refine drawing. Section boxes and open-space connections will never be made into walls.')
-    if not plan.get('floor_cameras',{}).get(room['id']):issues.append('Set this section’s camera and viewing direction on the full plan in Structure check.')
+    if not camera_for(plan,room):issues.append('Save a camera view for this section in Views.')
     missing=unresolved_curves(plan,architecture,room['floor'])
     if missing:issues.append('Curved architecture lacks matching reviewed curve geometry: '+', '.join(missing)+'. Review these particular paths; do not substitute straight walls.')
     return issues
@@ -170,7 +171,7 @@ def build(store,room,preview_items=None,camera_override=None):
             for a,z in zip(corners,corners[1:]+corners[:1]):face([[*a,0],[*z,0],[*z,h],[*a,h]],color,'furniture')
             face([[*q,h] for q in corners],color,'furniture')
             products.append({'asset_id':item['asset_id'],'room_id':r['id'],'centre':q,'facing':item['angle'],'size_confirmed':bool(dims and item.get('size'))})
-    camera=camera_override or plan.get('floor_cameras',{}).get(room['id']);world_camera=None
+    camera=camera_override or camera_for(plan,room);world_camera=None
     if camera:
         world_camera={'position':[*xy(camera['position']),camera['height']], 'target':[*xy(camera['target']),camera.get('target_height',camera['height'])], 'horizontal_fov':camera.get('horizontal_fov',math.degrees(2*math.atan(960/1450)))}
     content={'plan_id':plan['id'],'floor':room['floor'],'bounds':b,'width':W,'depth':D,'height':H,'calibrated':bool(dims),'floor_boundary_status':'saved polygon' if measurement else 'unknown; reference plane only','model_scale':model,'surfaces':surfaces,'lines':lines,'products':products,
@@ -184,10 +185,16 @@ def build(store,room,preview_items=None,camera_override=None):
     return content
 
 
+def visible_block_issues(store,room,projected):
+    """Review the active room and any neighbouring objects visible to this camera."""
+    from furniture_blocks import readiness as block_readiness
+    visible_rooms={room['id']}|{p['room_id'] for p in projected if p.get('visible_pixels',0)>0}
+    return [section['name']+': '+issue for section in sections(store,room)
+            if section['id'] in visible_rooms for issue in block_readiness(store,section)]
+
+
 def create_guide(store,room,refs,folder):
     issues=readiness(store,room)
-    from furniture_blocks import readiness as block_readiness
-    for section in sections(store,room):issues.extend(block_readiness(store,section))
     if issues:raise ValueError('Shared floor: '+' '.join(issues))
     scene=build(store,room);camera=scene['camera']
     from perspective_layout import render_faces
@@ -198,6 +205,8 @@ def create_guide(store,room,refs,folder):
         owners=list(range(1,len(faces)+1)),return_buffers=True,horizontal_fov=camera['horizontal_fov'])
     owners=np.array([0]+[owner_ids.get(f.get('object_key'),0) for f in scene['surfaces']],dtype=np.int32)[face_ids]
     projected=save_projection(products,owners,depth,folder)
+    issues=visible_block_issues(store,room,projected)
+    if issues:raise ValueError('Shared floor: '+' '.join(issues))
     invisible=[p['label'] for p in projected if p['room_id']==room['id'] and not p['visible_pixels']]
     if invisible:raise ValueError('The selected camera cannot see these furniture blocks: '+', '.join(invisible)+'. Adjust the camera or placement before generating.')
     from geometry_guidance import save as save_guidance
@@ -287,6 +296,17 @@ def preview_camera(store,pid,aid,data):
 def save_camera(store,pid,aid,data):
     if any(j['project_id']==pid and j['status'] in ('queued','running','waiting') for j in store.db['jobs'].values()):raise ValueError('Finish the active generation before changing shared views.')
     r,plan,camera=clean_camera(store,pid,aid,data)
+    if data.get('view_name'):
+        import uuid
+        key=data.get('view_id') or uuid.uuid4().hex
+        views=r.setdefault('camera_views',{});old=views.get(key)
+        if data.get('view_id') and not old:raise ValueError('Saved view not found in this room.')
+        if old and data.get('view_revision')!=old.get('revision',0):raise ValueError('This camera changed. Reopen it before saving.')
+        revision=(old.get('revision',0)+int(old['camera']!=camera)) if old else 1
+        views[key]={'id':key,'name':str(data['view_name']).strip()[:120],'camera':camera,'revision':revision}
+        if old and old['camera']!=camera:r.setdefault('view_approvals',{}).pop(key,None)
+        store.save()
+        return {'ok':True,'room_id':r['id'],'revision':r['revision'],'camera':camera,'view':copy.deepcopy(views[key])}
     if plan.setdefault('floor_cameras',{}).get(r['id'])!=camera:
         plan['floor_cameras'][r['id']]=camera;store.invalidate(pid,r);store.save()
     return {'ok':True,'room_id':r['id'],'revision':r['revision'],'camera':camera}
