@@ -1,0 +1,9 @@
+{
+  "dashboard_port": 8860,
+  "comfy_url": "http://127.0.0.1:8190",
+  "auto_start_renderer": false,
+  "comfy_python": "",
+  "comfy_root": "",
+  "geometry_python": "",
+  "ollama_executable": ""
+}

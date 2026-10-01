@@ -1,0 +1,15 @@
+const assert=require('node:assert/strict'),lib=require('../static/furniture-library.js');
+const plan={width:1000,height:600},wall={kind:'wall',points:[[100,100],[600,100]],thickness:10};
+const art=lib.create('painting-landscape',[0,0,1,1],plan,{width_m:10,depth_m:6},[.3,.18],'art');
+const before=structuredClone(art),hit=lib.snapToWall(art,plan,[wall],30);
+assert(hit);assert.equal(hit.item.angle,0);assert(Math.abs(hit.item.y*600-(105+art.depth*600/2+.05))<1e-8);assert.deepEqual(art,before);
+assert.equal(lib.snapToWall({...art,y:.05},plan,[wall],10),null);
+assert.equal(lib.snapToWall(art,plan,[{...wall,kind:'window'}],30),null);
+assert.equal(lib.snapToWall(art,plan,[{...wall,points:[[100,100],[105,100]]}],30),null);
+const v=lib.snapToWall({...art,x:.19,y:.5},plan,[{...wall,points:[[200,100],[200,500]]}],30);
+assert(v);assert.equal(v.item.angle,90);assert(v.item.x<.2);
+const stairs=lib.create('staircase-spiral',[0,0,1,1],plan,{width_m:10,depth_m:6},[.5,.5],'stairs');
+const resized=lib.transform(stairs,plan,'e',[0,0],[100,0]);
+assert(Math.abs(resized.width*1000-resized.depth*600)<1e-8);
+assert.equal(lib.categories.Lighting.length,6);assert.equal(lib.categories.Art.length,3);
+console.log('Lighting, painting wall snapping, and circular stair scaling passed.');

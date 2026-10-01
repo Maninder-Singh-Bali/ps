@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict');
+const {placementPoint:p}=require('../static/placement-map.js');
+const rect={left:10,top:20,width:1000,height:500},box=[.2,.2,.4,.4];
+assert.deepEqual(p(510,270,rect,box),{x:.5,y:.5});
+assert.ok(Math.abs(p(410,220,rect,box,true).x-.5)<1e-9);
+assert.ok(Math.abs(p(410,220,rect,box,true).y-.5)<1e-9);
+assert.equal(p(100,100,rect,box,true),null);
+assert.equal(p(-20,0,rect,box),null);
+assert.deepEqual(p(-20,0,rect,box,true,true),{x:0,y:0});
+assert.deepEqual(p(2000,2000,rect,box,true,true),{x:1,y:1});
+console.log('7 placement-map coordinate checks passed');

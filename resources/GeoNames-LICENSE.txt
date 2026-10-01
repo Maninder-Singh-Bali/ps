@@ -1,0 +1,6 @@
+GeoNames cities15000 and admin1CodesASCII
+https://www.geonames.org/
+https://download.geonames.org/export/dump/
+Creative Commons Attribution 4.0: https://creativecommons.org/licenses/by/4.0/
+Downloaded 2026-09-30
+Reduced to city, coordinates, country, region and timezone. Approximate nearest-city lookup, not address or boundary validation.

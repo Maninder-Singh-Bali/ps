@@ -1,0 +1,20 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+let source=fs.readFileSync('static/furniture-blocks.js','utf8'),at=source.lastIndexOf('})();');
+source=source.slice(0,at)+`window.testHistory={init(c,w,i){ctx=c;walls=w;items=i;selected='chair';history=null;dirty=false;render=()=>syncHistory();call=async()=>{};syncHistory()},sync:syncHistory,travel:travelHistory,get:()=>({ctx,items,history,dirty,walls}),select(id){selected=id}};`+source.slice(at);
+const rooms=[{id:'one',plan_id:'plan',bbox:[0,0,1,1],revision:3,block_layout:{items:[{id:'chair',x:.2}]}},{id:'two',plan_id:'plan',bbox:[0,0,1,1],revision:4,block_layout:{items:[]}}];
+const dom={open:true,addEventListener(){}};
+const env={window:{addEventListener(){}},document:{addEventListener(){},querySelector:()=>dom},structuredClone,state:{projects:{p:{rooms}}},A:()=>({}),modalType:'blocks',$:()=>dom,toast(){}};
+vm.createContext(env);vm.runInContext(source,env);
+const drawing={edits:{},features:[{id:'wall',points:[[0,0],[10,0]]}]};const w={doc:structuredClone(drawing),selected:null,snapshot(){return structuredClone({edits:this.doc.edits,features:this.doc.features})},clear(){this.selected=null},history:[],future:[]};
+const t=env.window.testHistory;t.init({pid:'p',rid:'one',drafts:{},savedDrawing:structuredClone(drawing)},w,structuredClone(rooms[0].block_layout.items));
+(async()=>{
+ t.get().items[0].x=.4;t.sync();w.doc.features[0].points[1][0]=20;t.sync();assert.equal(t.get().history.past.length,2);
+ await t.travel();assert.equal(w.doc.features[0].points[1][0],10);assert.equal(t.get().items[0].x,.4);
+ await t.travel();assert.equal(t.get().items[0].x,.2);assert.equal(t.get().dirty,false);
+ await t.travel(true);await t.travel(true);assert.equal(w.doc.features[0].points[1][0],20);assert.equal(t.get().items[0].x,.4);
+ await t.travel();t.get().items[0].x=.7;t.sync();assert.equal(t.get().history.future.length,0);
+ t.select(null);t.sync();assert.equal(t.get().history.past.length,2,'Selection is not a geometry edit');
+ rooms[0].revision=8;await t.travel();assert.equal(t.get().ctx.revision,8,'Undo uses current saved revision');
+ assert.equal(rooms[0].block_layout.items[0].x,.2,'Undo changes editor drafts, never saved data');
+ console.log('Unified wall/furniture undo-redo order, branching, no-op selection, save revisions and draft isolation passed');
+})().catch(e=>{console.error(e);process.exitCode=1});

@@ -1,0 +1,21 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const context={window:{},fetch:async()=>({ok:true,json:async()=>JSON.parse(fs.readFileSync('static/furniture-meshes.json','utf8'))})};
+vm.createContext(context);vm.runInContext(fs.readFileSync('static/furniture-meshes.js','utf8'),context);
+(async()=>{
+ const M=context.window.FurnitureMeshes;await M.load();
+ const plan={width:1000,height:500};
+ const scene=(floor,bounds,id)=>({floor,bounds,width:10,depth:10,height:3,surfaces:[{kind:'floor',points:[[0,0,0],[10,0,0],[10,10,0],[0,10,0]],color:[220,220,220]},{kind:'wall',source_id:id,points:[[0,0,0],[10,0,0],[10,0,3],[0,0,3]],color:[230,230,230]}]});
+ const floors=[{room_id:'ground-room',scene:scene('Ground',[.05,.1,.45,.9],'ground-wall')},{room_id:'first-room',scene:scene('First',[.55,.1,.95,.9],'first-wall')}];
+ const blocks=[{owner:{id:'first-room',floor:'First'},v:{id:'chair',kind:'chair',preset_id:'chair',x:.65,y:.3,width:.05,depth:.1,height_m:.8,angle:0}}];
+ const before=JSON.stringify({floors,blocks});const all=M.building(floors,plan,blocks,{wall:'first-wall'});
+ assert.equal(all.levels.length,2);assert.equal(all.levels[1].elevation,3);
+ const ground=all.faces.find(f=>f.id==='ground-wall'),first=all.faces.find(f=>f.id==='first-wall');
+ assert.equal(first.points[0][0],ground.points[0][0]);assert.equal(first.points[0][1],ground.points[0][1]);
+ assert.equal(first.points[0][2],ground.points[2][2]);assert(first.selected);assert.equal(first.roomId,'first-room');
+ const chair=all.faces.filter(f=>f.id==='chair');assert(chair.length>0);assert(chair.every(f=>f.points.every(p=>p[2]>=120)));
+ const firstOnly=M.building(floors,plan,blocks,{},f=>f==='First');assert.equal(firstOnly.levels.length,1);assert.equal(firstOnly.levels[0].elevation,3);assert(!firstOnly.faces.some(f=>f.floorName==='Ground'));
+ assert.equal(M.building(floors,plan,blocks,{},()=>false).faces.length,0);
+ const groundOnly=M.building(floors,plan,blocks,{},f=>f==='Ground');assert(groundOnly.faces.every(f=>f.floorName==='Ground'));
+ assert.equal(JSON.stringify({floors,blocks}),before);
+ console.log('Stacked floors: common origin, height, furniture, selection identities, independent visibility and immutable inputs passed');
+})().catch(e=>{console.error(e);process.exitCode=1});

@@ -1,0 +1,4376 @@
+{
+  "version": 1,
+  "materials": {
+    "brass": [
+      178,
+      145,
+      87
+    ],
+    "shade": [
+      228,
+      218,
+      193
+    ],
+    "bulb": [
+      252,
+      238,
+      189
+    ],
+    "canvas": [
+      223,
+      219,
+      204
+    ],
+    "art": [
+      114,
+      144,
+      131
+    ],
+    "sun": [
+      206,
+      163,
+      97
+    ],
+    "wood": [
+      163,
+      135,
+      104
+    ],
+    "fabric": [
+      149,
+      170,
+      168
+    ],
+    "pillow": [
+      227,
+      226,
+      210
+    ],
+    "cushion": [
+      183,
+      199,
+      193
+    ],
+    "blanket": [
+      132,
+      160,
+      164
+    ],
+    "metal": [
+      95,
+      111,
+      116
+    ],
+    "panel": [
+      194,
+      200,
+      196
+    ],
+    "appliance": [
+      222,
+      226,
+      221
+    ],
+    "ceramic": [
+      235,
+      233,
+      219
+    ],
+    "dark": [
+      57,
+      72,
+      77
+    ],
+    "glass": [
+      162,
+      201,
+      211
+    ],
+    "leaf": [
+      112,
+      150,
+      101
+    ],
+    "soil": [
+      83,
+      68,
+      53
+    ],
+    "terracotta": [
+      181,
+      128,
+      97
+    ],
+    "stone": [
+      190,
+      187,
+      175
+    ]
+  },
+  "defaults": {
+    "chair": "chair",
+    "table": "coffee-table",
+    "bed": "bed",
+    "storage": "storage",
+    "refrigerator": "refrigerator",
+    "comforter": "comforter",
+    "pillar": "pillar-square",
+    "fixture": "basin",
+    "appliance": "appliance",
+    "desk": "desk",
+    "plant": "plant",
+    "rug": "rug",
+    "light": "floor-lamp",
+    "decor": "painting-landscape",
+    "unknown": "unknown"
+  },
+  "recipes": {
+    "chair": [
+      {
+        "bounds": [
+          0.13,
+          0.15,
+          0.0,
+          0.08,
+          0.08,
+          0.435483870967742
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.13,
+          0.79,
+          0.0,
+          0.08,
+          0.08,
+          0.435483870967742
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.79,
+          0.15,
+          0.0,
+          0.08,
+          0.08,
+          0.435483870967742
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.79,
+          0.79,
+          0.0,
+          0.08,
+          0.08,
+          0.435483870967742
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.08,
+          0.13,
+          0.41840607210626185,
+          0.84,
+          0.79,
+          0.11100569259962051
+        ],
+        "material": "fabric",
+        "role": "seat",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.08,
+          0.04,
+          0.4696394686907021,
+          0.84,
+          0.13,
+          0.5303605313092978
+        ],
+        "material": "fabric",
+        "role": "back",
+        "type": "bevel"
+      }
+    ],
+    "armchair": [
+      {
+        "bounds": [
+          0.13,
+          0.15,
+          0.0,
+          0.08,
+          0.08,
+          0.4112903225806452
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.13,
+          0.79,
+          0.0,
+          0.08,
+          0.08,
+          0.4112903225806452
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.79,
+          0.15,
+          0.0,
+          0.08,
+          0.08,
+          0.4112903225806452
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.79,
+          0.79,
+          0.0,
+          0.08,
+          0.08,
+          0.4112903225806452
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.08,
+          0.13,
+          0.3951612903225806,
+          0.84,
+          0.79,
+          0.10483870967741937
+        ],
+        "material": "fabric",
+        "role": "seat",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.08,
+          0.04,
+          0.44354838709677424,
+          0.84,
+          0.13,
+          0.5564516129032258
+        ],
+        "material": "fabric",
+        "role": "back",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.01,
+          0.15,
+          0.4596774193548387,
+          0.1,
+          0.65,
+          0.2245331069609508
+        ],
+        "material": "fabric",
+        "role": "arm",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.89,
+          0.15,
+          0.4596774193548387,
+          0.1,
+          0.65,
+          0.2245331069609508
+        ],
+        "material": "fabric",
+        "role": "arm",
+        "type": "box"
+      }
+    ],
+    "bar-stool": [
+      {
+        "bounds": [
+          0.18,
+          0.18,
+          0,
+          0.07,
+          0.07,
+          0.85
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.18,
+          0.75,
+          0,
+          0.07,
+          0.07,
+          0.85
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.75,
+          0.18,
+          0,
+          0.07,
+          0.07,
+          0.85
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.75,
+          0.75,
+          0,
+          0.07,
+          0.07,
+          0.85
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.04,
+          0.04,
+          0.84,
+          0.92,
+          0.92,
+          0.16
+        ],
+        "material": "fabric",
+        "role": "seat",
+        "type": "cylinder"
+      },
+      {
+        "bounds": [
+          0.18,
+          0.18,
+          0.3,
+          0.64,
+          0.05,
+          0.05
+        ],
+        "material": "metal",
+        "role": "brace",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.18,
+          0.77,
+          0.3,
+          0.64,
+          0.05,
+          0.05
+        ],
+        "material": "metal",
+        "role": "brace",
+        "type": "box"
+      }
+    ],
+    "ottoman": [
+      {
+        "bounds": [
+          0.08,
+          0.08,
+          0,
+          0.07,
+          0.07,
+          0.15
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.08,
+          0.8499999999999999,
+          0,
+          0.07,
+          0.07,
+          0.15
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8499999999999999,
+          0.08,
+          0,
+          0.07,
+          0.07,
+          0.15
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8499999999999999,
+          0.8499999999999999,
+          0,
+          0.07,
+          0.07,
+          0.15
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.02,
+          0.02,
+          0.15,
+          0.96,
+          0.96,
+          0.85
+        ],
+        "material": "fabric",
+        "role": "seat",
+        "type": "bevel"
+      }
+    ],
+    "kitchen-table": [
+      {
+        "bounds": [
+          0.08,
+          0.08,
+          0,
+          0.07,
+          0.07,
+          0.89
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.08,
+          0.8499999999999999,
+          0,
+          0.07,
+          0.07,
+          0.89
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8499999999999999,
+          0.08,
+          0,
+          0.07,
+          0.07,
+          0.89
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8499999999999999,
+          0.8499999999999999,
+          0,
+          0.07,
+          0.07,
+          0.89
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0,
+          0,
+          0.88,
+          1,
+          1,
+          0.12
+        ],
+        "material": "wood",
+        "role": "top",
+        "type": "box"
+      }
+    ],
+    "coffee-table": [
+      {
+        "bounds": [
+          0.08,
+          0.08,
+          0,
+          0.07,
+          0.07,
+          0.89
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.08,
+          0.8499999999999999,
+          0,
+          0.07,
+          0.07,
+          0.89
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8499999999999999,
+          0.08,
+          0,
+          0.07,
+          0.07,
+          0.89
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8499999999999999,
+          0.8499999999999999,
+          0,
+          0.07,
+          0.07,
+          0.89
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0,
+          0,
+          0.88,
+          1,
+          1,
+          0.12
+        ],
+        "material": "wood",
+        "role": "top",
+        "type": "box"
+      }
+    ],
+    "desk": [
+      {
+        "bounds": [
+          0.08,
+          0.08,
+          0,
+          0.07,
+          0.07,
+          0.89
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.08,
+          0.8499999999999999,
+          0,
+          0.07,
+          0.07,
+          0.89
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8499999999999999,
+          0.08,
+          0,
+          0.07,
+          0.07,
+          0.89
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8499999999999999,
+          0.8499999999999999,
+          0,
+          0.07,
+          0.07,
+          0.89
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0,
+          0,
+          0.88,
+          1,
+          1,
+          0.12
+        ],
+        "material": "wood",
+        "role": "top",
+        "type": "box"
+      }
+    ],
+    "table-round": [
+      {
+        "bounds": [
+          0.04,
+          0.04,
+          0.88,
+          0.92,
+          0.92,
+          0.12
+        ],
+        "material": "wood",
+        "role": "top",
+        "type": "cylinder"
+      },
+      {
+        "bounds": [
+          0.43,
+          0.43,
+          0.07,
+          0.14,
+          0.14,
+          0.81
+        ],
+        "material": "metal",
+        "role": "pedestal",
+        "type": "cylinder"
+      },
+      {
+        "bounds": [
+          0.25,
+          0.25,
+          0,
+          0.5,
+          0.5,
+          0.07
+        ],
+        "material": "metal",
+        "role": "foot",
+        "type": "cylinder"
+      }
+    ],
+    "dining-4": [
+      {
+        "bounds": [
+          0.29,
+          0.206,
+          0.0,
+          0.035,
+          0.049,
+          0.6942
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.29,
+          0.7449999999999999,
+          0.0,
+          0.035,
+          0.049,
+          0.6942
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.6749999999999999,
+          0.206,
+          0.0,
+          0.035,
+          0.049,
+          0.6942
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.6749999999999999,
+          0.7449999999999999,
+          0.0,
+          0.035,
+          0.049,
+          0.6942
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.25,
+          0.15,
+          0.6864,
+          0.5,
+          0.7,
+          0.0936
+        ],
+        "material": "wood",
+        "role": "top",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.0485,
+          0.41095000000000004,
+          0,
+          0.0152,
+          0.024400000000000005,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.1701,
+          0.41095000000000004,
+          0,
+          0.0152,
+          0.024400000000000005,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.0485,
+          0.20965,
+          0,
+          0.0152,
+          0.024400000000000005,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.1701,
+          0.20965,
+          0,
+          0.0152,
+          0.024400000000000005,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.044700000000000004,
+          0.19440000000000004,
+          0.49,
+          0.1501,
+          0.25620000000000004,
+          0.13
+        ],
+        "material": "fabric",
+        "role": "seat",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.0276,
+          0.19440000000000004,
+          0.55,
+          0.0247,
+          0.25620000000000004,
+          0.45
+        ],
+        "material": "fabric",
+        "role": "back",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.9363,
+          0.20965,
+          0,
+          0.0152,
+          0.024400000000000005,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8147,
+          0.20965,
+          0,
+          0.0152,
+          0.024400000000000005,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.9363,
+          0.41095000000000004,
+          0,
+          0.0152,
+          0.024400000000000005,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8147,
+          0.41095000000000004,
+          0,
+          0.0152,
+          0.024400000000000005,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8052,
+          0.19440000000000002,
+          0.49,
+          0.1501,
+          0.25620000000000004,
+          0.13
+        ],
+        "material": "fabric",
+        "role": "seat",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.9477,
+          0.19440000000000002,
+          0.55,
+          0.0247,
+          0.25620000000000004,
+          0.45
+        ],
+        "material": "fabric",
+        "role": "back",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.0485,
+          0.75095,
+          0,
+          0.0152,
+          0.024400000000000005,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.1701,
+          0.75095,
+          0,
+          0.0152,
+          0.024400000000000005,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.0485,
+          0.54965,
+          0,
+          0.0152,
+          0.024400000000000005,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.1701,
+          0.54965,
+          0,
+          0.0152,
+          0.024400000000000005,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.044700000000000004,
+          0.5344,
+          0.49,
+          0.1501,
+          0.25620000000000004,
+          0.13
+        ],
+        "material": "fabric",
+        "role": "seat",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.0276,
+          0.5344,
+          0.55,
+          0.0247,
+          0.25620000000000004,
+          0.45
+        ],
+        "material": "fabric",
+        "role": "back",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.9363,
+          0.54965,
+          0,
+          0.0152,
+          0.024400000000000005,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8147,
+          0.54965,
+          0,
+          0.0152,
+          0.024400000000000005,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.9363,
+          0.75095,
+          0,
+          0.0152,
+          0.024400000000000005,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8147,
+          0.75095,
+          0,
+          0.0152,
+          0.024400000000000005,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8052,
+          0.5344,
+          0.49,
+          0.1501,
+          0.25620000000000004,
+          0.13
+        ],
+        "material": "fabric",
+        "role": "seat",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.9477,
+          0.5344,
+          0.55,
+          0.0247,
+          0.25620000000000004,
+          0.45
+        ],
+        "material": "fabric",
+        "role": "back",
+        "type": "bevel"
+      }
+    ],
+    "dining-6": [
+      {
+        "bounds": [
+          0.29,
+          0.206,
+          0.0,
+          0.035,
+          0.049,
+          0.6942
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.29,
+          0.7449999999999999,
+          0.0,
+          0.035,
+          0.049,
+          0.6942
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.6749999999999999,
+          0.206,
+          0.0,
+          0.035,
+          0.049,
+          0.6942
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.6749999999999999,
+          0.7449999999999999,
+          0.0,
+          0.035,
+          0.049,
+          0.6942
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.25,
+          0.15,
+          0.6864,
+          0.5,
+          0.7,
+          0.0936
+        ],
+        "material": "wood",
+        "role": "top",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.0485,
+          0.3214166666666667,
+          0,
+          0.0152,
+          0.015333333333333334,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.1701,
+          0.3214166666666667,
+          0,
+          0.0152,
+          0.015333333333333334,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.0485,
+          0.19491666666666668,
+          0,
+          0.0152,
+          0.015333333333333334,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.1701,
+          0.19491666666666668,
+          0,
+          0.0152,
+          0.015333333333333334,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.044700000000000004,
+          0.18533333333333335,
+          0.49,
+          0.1501,
+          0.161,
+          0.13
+        ],
+        "material": "fabric",
+        "role": "seat",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.0276,
+          0.18533333333333335,
+          0.55,
+          0.0247,
+          0.161,
+          0.45
+        ],
+        "material": "fabric",
+        "role": "back",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.9363,
+          0.19491666666666668,
+          0,
+          0.0152,
+          0.015333333333333334,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8147,
+          0.19491666666666668,
+          0,
+          0.0152,
+          0.015333333333333334,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.9363,
+          0.3214166666666667,
+          0,
+          0.0152,
+          0.015333333333333334,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8147,
+          0.3214166666666667,
+          0,
+          0.0152,
+          0.015333333333333334,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8052,
+          0.18533333333333335,
+          0.49,
+          0.1501,
+          0.161,
+          0.13
+        ],
+        "material": "fabric",
+        "role": "seat",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.9477,
+          0.18533333333333335,
+          0.55,
+          0.0247,
+          0.161,
+          0.45
+        ],
+        "material": "fabric",
+        "role": "back",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.0485,
+          0.5480833333333334,
+          0,
+          0.0152,
+          0.015333333333333334,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.1701,
+          0.5480833333333334,
+          0,
+          0.0152,
+          0.015333333333333334,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.0485,
+          0.42158333333333337,
+          0,
+          0.0152,
+          0.015333333333333334,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.1701,
+          0.42158333333333337,
+          0,
+          0.0152,
+          0.015333333333333334,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.044700000000000004,
+          0.4120000000000001,
+          0.49,
+          0.1501,
+          0.161,
+          0.13
+        ],
+        "material": "fabric",
+        "role": "seat",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.0276,
+          0.4120000000000001,
+          0.55,
+          0.0247,
+          0.161,
+          0.45
+        ],
+        "material": "fabric",
+        "role": "back",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.9363,
+          0.4215833333333334,
+          0,
+          0.0152,
+          0.015333333333333334,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8147,
+          0.4215833333333334,
+          0,
+          0.0152,
+          0.015333333333333334,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.9363,
+          0.5480833333333334,
+          0,
+          0.0152,
+          0.015333333333333334,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8147,
+          0.5480833333333334,
+          0,
+          0.0152,
+          0.015333333333333334,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8052,
+          0.41200000000000003,
+          0.49,
+          0.1501,
+          0.161,
+          0.13
+        ],
+        "material": "fabric",
+        "role": "seat",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.9477,
+          0.41200000000000003,
+          0.55,
+          0.0247,
+          0.161,
+          0.45
+        ],
+        "material": "fabric",
+        "role": "back",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.0485,
+          0.77475,
+          0,
+          0.0152,
+          0.015333333333333334,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.1701,
+          0.77475,
+          0,
+          0.0152,
+          0.015333333333333334,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.0485,
+          0.6482500000000001,
+          0,
+          0.0152,
+          0.015333333333333334,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.1701,
+          0.6482500000000001,
+          0,
+          0.0152,
+          0.015333333333333334,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.044700000000000004,
+          0.6386666666666667,
+          0.49,
+          0.1501,
+          0.161,
+          0.13
+        ],
+        "material": "fabric",
+        "role": "seat",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.0276,
+          0.6386666666666667,
+          0.55,
+          0.0247,
+          0.161,
+          0.45
+        ],
+        "material": "fabric",
+        "role": "back",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.9363,
+          0.6482500000000001,
+          0,
+          0.0152,
+          0.015333333333333334,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8147,
+          0.6482500000000001,
+          0,
+          0.0152,
+          0.015333333333333334,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.9363,
+          0.77475,
+          0,
+          0.0152,
+          0.015333333333333334,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8147,
+          0.77475,
+          0,
+          0.0152,
+          0.015333333333333334,
+          0.51
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8052,
+          0.6386666666666667,
+          0.49,
+          0.1501,
+          0.161,
+          0.13
+        ],
+        "material": "fabric",
+        "role": "seat",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.9477,
+          0.6386666666666667,
+          0.55,
+          0.0247,
+          0.161,
+          0.45
+        ],
+        "material": "fabric",
+        "role": "back",
+        "type": "bevel"
+      }
+    ],
+    "nightstand": [
+      {
+        "bounds": [
+          0.02,
+          0.03,
+          0.05,
+          0.96,
+          0.91,
+          0.89
+        ],
+        "material": "wood",
+        "role": "body",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0,
+          0,
+          0.94,
+          1,
+          1,
+          0.06
+        ],
+        "material": "wood",
+        "role": "top",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.03,
+          0.94,
+          0.12,
+          0.46,
+          0.03,
+          0.76
+        ],
+        "material": "panel",
+        "role": "door",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.51,
+          0.94,
+          0.12,
+          0.46,
+          0.03,
+          0.76
+        ],
+        "material": "panel",
+        "role": "door",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.45,
+          0.97,
+          0.48,
+          0.025,
+          0.03,
+          0.18
+        ],
+        "material": "metal",
+        "role": "handle",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.525,
+          0.97,
+          0.48,
+          0.025,
+          0.03,
+          0.18
+        ],
+        "material": "metal",
+        "role": "handle",
+        "type": "box"
+      }
+    ],
+    "wardrobe": [
+      {
+        "bounds": [
+          0.02,
+          0.03,
+          0.05,
+          0.96,
+          0.91,
+          0.89
+        ],
+        "material": "wood",
+        "role": "body",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0,
+          0,
+          0.94,
+          1,
+          1,
+          0.06
+        ],
+        "material": "wood",
+        "role": "top",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.03,
+          0.94,
+          0.12,
+          0.46,
+          0.03,
+          0.76
+        ],
+        "material": "panel",
+        "role": "door",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.51,
+          0.94,
+          0.12,
+          0.46,
+          0.03,
+          0.76
+        ],
+        "material": "panel",
+        "role": "door",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.45,
+          0.97,
+          0.48,
+          0.025,
+          0.03,
+          0.18
+        ],
+        "material": "metal",
+        "role": "handle",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.525,
+          0.97,
+          0.48,
+          0.025,
+          0.03,
+          0.18
+        ],
+        "material": "metal",
+        "role": "handle",
+        "type": "box"
+      }
+    ],
+    "tv-unit": [
+      {
+        "bounds": [
+          0.02,
+          0.03,
+          0.05,
+          0.96,
+          0.91,
+          0.89
+        ],
+        "material": "wood",
+        "role": "body",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0,
+          0,
+          0.94,
+          1,
+          1,
+          0.06
+        ],
+        "material": "wood",
+        "role": "top",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.03,
+          0.94,
+          0.12,
+          0.46,
+          0.03,
+          0.76
+        ],
+        "material": "panel",
+        "role": "door",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.51,
+          0.94,
+          0.12,
+          0.46,
+          0.03,
+          0.76
+        ],
+        "material": "panel",
+        "role": "door",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.45,
+          0.97,
+          0.48,
+          0.025,
+          0.03,
+          0.18
+        ],
+        "material": "metal",
+        "role": "handle",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.525,
+          0.97,
+          0.48,
+          0.025,
+          0.03,
+          0.18
+        ],
+        "material": "metal",
+        "role": "handle",
+        "type": "box"
+      }
+    ],
+    "kitchen-counter": [
+      {
+        "bounds": [
+          0.02,
+          0.03,
+          0.05,
+          0.96,
+          0.91,
+          0.89
+        ],
+        "material": "wood",
+        "role": "body",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0,
+          0,
+          0.94,
+          1,
+          1,
+          0.06
+        ],
+        "material": "wood",
+        "role": "top",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.03,
+          0.94,
+          0.12,
+          0.46,
+          0.03,
+          0.76
+        ],
+        "material": "panel",
+        "role": "door",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.51,
+          0.94,
+          0.12,
+          0.46,
+          0.03,
+          0.76
+        ],
+        "material": "panel",
+        "role": "door",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.45,
+          0.97,
+          0.48,
+          0.025,
+          0.03,
+          0.18
+        ],
+        "material": "metal",
+        "role": "handle",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.525,
+          0.97,
+          0.48,
+          0.025,
+          0.03,
+          0.18
+        ],
+        "material": "metal",
+        "role": "handle",
+        "type": "box"
+      }
+    ],
+    "kitchen-island": [
+      {
+        "bounds": [
+          0.02,
+          0.03,
+          0.05,
+          0.96,
+          0.91,
+          0.89
+        ],
+        "material": "wood",
+        "role": "body",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0,
+          0,
+          0.94,
+          1,
+          1,
+          0.06
+        ],
+        "material": "wood",
+        "role": "top",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.03,
+          0.94,
+          0.12,
+          0.46,
+          0.03,
+          0.76
+        ],
+        "material": "panel",
+        "role": "door",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.51,
+          0.94,
+          0.12,
+          0.46,
+          0.03,
+          0.76
+        ],
+        "material": "panel",
+        "role": "door",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.45,
+          0.97,
+          0.48,
+          0.025,
+          0.03,
+          0.18
+        ],
+        "material": "metal",
+        "role": "handle",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.525,
+          0.97,
+          0.48,
+          0.025,
+          0.03,
+          0.18
+        ],
+        "material": "metal",
+        "role": "handle",
+        "type": "box"
+      }
+    ],
+    "storage": [
+      {
+        "bounds": [
+          0.02,
+          0.03,
+          0.05,
+          0.96,
+          0.91,
+          0.89
+        ],
+        "material": "wood",
+        "role": "body",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0,
+          0,
+          0.94,
+          1,
+          1,
+          0.06
+        ],
+        "material": "wood",
+        "role": "top",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.03,
+          0.94,
+          0.12,
+          0.46,
+          0.03,
+          0.76
+        ],
+        "material": "panel",
+        "role": "door",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.51,
+          0.94,
+          0.12,
+          0.46,
+          0.03,
+          0.76
+        ],
+        "material": "panel",
+        "role": "door",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.45,
+          0.97,
+          0.48,
+          0.025,
+          0.03,
+          0.18
+        ],
+        "material": "metal",
+        "role": "handle",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.525,
+          0.97,
+          0.48,
+          0.025,
+          0.03,
+          0.18
+        ],
+        "material": "metal",
+        "role": "handle",
+        "type": "box"
+      }
+    ],
+    "bookcase": [
+      {
+        "bounds": [
+          0,
+          0,
+          0,
+          0.07,
+          1,
+          1
+        ],
+        "material": "wood",
+        "role": "body",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.93,
+          0,
+          0,
+          0.07,
+          1,
+          1
+        ],
+        "material": "wood",
+        "role": "body",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.07,
+          0,
+          0,
+          0.86,
+          0.07,
+          1
+        ],
+        "material": "panel",
+        "role": "back",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0,
+          0,
+          0,
+          1,
+          1,
+          0.045
+        ],
+        "material": "wood",
+        "role": "shelf",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0,
+          0,
+          0.24,
+          1,
+          1,
+          0.045
+        ],
+        "material": "wood",
+        "role": "shelf",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0,
+          0,
+          0.48,
+          1,
+          1,
+          0.045
+        ],
+        "material": "wood",
+        "role": "shelf",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0,
+          0,
+          0.72,
+          1,
+          1,
+          0.045
+        ],
+        "material": "wood",
+        "role": "shelf",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0,
+          0,
+          0.955,
+          1,
+          1,
+          0.045
+        ],
+        "material": "wood",
+        "role": "shelf",
+        "type": "box"
+      }
+    ],
+    "bed-single": [
+      {
+        "bounds": [
+          0.08,
+          0.08,
+          0,
+          0.07,
+          0.07,
+          0.16
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.08,
+          0.8499999999999999,
+          0,
+          0.07,
+          0.07,
+          0.16
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8499999999999999,
+          0.08,
+          0,
+          0.07,
+          0.07,
+          0.16
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8499999999999999,
+          0.8499999999999999,
+          0,
+          0.07,
+          0.07,
+          0.16
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.03,
+          0.06,
+          0.15,
+          0.94,
+          0.94,
+          0.22
+        ],
+        "material": "wood",
+        "role": "frame",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.04,
+          0.07,
+          0.37,
+          0.92,
+          0.92,
+          0.29
+        ],
+        "material": "fabric",
+        "role": "mattress",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0,
+          0,
+          0,
+          1,
+          0.06,
+          1
+        ],
+        "material": "wood",
+        "role": "headboard",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.04,
+          0.41,
+          0.66,
+          0.92,
+          0.57,
+          0.09
+        ],
+        "material": "blanket",
+        "role": "cover",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.09,
+          0.1,
+          0.66,
+          0.7999999999999999,
+          0.23,
+          0.12
+        ],
+        "material": "pillow",
+        "role": "pillow",
+        "type": "bevel"
+      }
+    ],
+    "bed-double": [
+      {
+        "bounds": [
+          0.08,
+          0.08,
+          0,
+          0.07,
+          0.07,
+          0.16
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.08,
+          0.8499999999999999,
+          0,
+          0.07,
+          0.07,
+          0.16
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8499999999999999,
+          0.08,
+          0,
+          0.07,
+          0.07,
+          0.16
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8499999999999999,
+          0.8499999999999999,
+          0,
+          0.07,
+          0.07,
+          0.16
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.03,
+          0.06,
+          0.15,
+          0.94,
+          0.94,
+          0.22
+        ],
+        "material": "wood",
+        "role": "frame",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.04,
+          0.07,
+          0.37,
+          0.92,
+          0.92,
+          0.29
+        ],
+        "material": "fabric",
+        "role": "mattress",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0,
+          0,
+          0,
+          1,
+          0.06,
+          1
+        ],
+        "material": "wood",
+        "role": "headboard",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.04,
+          0.41,
+          0.66,
+          0.92,
+          0.57,
+          0.09
+        ],
+        "material": "blanket",
+        "role": "cover",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.09,
+          0.1,
+          0.66,
+          0.38,
+          0.23,
+          0.12
+        ],
+        "material": "pillow",
+        "role": "pillow",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.51,
+          0.1,
+          0.66,
+          0.38,
+          0.23,
+          0.12
+        ],
+        "material": "pillow",
+        "role": "pillow",
+        "type": "bevel"
+      }
+    ],
+    "bed-queen": [
+      {
+        "bounds": [
+          0.08,
+          0.08,
+          0,
+          0.07,
+          0.07,
+          0.16
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.08,
+          0.8499999999999999,
+          0,
+          0.07,
+          0.07,
+          0.16
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8499999999999999,
+          0.08,
+          0,
+          0.07,
+          0.07,
+          0.16
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8499999999999999,
+          0.8499999999999999,
+          0,
+          0.07,
+          0.07,
+          0.16
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.03,
+          0.06,
+          0.15,
+          0.94,
+          0.94,
+          0.22
+        ],
+        "material": "wood",
+        "role": "frame",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.04,
+          0.07,
+          0.37,
+          0.92,
+          0.92,
+          0.29
+        ],
+        "material": "fabric",
+        "role": "mattress",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0,
+          0,
+          0,
+          1,
+          0.06,
+          1
+        ],
+        "material": "wood",
+        "role": "headboard",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.04,
+          0.41,
+          0.66,
+          0.92,
+          0.57,
+          0.09
+        ],
+        "material": "blanket",
+        "role": "cover",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.09,
+          0.1,
+          0.66,
+          0.38,
+          0.23,
+          0.12
+        ],
+        "material": "pillow",
+        "role": "pillow",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.51,
+          0.1,
+          0.66,
+          0.38,
+          0.23,
+          0.12
+        ],
+        "material": "pillow",
+        "role": "pillow",
+        "type": "bevel"
+      }
+    ],
+    "bed-king": [
+      {
+        "bounds": [
+          0.08,
+          0.08,
+          0,
+          0.07,
+          0.07,
+          0.16
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.08,
+          0.8499999999999999,
+          0,
+          0.07,
+          0.07,
+          0.16
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8499999999999999,
+          0.08,
+          0,
+          0.07,
+          0.07,
+          0.16
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8499999999999999,
+          0.8499999999999999,
+          0,
+          0.07,
+          0.07,
+          0.16
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.03,
+          0.06,
+          0.15,
+          0.94,
+          0.94,
+          0.22
+        ],
+        "material": "wood",
+        "role": "frame",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.04,
+          0.07,
+          0.37,
+          0.92,
+          0.92,
+          0.29
+        ],
+        "material": "fabric",
+        "role": "mattress",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0,
+          0,
+          0,
+          1,
+          0.06,
+          1
+        ],
+        "material": "wood",
+        "role": "headboard",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.04,
+          0.41,
+          0.66,
+          0.92,
+          0.57,
+          0.09
+        ],
+        "material": "blanket",
+        "role": "cover",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.09,
+          0.1,
+          0.66,
+          0.38,
+          0.23,
+          0.12
+        ],
+        "material": "pillow",
+        "role": "pillow",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.51,
+          0.1,
+          0.66,
+          0.38,
+          0.23,
+          0.12
+        ],
+        "material": "pillow",
+        "role": "pillow",
+        "type": "bevel"
+      }
+    ],
+    "bed": [
+      {
+        "bounds": [
+          0.08,
+          0.08,
+          0,
+          0.07,
+          0.07,
+          0.16
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.08,
+          0.8499999999999999,
+          0,
+          0.07,
+          0.07,
+          0.16
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8499999999999999,
+          0.08,
+          0,
+          0.07,
+          0.07,
+          0.16
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.8499999999999999,
+          0.8499999999999999,
+          0,
+          0.07,
+          0.07,
+          0.16
+        ],
+        "material": "wood",
+        "role": "leg",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.03,
+          0.06,
+          0.15,
+          0.94,
+          0.94,
+          0.22
+        ],
+        "material": "wood",
+        "role": "frame",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.04,
+          0.07,
+          0.37,
+          0.92,
+          0.92,
+          0.29
+        ],
+        "material": "fabric",
+        "role": "mattress",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0,
+          0,
+          0,
+          1,
+          0.06,
+          1
+        ],
+        "material": "wood",
+        "role": "headboard",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.04,
+          0.41,
+          0.66,
+          0.92,
+          0.57,
+          0.09
+        ],
+        "material": "blanket",
+        "role": "cover",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.09,
+          0.1,
+          0.66,
+          0.38,
+          0.23,
+          0.12
+        ],
+        "material": "pillow",
+        "role": "pillow",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.51,
+          0.1,
+          0.66,
+          0.38,
+          0.23,
+          0.12
+        ],
+        "material": "pillow",
+        "role": "pillow",
+        "type": "bevel"
+      }
+    ],
+    "comforter": [
+      {
+        "bounds": [
+          0.01,
+          0.01,
+          0,
+          0.98,
+          0.98,
+          0.75
+        ],
+        "material": "blanket",
+        "role": "cover",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.01,
+          0.08,
+          0.75,
+          0.98,
+          0.14,
+          0.25
+        ],
+        "material": "fabric",
+        "role": "fold",
+        "type": "bevel"
+      }
+    ],
+    "refrigerator": [
+      {
+        "bounds": [
+          0.03,
+          0.03,
+          0,
+          0.94,
+          0.89,
+          1
+        ],
+        "material": "appliance",
+        "role": "body",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.04,
+          0.92,
+          0.02,
+          0.92,
+          0.04,
+          0.65
+        ],
+        "material": "panel",
+        "role": "door",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.04,
+          0.92,
+          0.69,
+          0.92,
+          0.04,
+          0.3
+        ],
+        "material": "panel",
+        "role": "door",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.87,
+          0.96,
+          0.35,
+          0.03,
+          0.04,
+          0.2
+        ],
+        "material": "metal",
+        "role": "handle",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.87,
+          0.96,
+          0.76,
+          0.03,
+          0.04,
+          0.13
+        ],
+        "material": "metal",
+        "role": "handle",
+        "type": "box"
+      }
+    ],
+    "dishwasher": [
+      {
+        "bounds": [
+          0,
+          0,
+          0,
+          1,
+          0.94,
+          1
+        ],
+        "material": "appliance",
+        "role": "body",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.05,
+          0.94,
+          0.05,
+          0.9,
+          0.035,
+          0.77
+        ],
+        "material": "panel",
+        "role": "door",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.06,
+          0.94,
+          0.87,
+          0.88,
+          0.025,
+          0.09
+        ],
+        "material": "dark",
+        "role": "controls",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.33,
+          0.975,
+          0.78,
+          0.34,
+          0.025,
+          0.025
+        ],
+        "material": "metal",
+        "role": "handle",
+        "type": "box"
+      }
+    ],
+    "washer": [
+      {
+        "bounds": [
+          0,
+          0,
+          0,
+          1,
+          0.94,
+          1
+        ],
+        "material": "appliance",
+        "role": "body",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.05,
+          0.94,
+          0.05,
+          0.9,
+          0.035,
+          0.77
+        ],
+        "material": "panel",
+        "role": "door",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.06,
+          0.94,
+          0.87,
+          0.88,
+          0.025,
+          0.09
+        ],
+        "material": "dark",
+        "role": "controls",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.2,
+          0.975,
+          0.18,
+          0.6,
+          0.025,
+          0.6
+        ],
+        "material": "metal",
+        "role": "drum",
+        "type": "cylinder",
+        "axis": "y"
+      },
+      {
+        "bounds": [
+          0.26,
+          0.995,
+          0.24,
+          0.48,
+          0.005,
+          0.48
+        ],
+        "material": "dark",
+        "role": "drum-glass",
+        "type": "cylinder",
+        "axis": "y"
+      }
+    ],
+    "cooker": [
+      {
+        "bounds": [
+          0,
+          0,
+          0,
+          1,
+          0.94,
+          1
+        ],
+        "material": "appliance",
+        "role": "body",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.05,
+          0.94,
+          0.05,
+          0.9,
+          0.035,
+          0.77
+        ],
+        "material": "panel",
+        "role": "door",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.06,
+          0.94,
+          0.87,
+          0.88,
+          0.025,
+          0.09
+        ],
+        "material": "dark",
+        "role": "controls",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.14,
+          0.14,
+          0.99,
+          0.23,
+          0.23,
+          0.01
+        ],
+        "material": "dark",
+        "role": "burner",
+        "type": "cylinder"
+      },
+      {
+        "bounds": [
+          0.14,
+          0.63,
+          0.99,
+          0.23,
+          0.23,
+          0.01
+        ],
+        "material": "dark",
+        "role": "burner",
+        "type": "cylinder"
+      },
+      {
+        "bounds": [
+          0.63,
+          0.14,
+          0.99,
+          0.23,
+          0.23,
+          0.01
+        ],
+        "material": "dark",
+        "role": "burner",
+        "type": "cylinder"
+      },
+      {
+        "bounds": [
+          0.63,
+          0.63,
+          0.99,
+          0.23,
+          0.23,
+          0.01
+        ],
+        "material": "dark",
+        "role": "burner",
+        "type": "cylinder"
+      }
+    ],
+    "appliance": [
+      {
+        "bounds": [
+          0,
+          0,
+          0,
+          1,
+          0.94,
+          1
+        ],
+        "material": "appliance",
+        "role": "body",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.05,
+          0.94,
+          0.05,
+          0.9,
+          0.035,
+          0.77
+        ],
+        "material": "panel",
+        "role": "door",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.06,
+          0.94,
+          0.87,
+          0.88,
+          0.025,
+          0.09
+        ],
+        "material": "dark",
+        "role": "controls",
+        "type": "box"
+      }
+    ],
+    "kitchen-sink": [
+      {
+        "bounds": [
+          0.02,
+          0.03,
+          0.05,
+          0.96,
+          0.91,
+          0.89
+        ],
+        "material": "wood",
+        "role": "body",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0,
+          0,
+          0.94,
+          1,
+          1,
+          0.06
+        ],
+        "material": "wood",
+        "role": "top",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.03,
+          0.94,
+          0.12,
+          0.46,
+          0.03,
+          0.76
+        ],
+        "material": "panel",
+        "role": "door",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.51,
+          0.94,
+          0.12,
+          0.46,
+          0.03,
+          0.76
+        ],
+        "material": "panel",
+        "role": "door",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.45,
+          0.97,
+          0.48,
+          0.025,
+          0.03,
+          0.18
+        ],
+        "material": "metal",
+        "role": "handle",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.525,
+          0.97,
+          0.48,
+          0.025,
+          0.03,
+          0.18
+        ],
+        "material": "metal",
+        "role": "handle",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.13,
+          0.14,
+          0.995,
+          0.74,
+          0.63,
+          0.005
+        ],
+        "material": "metal",
+        "role": "sink",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.2,
+          0.21,
+          0.997,
+          0.6,
+          0.49,
+          0.003
+        ],
+        "material": "dark",
+        "role": "basin",
+        "type": "box"
+      }
+    ],
+    "basin": [
+      {
+        "bounds": [
+          0.42,
+          0.28,
+          0,
+          0.16,
+          0.36,
+          0.72
+        ],
+        "material": "ceramic",
+        "role": "pedestal",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.06,
+          0.06,
+          0.72,
+          0.88,
+          0.88,
+          0.12
+        ],
+        "material": "ceramic",
+        "role": "bowl",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.06,
+          0.06,
+          0.84,
+          0.12,
+          0.88,
+          0.16
+        ],
+        "material": "ceramic",
+        "role": "rim",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.82,
+          0.06,
+          0.84,
+          0.12,
+          0.88,
+          0.16
+        ],
+        "material": "ceramic",
+        "role": "rim",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.18,
+          0.06,
+          0.84,
+          0.64,
+          0.12,
+          0.16
+        ],
+        "material": "ceramic",
+        "role": "rim",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.18,
+          0.82,
+          0.84,
+          0.64,
+          0.12,
+          0.16
+        ],
+        "material": "ceramic",
+        "role": "rim",
+        "type": "box"
+      }
+    ],
+    "toilet": [
+      {
+        "bounds": [
+          0.08,
+          0.02,
+          0,
+          0.84,
+          0.25,
+          1
+        ],
+        "material": "ceramic",
+        "role": "tank",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.3,
+          0.34,
+          0,
+          0.4,
+          0.48,
+          0.45
+        ],
+        "material": "ceramic",
+        "role": "pedestal",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.1,
+          0.28,
+          0.45,
+          0.8,
+          0.69,
+          0.25
+        ],
+        "material": "ceramic",
+        "role": "bowl",
+        "type": "cylinder"
+      },
+      {
+        "bounds": [
+          0.2,
+          0.4,
+          0.7,
+          0.6,
+          0.46,
+          0.02
+        ],
+        "material": "dark",
+        "role": "bowl-opening",
+        "type": "cylinder"
+      }
+    ],
+    "bathtub": [
+      {
+        "bounds": [
+          0.02,
+          0.02,
+          0,
+          0.96,
+          0.96,
+          0.18
+        ],
+        "material": "ceramic",
+        "role": "base",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0,
+          0,
+          0.18,
+          0.13,
+          1,
+          0.82
+        ],
+        "material": "ceramic",
+        "role": "rim",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.87,
+          0,
+          0.18,
+          0.13,
+          1,
+          0.82
+        ],
+        "material": "ceramic",
+        "role": "rim",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.13,
+          0,
+          0.18,
+          0.74,
+          0.1,
+          0.82
+        ],
+        "material": "ceramic",
+        "role": "rim",
+        "type": "bevel"
+      },
+      {
+        "bounds": [
+          0.13,
+          0.9,
+          0.18,
+          0.74,
+          0.1,
+          0.82
+        ],
+        "material": "ceramic",
+        "role": "rim",
+        "type": "bevel"
+      }
+    ],
+    "shower": [
+      {
+        "bounds": [
+          0,
+          0,
+          0,
+          1,
+          1,
+          0.04
+        ],
+        "material": "ceramic",
+        "role": "tray",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0,
+          0,
+          0.04,
+          0.025,
+          1,
+          0.96
+        ],
+        "material": "glass",
+        "role": "screen",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0,
+          0,
+          0.04,
+          1,
+          0.025,
+          0.96
+        ],
+        "material": "glass",
+        "role": "screen",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0,
+          0,
+          0,
+          0.025,
+          0.025,
+          1
+        ],
+        "material": "metal",
+        "role": "post",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.975,
+          0,
+          0,
+          0.025,
+          0.025,
+          1
+        ],
+        "material": "metal",
+        "role": "post",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0,
+          0.975,
+          0,
+          0.025,
+          0.025,
+          1
+        ],
+        "material": "metal",
+        "role": "post",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.43,
+          0.03,
+          0.87,
+          0.04,
+          0.14,
+          0.03
+        ],
+        "material": "metal",
+        "role": "arm",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.35,
+          0.15,
+          0.85,
+          0.2,
+          0.15,
+          0.025
+        ],
+        "material": "metal",
+        "role": "shower-head",
+        "type": "box"
+      }
+    ],
+    "plant": [
+      {
+        "bounds": [
+          0.22,
+          0.22,
+          0,
+          0.56,
+          0.56,
+          0.33
+        ],
+        "material": "terracotta",
+        "role": "pot",
+        "type": "cylinder",
+        "top_scale": 1.3
+      },
+      {
+        "bounds": [
+          0.44,
+          0.44,
+          0.3,
+          0.12,
+          0.12,
+          0.5
+        ],
+        "material": "wood",
+        "role": "stem",
+        "type": "cylinder"
+      },
+      {
+        "bounds": [
+          0.03,
+          0.03,
+          0.45,
+          0.62,
+          0.62,
+          0.5
+        ],
+        "material": "leaf",
+        "role": "foliage",
+        "type": "cylinder",
+        "top_scale": 0.18
+      },
+      {
+        "bounds": [
+          0.35,
+          0.3,
+          0.5,
+          0.62,
+          0.62,
+          0.5
+        ],
+        "material": "leaf",
+        "role": "foliage",
+        "type": "cylinder",
+        "top_scale": 0.18
+      },
+      {
+        "bounds": [
+          0.16,
+          0.27,
+          0.64,
+          0.58,
+          0.58,
+          0.36
+        ],
+        "material": "leaf",
+        "role": "foliage",
+        "type": "cylinder",
+        "top_scale": 0.18
+      }
+    ],
+    "rug": [
+      {
+        "bounds": [
+          0,
+          0,
+          0,
+          1,
+          1,
+          1
+        ],
+        "material": "blanket",
+        "role": "rug",
+        "type": "box"
+      }
+    ],
+    "pillar-square": [
+      {
+        "bounds": [
+          0,
+          0,
+          0,
+          1,
+          1,
+          1
+        ],
+        "material": "stone",
+        "role": "pillar",
+        "type": "box"
+      }
+    ],
+    "pillar-round": [
+      {
+        "bounds": [
+          0,
+          0,
+          0,
+          1,
+          1,
+          1
+        ],
+        "material": "stone",
+        "role": "pillar",
+        "type": "cylinder"
+      }
+    ],
+    "floor-lamp": [
+      {
+        "bounds": [
+          0.22,
+          0.22,
+          0,
+          0.56,
+          0.56,
+          0.04
+        ],
+        "material": "metal",
+        "role": "base",
+        "type": "cylinder"
+      },
+      {
+        "bounds": [
+          0.47,
+          0.47,
+          0.04,
+          0.06,
+          0.06,
+          0.68
+        ],
+        "material": "brass",
+        "role": "stem",
+        "type": "cylinder"
+      },
+      {
+        "bounds": [
+          0.02,
+          0.02,
+          0.68,
+          0.96,
+          0.96,
+          0.32
+        ],
+        "material": "shade",
+        "role": "shade",
+        "type": "cylinder",
+        "top_scale": 0.5
+      },
+      {
+        "bounds": [
+          0.35,
+          0.35,
+          0.69,
+          0.3,
+          0.3,
+          0.08
+        ],
+        "material": "bulb",
+        "role": "bulb",
+        "type": "cylinder"
+      }
+    ],
+    "table-lamp": [
+      {
+        "bounds": [
+          0.22,
+          0.22,
+          0,
+          0.56,
+          0.56,
+          0.04
+        ],
+        "material": "metal",
+        "role": "base",
+        "type": "cylinder"
+      },
+      {
+        "bounds": [
+          0.47,
+          0.47,
+          0.04,
+          0.06,
+          0.06,
+          0.68
+        ],
+        "material": "brass",
+        "role": "stem",
+        "type": "cylinder"
+      },
+      {
+        "bounds": [
+          0.02,
+          0.02,
+          0.68,
+          0.96,
+          0.96,
+          0.32
+        ],
+        "material": "shade",
+        "role": "shade",
+        "type": "cylinder",
+        "top_scale": 0.5
+      },
+      {
+        "bounds": [
+          0.35,
+          0.35,
+          0.69,
+          0.3,
+          0.3,
+          0.08
+        ],
+        "material": "bulb",
+        "role": "bulb",
+        "type": "cylinder"
+      }
+    ],
+    "pendant-light": [
+      {
+        "bounds": [
+          0.35,
+          0.35,
+          0.95,
+          0.3,
+          0.3,
+          0.05
+        ],
+        "material": "brass",
+        "role": "canopy",
+        "type": "cylinder"
+      },
+      {
+        "bounds": [
+          0.48,
+          0.48,
+          0.3,
+          0.04,
+          0.04,
+          0.65
+        ],
+        "material": "metal",
+        "role": "cord",
+        "type": "cylinder"
+      },
+      {
+        "bounds": [
+          0.02,
+          0.02,
+          0,
+          0.96,
+          0.96,
+          0.3
+        ],
+        "material": "shade",
+        "role": "shade",
+        "type": "cylinder",
+        "top_scale": 0.2
+      },
+      {
+        "bounds": [
+          0.32,
+          0.32,
+          0,
+          0.36,
+          0.36,
+          0.04
+        ],
+        "material": "bulb",
+        "role": "diffuser",
+        "type": "cylinder"
+      }
+    ],
+    "ceiling-light": [
+      {
+        "bounds": [
+          0.02,
+          0.02,
+          0.65,
+          0.96,
+          0.96,
+          0.35
+        ],
+        "material": "brass",
+        "role": "canopy",
+        "type": "cylinder"
+      },
+      {
+        "bounds": [
+          0.06,
+          0.06,
+          0,
+          0.88,
+          0.88,
+          0.65
+        ],
+        "material": "bulb",
+        "role": "diffuser",
+        "type": "cylinder"
+      }
+    ],
+    "wall-light": [
+      {
+        "bounds": [
+          0.3,
+          0,
+          0.05,
+          0.4,
+          0.12,
+          0.9
+        ],
+        "material": "brass",
+        "role": "mount",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.46,
+          0.1,
+          0.2,
+          0.08,
+          0.48,
+          0.1
+        ],
+        "material": "brass",
+        "role": "arm",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.05,
+          0.15,
+          0.3,
+          0.9,
+          0.82,
+          0.65
+        ],
+        "material": "shade",
+        "role": "shade",
+        "type": "cylinder",
+        "top_scale": 0.6
+      },
+      {
+        "bounds": [
+          0.36,
+          0.45,
+          0.2,
+          0.28,
+          0.28,
+          0.15
+        ],
+        "material": "bulb",
+        "role": "bulb",
+        "type": "cylinder"
+      }
+    ],
+    "chandelier": [
+      {
+        "bounds": [
+          0.43,
+          0.43,
+          0.94,
+          0.14,
+          0.14,
+          0.06
+        ],
+        "material": "brass",
+        "role": "canopy",
+        "type": "cylinder"
+      },
+      {
+        "bounds": [
+          0.485,
+          0.485,
+          0.12,
+          0.03,
+          0.03,
+          0.82
+        ],
+        "material": "brass",
+        "role": "stem",
+        "type": "cylinder"
+      },
+      {
+        "bounds": [
+          0.17,
+          0.17,
+          0.12,
+          0.66,
+          0.66,
+          0.04
+        ],
+        "material": "brass",
+        "role": "ring",
+        "type": "cylinder"
+      },
+      {
+        "bounds": [
+          0.8150000000000001,
+          0.475,
+          0.13,
+          0.05,
+          0.05,
+          0.16
+        ],
+        "material": "brass",
+        "role": "arm",
+        "type": "cylinder"
+      },
+      {
+        "bounds": [
+          0.7300000000000001,
+          0.39,
+          0.29,
+          0.22,
+          0.22,
+          0.23
+        ],
+        "material": "shade",
+        "role": "shade",
+        "type": "cylinder",
+        "top_scale": 0.55
+      },
+      {
+        "bounds": [
+          0.645,
+          0.7694486372867092,
+          0.13,
+          0.05,
+          0.05,
+          0.16
+        ],
+        "material": "brass",
+        "role": "arm",
+        "type": "cylinder"
+      },
+      {
+        "bounds": [
+          0.56,
+          0.6844486372867092,
+          0.29,
+          0.22,
+          0.22,
+          0.23
+        ],
+        "material": "shade",
+        "role": "shade",
+        "type": "cylinder",
+        "top_scale": 0.55
+      },
+      {
+        "bounds": [
+          0.30500000000000005,
+          0.7694486372867092,
+          0.13,
+          0.05,
+          0.05,
+          0.16
+        ],
+        "material": "brass",
+        "role": "arm",
+        "type": "cylinder"
+      },
+      {
+        "bounds": [
+          0.22000000000000008,
+          0.6844486372867092,
+          0.29,
+          0.22,
+          0.22,
+          0.23
+        ],
+        "material": "shade",
+        "role": "shade",
+        "type": "cylinder",
+        "top_scale": 0.55
+      },
+      {
+        "bounds": [
+          0.13499999999999998,
+          0.475,
+          0.13,
+          0.05,
+          0.05,
+          0.16
+        ],
+        "material": "brass",
+        "role": "arm",
+        "type": "cylinder"
+      },
+      {
+        "bounds": [
+          0.049999999999999975,
+          0.39,
+          0.29,
+          0.22,
+          0.22,
+          0.23
+        ],
+        "material": "shade",
+        "role": "shade",
+        "type": "cylinder",
+        "top_scale": 0.55
+      },
+      {
+        "bounds": [
+          0.3049999999999998,
+          0.1805513627132909,
+          0.13,
+          0.05,
+          0.05,
+          0.16
+        ],
+        "material": "brass",
+        "role": "arm",
+        "type": "cylinder"
+      },
+      {
+        "bounds": [
+          0.21999999999999986,
+          0.09555136271329089,
+          0.29,
+          0.22,
+          0.22,
+          0.23
+        ],
+        "material": "shade",
+        "role": "shade",
+        "type": "cylinder",
+        "top_scale": 0.55
+      },
+      {
+        "bounds": [
+          0.645,
+          0.18055136271329084,
+          0.13,
+          0.05,
+          0.05,
+          0.16
+        ],
+        "material": "brass",
+        "role": "arm",
+        "type": "cylinder"
+      },
+      {
+        "bounds": [
+          0.56,
+          0.09555136271329083,
+          0.29,
+          0.22,
+          0.22,
+          0.23
+        ],
+        "material": "shade",
+        "role": "shade",
+        "type": "cylinder",
+        "top_scale": 0.55
+      }
+    ],
+    "painting-landscape": [
+      {
+        "bounds": [
+          0,
+          0,
+          0,
+          1,
+          0.6,
+          1
+        ],
+        "material": "wood",
+        "role": "frame",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.045,
+          0.6,
+          0.06,
+          0.91,
+          0.2,
+          0.88
+        ],
+        "material": "canvas",
+        "role": "canvas",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.08,
+          0.8,
+          0.1,
+          0.84,
+          0.2,
+          0.31
+        ],
+        "material": "art",
+        "role": "landscape",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.65,
+          0.8,
+          0.64,
+          0.15,
+          0.2,
+          0.18
+        ],
+        "material": "sun",
+        "role": "sun",
+        "type": "cylinder",
+        "axis": "y"
+      }
+    ],
+    "painting-portrait": [
+      {
+        "bounds": [
+          0,
+          0,
+          0,
+          1,
+          0.6,
+          1
+        ],
+        "material": "wood",
+        "role": "frame",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.045,
+          0.6,
+          0.06,
+          0.91,
+          0.2,
+          0.88
+        ],
+        "material": "canvas",
+        "role": "canvas",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.08,
+          0.8,
+          0.1,
+          0.84,
+          0.2,
+          0.31
+        ],
+        "material": "art",
+        "role": "landscape",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.65,
+          0.8,
+          0.64,
+          0.15,
+          0.2,
+          0.18
+        ],
+        "material": "sun",
+        "role": "sun",
+        "type": "cylinder",
+        "axis": "y"
+      }
+    ],
+    "painting-square": [
+      {
+        "bounds": [
+          0,
+          0,
+          0,
+          1,
+          0.6,
+          1
+        ],
+        "material": "wood",
+        "role": "frame",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.045,
+          0.6,
+          0.06,
+          0.91,
+          0.2,
+          0.88
+        ],
+        "material": "canvas",
+        "role": "canvas",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.08,
+          0.8,
+          0.1,
+          0.84,
+          0.2,
+          0.31
+        ],
+        "material": "art",
+        "role": "landscape",
+        "type": "box"
+      },
+      {
+        "bounds": [
+          0.65,
+          0.8,
+          0.64,
+          0.15,
+          0.2,
+          0.18
+        ],
+        "material": "sun",
+        "role": "sun",
+        "type": "cylinder",
+        "axis": "y"
+      }
+    ],
+    "unknown": [
+      {
+        "bounds": [
+          0,
+          0,
+          0,
+          1,
+          1,
+          1
+        ],
+        "material": "panel",
+        "role": "body",
+        "type": "box"
+      }
+    ]
+  }
+}

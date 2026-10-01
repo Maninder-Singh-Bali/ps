@@ -1,0 +1,273 @@
+{
+  "1": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "flux-2-klein-4b-fp8.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "2": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen_3_4b.safetensors",
+      "type": "flux2",
+      "device": "default"
+    }
+  },
+  "3": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "flux2-vae.safetensors"
+    }
+  },
+  "4": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "VillaQwenNative1080/living-target.png"
+    }
+  },
+  "5": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "VillaQwenNative1080/walnut-cream-sofa-reference.png"
+    }
+  },
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": [
+        "2",
+        0
+      ],
+      "text": "Edit image 1. Replace only its terracotta sofa on the left with the exact sofa design shown in image 2, adapted to image 1's existing perspective and floor position. Image 2 is a furniture product reference only: do not import its pool, garden, fireplace, windows or room.\nThe new sofa has a sculptural continuous dark walnut frame, large open oval loop arms, a curved wooden back rail, a broad low wooden base, cream plain upholstered seat and back cushions, and green botanical and beige accent pillows. Preserve these distinctive construction details. Remove the previous sofa's terracotta upholstery, brass badge, slim brass base and legs completely. Place the new sofa within the same living-room seating footprint along the left wall, facing inward toward the unchanged marble coffee table. Match its realistic scale, perspective, sunlight and contact shadows to the room.\nKeep the camera viewpoint, field of view, architecture, wall painting, fireplace, stairs, ceiling vents, kitchen, dining area, marble floor design, rug, marble-and-walnut coffee table and flowers, floral ring chair, curtains, glass sliders, courtyard and tree exactly as in image 1. No people. Preserve photographic fine material detail with natural wood grain and plain fabric weave, soft highlight rolloff, no embossed maze patterns, no plastic smoothing or sharpening halos. Output the entire wide room composition of image 1."
+    }
+  },
+  "7": {
+    "class_type": "ConditioningZeroOut",
+    "inputs": {
+      "conditioning": [
+        "6",
+        0
+      ]
+    }
+  },
+  "8": {
+    "class_type": "ImageScaleToTotalPixels",
+    "inputs": {
+      "image": [
+        "4",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "megapixels": 1.0,
+      "resolution_steps": 16
+    }
+  },
+  "9": {
+    "class_type": "ImageScaleToTotalPixels",
+    "inputs": {
+      "image": [
+        "5",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "megapixels": 1.0,
+      "resolution_steps": 16
+    }
+  },
+  "10": {
+    "class_type": "VAEEncode",
+    "inputs": {
+      "pixels": [
+        "8",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ]
+    }
+  },
+  "11": {
+    "class_type": "VAEEncode",
+    "inputs": {
+      "pixels": [
+        "9",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ]
+    }
+  },
+  "12": {
+    "class_type": "ReferenceLatent",
+    "inputs": {
+      "conditioning": [
+        "6",
+        0
+      ],
+      "latent": [
+        "10",
+        0
+      ]
+    }
+  },
+  "13": {
+    "class_type": "ReferenceLatent",
+    "inputs": {
+      "conditioning": [
+        "7",
+        0
+      ],
+      "latent": [
+        "10",
+        0
+      ]
+    }
+  },
+  "14": {
+    "class_type": "ReferenceLatent",
+    "inputs": {
+      "conditioning": [
+        "12",
+        0
+      ],
+      "latent": [
+        "11",
+        0
+      ]
+    }
+  },
+  "15": {
+    "class_type": "ReferenceLatent",
+    "inputs": {
+      "conditioning": [
+        "13",
+        0
+      ],
+      "latent": [
+        "11",
+        0
+      ]
+    }
+  },
+  "16": {
+    "class_type": "CFGGuider",
+    "inputs": {
+      "model": [
+        "1",
+        0
+      ],
+      "positive": [
+        "14",
+        0
+      ],
+      "negative": [
+        "15",
+        0
+      ],
+      "cfg": 1.0
+    }
+  },
+  "17": {
+    "class_type": "RandomNoise",
+    "inputs": {
+      "noise_seed": 2909202661
+    }
+  },
+  "18": {
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "euler"
+    }
+  },
+  "19": {
+    "class_type": "Flux2Scheduler",
+    "inputs": {
+      "steps": 4,
+      "width": 1920,
+      "height": 1088
+    }
+  },
+  "20": {
+    "class_type": "EmptyFlux2LatentImage",
+    "inputs": {
+      "width": 1920,
+      "height": 1088,
+      "batch_size": 1
+    }
+  },
+  "21": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": [
+        "17",
+        0
+      ],
+      "guider": [
+        "16",
+        0
+      ],
+      "sampler": [
+        "18",
+        0
+      ],
+      "sigmas": [
+        "19",
+        0
+      ],
+      "latent_image": [
+        "20",
+        0
+      ]
+    }
+  },
+  "22": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "21",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ]
+    }
+  },
+  "23": {
+    "class_type": "ImageCrop",
+    "inputs": {
+      "image": [
+        "22",
+        0
+      ],
+      "width": 1920,
+      "height": 1080,
+      "x": 0,
+      "y": 4
+    }
+  },
+  "24": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": [
+        "23",
+        0
+      ],
+      "filename_prefix": "Villa_Control/Flux2_Klein4B_Sofa_Native1080_Test_v1"
+    }
+  },
+  "25": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": [
+        "22",
+        0
+      ],
+      "filename_prefix": "Villa_Control/Flux2_Klein4B_Raw1920x1088_Test_v1"
+    }
+  }
+}

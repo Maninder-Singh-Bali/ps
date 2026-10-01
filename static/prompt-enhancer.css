@@ -1,0 +1,8 @@
+.prompt-tools{display:flex;align-items:center;gap:8px;margin:-4px 0 18px}
+.prompt-tools [hidden]{display:none}
+#prompt-enhancer{width:min(1050px,94vw)}
+.enhancer-method{margin:0;font-size:12px;font-weight:600;color:#6f795f}
+.prompt-comparison{display:grid;grid-template-columns:1fr 1.4fr;gap:18px;margin-top:20px}
+.prompt-comparison textarea{height:38vh;min-height:180px;resize:vertical;font-size:13px}
+.prompt-comparison textarea[readonly]{background:#f3f4ed;color:#747c68}
+@media(max-width:760px){.prompt-comparison{grid-template-columns:1fr}.prompt-comparison textarea{height:180px}}

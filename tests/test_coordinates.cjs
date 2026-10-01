@@ -1,0 +1,10 @@
+const assert=require('node:assert/strict');
+const {parseCoordinates:p}=require('../static/coordinates.js');
+assert.deepEqual(p('28.6139, 77.2090'),{latitude:28.6139,longitude:77.209});
+assert.deepEqual(p('(0, 0)'),{latitude:0,longitude:0});
+assert.deepEqual(p('-33.8688, 151.2093'),{latitude:-33.8688,longitude:151.2093});
+assert.deepEqual(p('33.5 S, 70.25 W'),{latitude:-33.5,longitude:-70.25});
+assert.deepEqual(p('28°30\'00"N, 77°15\'00"E'),{latitude:28.5,longitude:77.25});
+assert.deepEqual(p(''),{latitude:null,longitude:null});
+for(const v of ['91,0','0,181','0','Nonsense','77 E,28 N','1°61\'N,2 E'])assert.throws(()=>p(v));
+console.log('12 coordinate paste and validation checks passed');

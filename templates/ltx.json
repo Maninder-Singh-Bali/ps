@@ -1,0 +1,280 @@
+{
+  "1": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "2": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot.safetensors",
+      "type": "ltxv",
+      "device": "default"
+    }
+  },
+  "3": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "ltx-2.5-video-vae-bf16.safetensors"
+    }
+  },
+  "4": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "ltx-2.5-audio-vae-bf16.safetensors"
+    }
+  },
+  "5": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": [
+        "2",
+        0
+      ],
+      "text": "Five-second architectural cinema shot of the supplied empty living room. Preserve the exact first-frame room, furniture and sliding-door assembly. Camera makes only a tiny five-centimetre lateral dolly over five seconds, fixed 35mm prime, level horizon. All door leaves, handles, rails and vertical frame members remain rigidly anchored in their original positions for the entire take. The opening remains exactly the same width; no door opening or closing in this shot. Glass stays clear with faint consistent reflections. Only small perspective changes in reflections caused by camera movement. Preserve the exact bright daytime exposure, white balance, sun and shadows from first frame until last frame. No lighting transition. Outdoor tree trunk stays fixed, only a little leaf flutter. Curtains, sofa, chair, flowers and table remain still. Preserve realistic fine fabric, marble and walnut detail. No people. No speech or music. Natural resolved fine detail, no sharpening halos, no waxy smoothing, no added film grain. Plain fine textile fibers, no embossed cellular fabric."
+    }
+  },
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": [
+        "2",
+        0
+      ],
+      "text": "people, woman, host, face, hands, human reflection, speech, narration, music, moving furniture, morphing, melting decor, floating vase, distorted flowers, fake reflections, mirror windows, repeated tree, texture crawl, flicker, extra glass panels, duplicated door frames, door drifting, glass turning opaque, day to night transition, dimming daylight, unstable exposure, wobbling walls, fast orbit, zoom, shaking, bent lines, CGI, text, watermark"
+    }
+  },
+  "7": {
+    "class_type": "LTXVConditioning",
+    "inputs": {
+      "positive": [
+        "5",
+        0
+      ],
+      "negative": [
+        "6",
+        0
+      ],
+      "frame_rate": 24
+    }
+  },
+  "8": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "VillaNative1080TestV1/Living_Native1080_5s.png"
+    }
+  },
+  "9": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "8",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "width": 1920,
+      "height": 1088,
+      "crop": "center"
+    }
+  },
+  "10": {
+    "class_type": "LTXVPreprocess",
+    "inputs": {
+      "image": [
+        "9",
+        0
+      ],
+      "img_compression": 0
+    }
+  },
+  "11": {
+    "class_type": "EmptyLTXVLatentVideo",
+    "inputs": {
+      "width": 1920,
+      "height": 1088,
+      "length": 121,
+      "batch_size": 1
+    }
+  },
+  "12": {
+    "class_type": "LTXVImgToVideoInplace",
+    "inputs": {
+      "vae": [
+        "3",
+        0
+      ],
+      "image": [
+        "10",
+        0
+      ],
+      "latent": [
+        "11",
+        0
+      ],
+      "strength": 0.9,
+      "bypass": false
+    }
+  },
+  "13": {
+    "class_type": "LTXVEmptyLatentAudio",
+    "inputs": {
+      "frames_number": 121,
+      "frame_rate": 24,
+      "batch_size": 1,
+      "audio_vae": [
+        "4",
+        0
+      ]
+    }
+  },
+  "14": {
+    "class_type": "LTXVConcatAVLatent",
+    "inputs": {
+      "video_latent": [
+        "12",
+        0
+      ],
+      "audio_latent": [
+        "13",
+        0
+      ]
+    }
+  },
+  "15": {
+    "class_type": "RandomNoise",
+    "inputs": {
+      "noise_seed": 2809202700
+    }
+  },
+  "16": {
+    "class_type": "LTXVDualCFGGuider",
+    "inputs": {
+      "model": [
+        "1",
+        0
+      ],
+      "positive": [
+        "7",
+        0
+      ],
+      "negative": [
+        "7",
+        1
+      ],
+      "video_cfg": 1,
+      "audio_cfg": 1
+    }
+  },
+  "17": {
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "euler_ancestral"
+    }
+  },
+  "18": {
+    "class_type": "ManualSigmas",
+    "inputs": {
+      "sigmas": "1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0"
+    }
+  },
+  "19": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": [
+        "15",
+        0
+      ],
+      "guider": [
+        "16",
+        0
+      ],
+      "sampler": [
+        "17",
+        0
+      ],
+      "sigmas": [
+        "18",
+        0
+      ],
+      "latent_image": [
+        "14",
+        0
+      ]
+    }
+  },
+  "20": {
+    "class_type": "LTXVSeparateAVLatent",
+    "inputs": {
+      "av_latent": [
+        "19",
+        0
+      ]
+    }
+  },
+  "29": {
+    "class_type": "VAEDecodeTiled",
+    "inputs": {
+      "samples": [
+        "20",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ],
+      "tile_size": 768,
+      "overlap": 128,
+      "temporal_size": 32,
+      "temporal_overlap": 8
+    }
+  },
+  "31": {
+    "class_type": "CreateVideo",
+    "inputs": {
+      "images": [
+        "34",
+        0
+      ],
+      "fps": 24,
+      "bit_depth": 8
+    }
+  },
+  "32": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "video": [
+        "31",
+        0
+      ],
+      "filename_prefix": "Villa_Control/LTX25_Native1080_FirstFrame",
+      "format": "mp4",
+      "codec": "auto"
+    }
+  },
+  "33": {
+    "class_type": "ImageCrop",
+    "inputs": {
+      "image": [
+        "29",
+        0
+      ],
+      "width": 1920,
+      "height": 1080,
+      "x": 0,
+      "y": 4
+    }
+  },
+  "34": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "33",
+        0
+      ],
+      "batch_index": 0,
+      "length": 120
+    }
+  }
+}

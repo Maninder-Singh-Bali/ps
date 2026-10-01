@@ -1,0 +1,17 @@
+const assert=require('node:assert/strict');
+const {convert}=require('../static/traced-furniture.js');
+const p=(id,box,closed=true,extra={})=>({id,box,closed,kind:'furniture',...extra});
+const room={id:'room',bbox:[0,0,1,1]},plan={width:100,height:100};
+const probes=[p('bed',[5,5,25,35]),p('pillow1',[7,7,8,7]),p('pillow2',[17,7,8,7]),p('sofa',[40,5,40,15],true,{rounded:true}),...Array.from({length:5},(_,i)=>p('seat'+i,[42+i*6,7,0,10],false)),p('table',[40,40,25,25]),p('chair',[45,60,10,10],true,{atomic:true}),p('wall',[0,0,100,2],true,{kind:'wall'})];
+const out=convert(probes,[room],plan);
+assert.equal(out.replacements.length,4);
+assert.equal(out.replacements.find(r=>r.item.kind==='sofa').item.seat_count,3);
+assert.equal(out.replacements.filter(r=>r.item.kind==='bed').length,1);
+assert.equal(out.replacements.filter(r=>r.item.kind==='chair').length,1);
+assert(!out.hide_ids.includes('wall'));
+const saved=convert(probes,[{...room,block_layout:{items:[{id:'keep'}]}}],plan);
+assert.equal(saved.replacements.length,0);assert.equal(saved.hide_ids.length,out.hide_ids.length);
+const unmapped=convert(probes,[],plan);assert.equal(unmapped.hide_ids.length,0);assert.equal(unmapped.unassigned.length,4);
+const other=convert([p('left',[5,5,10,10]),p('right',[60,5,10,10])],[{id:'left',bbox:[0,0,.5,1]},{id:'right',bbox:[.5,0,.5,1]}],plan);
+assert.deepEqual(other.replacements.map(r=>r.room_id),['left','right']);
+console.log('Whole-plan conversion: grouping, section routing, architecture and saved layout preservation passed');

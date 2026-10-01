@@ -1,0 +1,13 @@
+# Versions exercised locally; models and GPU runtimes are separate.
+Pillow==12.3.0
+numpy==2.5.1
+requests==2.34.2
+websocket-client==1.9.2
+av==18.0.0
+PyMuPDF==1.26.7
+pypdfium2==5.13.0
+ezdxf==1.4.4
+fonttools==4.66.1
+tzfpy==2.1.0
+tzdata==2026.4
+scipy==1.18.0

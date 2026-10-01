@@ -1,0 +1,13 @@
+const assert = require('node:assert/strict');
+const {enhanceStudioPrompt} = require('../static/prompt-enhancer.js');
+const original='dont change the 2.4 m ALBO sofa; no blue fabric. Keep 3 cushions and the backgroud.';
+const result=enhanceStudioPrompt(original,{scope:'room',room:'Living',floor:'Lower',keepEnvironment:true});
+assert(result.prompt.includes('do not change the 2.4 m ALBO sofa; no blue fabric. Keep 3 cushions and the background.'));
+assert(result.prompt.includes('except where the request above explicitly asks for a change'));
+assert(!result.prompt.includes('walnut'));
+assert.equal(enhanceStudioPrompt(result.prompt,{scope:'room',room:'Living',floor:'Lower',keepEnvironment:true}).prompt,result.prompt);
+assert(!enhanceStudioPrompt('A watercolor chair',{scope:'reference'}).prompt.includes('Photographic finish'));
+assert(!enhanceStudioPrompt('A red chair',{scope:'reference'}).prompt.includes('Continuity'));
+assert.throws(()=>enhanceStudioPrompt(' '));
+assert.throws(()=>enhanceStudioPrompt('x'.repeat(6001)));
+console.log('Prompt checks passed: exclusions, numbers, product names, repeat use and length limits.');
