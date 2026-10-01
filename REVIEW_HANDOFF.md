@@ -2,6 +2,12 @@
 
 Tested source checkpoint, 1 October 2026. Start here when reviewing this repository with ChatGPT or another code-review tool.
 
+## Current checkpoint: real dimensioned vector-PDF draft
+
+Starting from `3003de7`, completed a real first-floor PDF through dashboard import, explicit native-wall review, manual openings and room polygons, proposed furnishing, save and fresh-service reopening. See [VECTOR_PLAN_EVALUATION.md](VECTOR_PLAN_EVALUATION.md) for automatic versus manual results, timings, remaining failures and test evidence. **The saved editable draft is demonstrated; automatic semantic reconstruction and complete architectural fidelity are not.** Native extraction retained 2,474 paths but identified zero typed walls/openings/rooms. The corrected model contains nine room zones, six windows, eleven door/opening elements and seven explicitly proposed furniture assets. Source fixtures, stair detail and local vertical dimensions remain incomplete.
+
+Only two demonstrated blockers changed: explicit classification/restoration of reviewed native filled rectangles, and inclusion of the saved floor perimeter when determining shared-scene bounds. Tests: 343 Python tests exercised across two existing runtimes and 21 JavaScript suites passed. Saved/reopened scene equality passed. Original Studio, pre-existing evaluation projects, raster baselines and isolated candidate research remain preserved. No sample files or generated evidence are published.
+
 ## Follow-up: whole ordinary-plan benchmark
 
 See [ORDINARY_PLAN_EVALUATION.md](ORDINARY_PLAN_EVALUATION.md) for the complete monochrome-plan comparison, actual timing, manual interventions and the resume-scope defect found and fixed in the dashboard. **This ordinary plan also failed acceptance; no corrected furnished 3D result is claimed.** The isolated dashboard now runs the source fixes after a controlled restart. Original projects and Plan 16 remain preserved.

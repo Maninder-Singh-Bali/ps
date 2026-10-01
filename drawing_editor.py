@@ -56,7 +56,10 @@ def get_document(st,pid,aid):
             markup=sanitized(n)
             if markup:
                 cls=n.get('class') or next((v.get('class') for v in n if v.get('class')),'detail')
-                elements.append({'id':'base'+str(i),'svg':markup,'kind':cls,'native_source_id':n.get('id')})
+                element={'id':'base'+str(i),'svg':markup,'kind':cls,'native_source_id':n.get('id')}
+                from native_review import annotate,classified
+                annotate(element,a)
+                elements.append(classified(element,saved.get('edits',{}).get(element['id'],{})))
     from raster_reconstruction import elements as raster_elements
     elements.extend(raster_elements(a))
     elements=combine_wall_edges(elements,saved.get('edits',{}),a['width'],a['height'])
@@ -70,6 +73,10 @@ def clean_changes(doc,data):
         if key not in ids or not isinstance(v,dict):raise ValueError('Unknown drawing element. Reopen the editor.')
         clean[key]={k:number(v.get(k,default),lo,hi,k) for k,default,lo,hi in [('dx',0,-doc['width'],doc['width']),('dy',0,-doc['height'],doc['height']),('sx',1,.01,100),('sy',1,.01,100),('rotation',0,-360,360),('cx',0,0,doc['width']),('cy',0,0,doc['height'])]}
         clean[key]['hidden']=v.get('hidden') is True
+        if 'kind' in v:
+            from native_review import classified
+            classified(next(e for e in doc['elements'] if e['id']==key),v)
+            clean[key]['kind']=v['kind']
     out=[];seen=set()
     for v in features:
         if not isinstance(v,dict) or v.get('kind') not in ('wall','window','door','sliding_door','line','floor_opening'):raise ValueError('Invalid drawing feature.')
@@ -107,7 +114,9 @@ def export_svg(doc,edits,features):
     for e in doc['elements']:
         if e.get('absorbed_by'):continue
         v=edits.get(e['id'],{})
-        if not v.get('hidden'):parts.append(f'<g transform="{transform(v)}">{e["svg"]}</g>')
+        if not v.get('hidden'):
+            from native_review import classified
+            parts.append(f'<g transform="{transform(v)}">{classified(e,v)["svg"]}</g>')
     parts.extend(feature_svg(f) for f in features)
     return f'<svg xmlns="http://www.w3.org/2000/svg" width="{doc["width"]}" height="{doc["height"]}" viewBox="0 0 {doc["width"]} {doc["height"]}"><title>User-corrected floor plan</title><style>{STYLE}</style><rect width="100%" height="100%" style="fill:white;stroke:none"/>'+''.join(parts)+'</svg>'
 

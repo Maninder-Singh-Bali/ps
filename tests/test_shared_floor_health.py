@@ -19,6 +19,19 @@ class SharedFloorHealth(unittest.TestCase):
   self.a['source_review']={'kind':'plan','reviewed':True,'revision':0,'source_sha256':self.a['sha256'],'panels':[{'id':'plan','bbox':[0,0,1,1]}]}
  def tearDown(self):self.tmp.cleanup()
  def fake_raster(self,source,dest):Image.new('RGB',(200,100),'white').save(dest)
+ def test_reviewed_floor_envelope_keeps_exterior_openings_outside_room_interiors(self):
+  self.r['bbox']=[.1,.1,.35,.8];self.other['bbox']=[.5,.1,.4,.8]
+  self.p['measurements']=[{'plan_id':self.aid,'floor':'Lower','outline':[[0,0],[1,0],[1,1],[0,1]],'scale':{'mode':'percent'}}]
+  self.a['drawing']['features']=[{'id':'exterior','kind':'wall','points':[[0,0],[0,100]],'thickness':3},
+    {'id':'window','kind':'window','points':[[0,20],[0,40]],'thickness':3},
+    {'id':'otherfloor','kind':'wall','points':[[210,0],[210,100]],'thickness':3}]
+  scene=shared_floor.build(self.st,self.r)
+  self.assertEqual(scene['bounds'],[0,0,1,1])
+  self.assertEqual(scene['architecture_counts']['window'],1)
+  self.assertTrue(any(v['source_id']=='exterior' for v in scene['lines']))
+  self.assertFalse(any(v['source_id']=='otherfloor' for v in scene['lines']))
+  self.p['measurements'][0]['floor']='Upper'
+  self.assertEqual(shared_floor.floor_bounds(self.st,self.r),[.1,.1,.9,.9])
  def test_explicit_courtyard_void_only_cuts_its_own_floor(self):
   from drawing_editor import clean_changes,feature_svg
   from drawing_scene import resolve

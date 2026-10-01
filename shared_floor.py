@@ -10,6 +10,19 @@ def sections(store,room):
     return [r for r in p.get('rooms',[room]) if r.get('plan_id')==room['plan_id'] and r.get('floor')==room['floor'] and r.get('bbox')]
 
 
+def floor_bounds(store, room):
+    """Include the reviewed floor envelope, not just rooms' interior faces."""
+    rs = sections(store, room)
+    points = [p for r in rs for p in (r['bbox'][:2],
+              [r['bbox'][0]+r['bbox'][2], r['bbox'][1]+r['bbox'][3]])]
+    project = store.project(store.asset(room['plan_id'])['project_id'])
+    for measurement in project.get('measurements', []):
+        if measurement['plan_id'] == room['plan_id'] and measurement['floor'] == room['floor']:
+            points.extend(measurement.get('outline', []))
+    return [min(p[0] for p in points), min(p[1] for p in points),
+            max(p[0] for p in points), max(p[1] for p in points)]
+
+
 def applies(store,room):
     if not room.get('plan_id'):return False
     plan=store.asset(room['plan_id'])
@@ -31,7 +44,7 @@ def readiness(store,room):
     architecture,unresolved=load(store,plan)
     if unresolved:issues.append(f'{len(unresolved)} architectural outlines need review before 3D generation: '+', '.join(unresolved)+'. Trace their actual geometry; they are not replaced by boxes.')
     rs=sections(store,room)
-    b=[min(r['bbox'][0] for r in rs),min(r['bbox'][1] for r in rs),max(r['bbox'][0]+r['bbox'][2] for r in rs),max(r['bbox'][1]+r['bbox'][3] for r in rs)]
+    b=floor_bounds(store,room)
     def on_floor(f):return all(b[0]-.003<=v[0]/plan['width']<=b[2]+.003 and b[1]-.003<=v[1]/plan['height']<=b[3]+.003 for v in f['points'])
     if not any(f['kind']=='wall' and on_floor(f) for f in architecture):issues.append('Trace the actual walls on this floor in Refine drawing. Section boxes and open-space connections will never be made into walls.')
     if not plan.get('floor_cameras',{}).get(room['id']):issues.append('Set this section’s camera and viewing direction on the full plan in Structure check.')
@@ -54,7 +67,7 @@ def floor_rectangles(width,depth,openings):
 
 
 def build(store,room,preview_items=None,camera_override=None):
-    plan=store.asset(room['plan_id']);rs=sections(store,room);b=[min(r['bbox'][0] for r in rs),min(r['bbox'][1] for r in rs),max(r['bbox'][0]+r['bbox'][2] for r in rs),max(r['bbox'][1]+r['bbox'][3] for r in rs)]
+    plan=store.asset(room['plan_id']);rs=sections(store,room);b=floor_bounds(store,room)
     span=[b[2]-b[0],b[3]-b[1]];synthetic={**room,'bbox':[b[0],b[1],*span]};dims=room_dimensions(store,synthetic)
     from scene_scale import settings,dimensions
     model=settings(plan,room['floor']); metric=dims or dimensions(store,synthetic)
