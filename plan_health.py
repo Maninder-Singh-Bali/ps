@@ -80,10 +80,14 @@ def inspect(store,pid,aid):
             links.append({'id':f['id'],'from':names.get(f.get('room_id'),'Unassigned'),'to':names.get(f['connection_room_id'],'Missing section'),
                           'kind':f['kind'],'label':f['label'],'status':f['review_status'],'floor':f['floor'],
                           'constraint':'Continuous space — no partition' if f['kind']=='space' else 'One shared feature for both sections'})
+    from raster_validation import status
+    from raster_identity import correction_for
     return {'plan_id':aid,'fingerprint':fingerprint(plan,p),'can_generate':bool(checks) and all(c['can_generate'] for c in checks),
+            'raster_validation':status(store,pid,aid) if plan.get('raster_geometry') else None,
+            'raster_orphaned_corrections':copy.deepcopy(plan.get('raster_orphaned_corrections',[])),
             'review_revision':plan.get('review_revision',0),'analysis_status':'Room analysis incomplete' if not checks else 'Review unresolved items',
             'raster_geometry':copy.deepcopy(plan.get('raster_geometry')),'raster_revision':plan.get('raster_revision',0),
-            'raster_corrections':copy.deepcopy(plan.get('raster_corrections',{})),
+            'raster_corrections':{key:copy.deepcopy(correction_for(plan,key)) for key in plan.get('raster_corrections',{})},
             'sections':checks,'connections':links,'repairs':repairs,'uncertain':uncertain,
             'drawing_revision':plan.get('drawing',{}).get('revision',0),'study_revision':plan.get('plan_reading',{}).get('revision',0),
             'history':copy.deepcopy(plan.get('repair_history',[])[-10:]),'vision_report':review_report(plan.get('vision_report')),

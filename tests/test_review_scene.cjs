@@ -1,0 +1,10 @@
+const assert=require('node:assert/strict');
+const {reviewSceneTarget}=require('../static/review-scene.js');
+const plan={raster_geometry:{walls:[]}};
+assert.equal(reviewSceneTarget(plan,null).endpoint,'raster-draft');
+assert.deepEqual(reviewSceneTarget(plan,'living'),{endpoint:'shared-scene',query:'?room_id=living'});
+assert.equal(reviewSceneTarget(plan,'living',true).endpoint,'raster-draft');
+assert.equal(reviewSceneTarget(plan,'living',false).endpoint,'shared-scene');
+assert.equal(reviewSceneTarget({plan_source:{vector:true}},null).endpoint,'raster-draft');
+assert.equal(reviewSceneTarget({},null),null);
+console.log('Review scene transition checks passed');

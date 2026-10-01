@@ -98,13 +98,17 @@ class Handler(BaseHTTPRequestHandler):
                         plan=self.store.asset(aid);architecture,_=load(self.store,plan)
                         return self.reply(from_plan(plan,[r for r in p['rooms'] if r['plan_id']==aid],architecture))
                     room_id=parse_qs(urlparse(self.path).query).get('room_id',[''])[0]
-                    if kind=='model.glb' and (self.store.asset(aid).get('raster_geometry') or not room_id):
+                    if kind=='model.glb' and (not room_id or parse_qs(urlparse(self.path).query).get('view')==['draft']):
                         from raster_reconstruction import draft
                         from model_export import glb
                         raw=glb(draft(self.store,pid,aid));self.send_response(200);self.send_header('Content-Type','model/gltf-binary');self.send_header('Content-Length',str(len(raw)));self.send_header('Content-Disposition','attachment; filename=Pixeloid-partial-draft.glb');self.end_headers();self.wfile.write(raw);return
                     room=self.store.room(pid,room_id)
                     if room.get('plan_id')!=aid:raise ValueError('Choose a section on this plan.')
                     scene=shared_floor.build(self.store,room);scene['issues']=shared_floor.readiness(self.store,room)
+                    if self.store.asset(aid).get('raster_geometry'):
+                        from raster_validation import status
+                        review=status(self.store,pid,aid)
+                        scene['geometry_validated']=review['geometry_validated'];scene['partial']=not review['geometry_validated']
                     if kind=='model.glb':
                         from model_export import glb
                         raw=glb(scene);self.send_response(200);self.send_header('Content-Type','model/gltf-binary');self.send_header('Content-Length',str(len(raw)));self.send_header('Content-Disposition','attachment; filename=Pixeloid-draft.glb');self.end_headers();self.wfile.write(raw);return
@@ -218,6 +222,9 @@ class Handler(BaseHTTPRequestHandler):
         if len(s)==6 and s[:2]==['api','projects'] and s[3]=='plans' and s[5]=='raster-correction':
             from raster_reconstruction import correct
             return correct(st,s[2],s[4],d)
+        if len(s)==6 and s[:2]==['api','projects'] and s[3]=='plans' and s[5]=='raster-validation':
+            from raster_validation import save
+            return save(st,s[2],s[4],d)
         if len(s)==6 and s[:2]==['api','projects'] and s[3]=='plans' and s[5]=='reconstruct':
             if s[4] not in st.project(s[2])['floor_plans']:raise ValueError('Choose this project’s plan.')
             return st.new_job(s[2],'raster_reconstruction',plan_id=s[4])

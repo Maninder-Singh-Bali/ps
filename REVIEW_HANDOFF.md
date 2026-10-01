@@ -23,9 +23,19 @@ Excluded: client floor plans and detections, screenshots, generated media, proje
 
 ## Current detection and 3D limitations
 
+### Review fixes in this revision
+
+1. **Raster completion:** added persisted, revision-bound boundary review with actionable checks and explicit acknowledgement. Pending, deferred, edited-but-unconfirmed paths, unhosted openings, invalid/overlapping section polygons, missing floor outlines and semantic conflicts prevent completion. Open transitions do not become invented walls. Changes to source, geometry, floors, scale or semantic evidence revoke completion. Image-generation checks consume this state instead of permanently rejecting every raster plan.
+2. **Rescan identity:** candidate IDs bind source hash, analysis coordinates and geometry rather than array positions. Corrections and drawing edits transfer only for exact one-to-one evidence matches. Changed or ambiguous matches are archived for review, and rescan invalidates stale undo/redo. Legacy sequential IDs cannot classify unrelated new openings.
+3. **Shared scene:** sections select the shared furnished scene by default even when raster evidence exists. A separate Boundary draft checkbox exposes the incomplete diagnostic view. GLB export follows the selected scene; regression checks confirm a chair remains in the shared scene/export.
+4. **Curves:** generation checks match each curved-wall observation to corresponding supported curved geometry. A matching accepted curve clears that particular issue; straight, unrelated and unresolved curves remain blocked.
+5. **Product test and execution:** the sanitized embedded-data fixture now uses the supported retailer domain with synthetic product values. A negative test preserves rejection of unsupported domains. The test runner prevents accidental execution against a different installed checkout.
+
+Regression coverage includes save rollback, stale review requests, correction migration, duplicate candidates, reordered/reversed paths, source/analysis changes, export selection and per-observation curve matching. These fixes improve reviewability and state safety; they do not turn the pixel tracer into a semantic segmentation model.
+
 The raster tracer is deterministic SciPy/NumPy/Pillow processing, not trained architectural segmentation. It recovers supported strokes but can confuse thick furniture outlines with walls and miss thin glazing or doorways. Exterior classification, opening hosts, junctions and complete room topology remain provisional. Open-plan spaces are not forcibly enclosed. Connected free space is not automatically a confirmed room or slab.
 
-A partial 3D preview is explicitly unverified. Raster-only drafts lack complete furnished-room assembly and a final geometry-clearance workflow. Specialist editors still exist under Advanced. Estimated scale and default heights must not be represented as measured dimensions. DWG has no validated compatible local adapter.
+A partial 3D preview is explicitly unverified. Boundary-only diagnostics remain available, while plans with sections use the shared furnished scene by default. An explicit geometry-review completion lifecycle now checks candidates, opening hosts, curves, floor/section polygons and conflicts. It requires a source-completeness check and acknowledgement of estimated dimensions; this is user review, not proof of reconstruction accuracy. Changes invalidate completion. Specialist editors still exist under Advanced. DWG has no validated compatible local adapter.
 
 FLUX reference-latent conditioning is soft. Depth, normal, object-ID and edge guides are exported, but no validated geometry-control model enforces them. A local synthetic render test invented openings and failed architectural review. The image and derived video were rejected after a test-only LTX approval was removed. Attractive media and completed jobs do not establish reconstruction accuracy.
 
@@ -33,37 +43,57 @@ There is no annotated held-out accuracy benchmark. No precision/recall, wall err
 
 ## Actual test results
 
-The sanitized public copy was re-tested after replacing the private fixture and adding portable Node resolution:
+Correction to the first handoff: the claimed final 36-test sanitization rerun imported another installed checkout through an embedded Python search path. That claim was invalid. The external reviewer correctly reproduced the public snapshot's product-fixture failure. The checkout-anchored `run_tests.py` now verifies the imported application path before discovery. Current results below supersede the initial publication claims:
 
 | Test | Actual result |
 | --- | --- |
-| Python suite | 295 discovered in 44.608 s: 292 passed, 3 skipped because that runtime lacks SciPy |
-| Those 3 pixel tests, installed SciPy runtime | 3 passed in 0.905 s; all 295 tests exercised across the two appropriate runtimes |
-| JavaScript | All 19 `tests/test_*.cjs` suites passed |
-| Final fixture sanitization | All 36 product/furniture tests passed in 2.265 s after replacing retailer references with generic examples |
+| Python suite, anchored to this checkout | 312 discovered in 31.227 s: 309 passed, 3 skipped because that runtime lacks SciPy |
+| Those 3 pixel tests, installed SciPy runtime | 3 passed in 0.083 s; all 312 tests exercised across the two appropriate runtimes |
+| JavaScript | All 20 `tests/test_*.cjs` suites passed; modified browser files passed syntax checks |
+| Product fixture | Supported retailer domain restored around synthetic product data; unsupported-domain rejection retained; production domain restriction unchanged |
 | Earlier installed-app dashboard journey | DXF upload, native preview, original-byte preservation, GLB export, point correction/undo and opening defer/undo passed |
 | Earlier local media execution | FLUX ~45 s; LTX 5-second clip ~481 s; playback and export passed at 1920×1080, 24 fps, 120 frames |
 | Media fidelity | Failed architectural review; invented openings were recorded and outputs rejected |
 
 The installed-app UI/media results predate publication sanitization. No fresh model render or cloud inference was required for publication. Private screenshots and logs are deliberately omitted. Test duration is machine-dependent; tests are not an accuracy benchmark.
 
+### Local dashboard evaluation, 1 October 2026
+
+The supplied archive's 27 JPEGs and two architectural DWG examples from the [official Autodesk sample page](https://www.autodesk.com/support/technical/article/caas/tsarticles/ts/6XGQklp3ZcBFqljLPjrnQ9.html) were retained outside this repository, with a local hash manifest. They are evaluation examples, not training data. No source images, CAD files, overlays, detection reports or private project records are published. Four representative archive entries were uploaded through a separate loopback dashboard and inspected in its split review workspace; the existing working Studio and client projects were preserved.
+
+| Private evaluation example | Original-pixel proposals | Actual dashboard result |
+| --- | --- | --- |
+| Curved furnished plan, 1200×2027 | 144 wall paths, 44 uncertain stretches, 2 openings, 2 connected spaces; extraction 4.009 s | Exterior curve retained as uncertain contour. Some furniture and fixture edges become wall candidates; thin glazing and many openings are missing. Local reader saved 316 estimates after 565.18 s with incomplete coverage and label conflicts. OCR supplied four unreliable sections with no floor assignment. Geometry review correctly remains incomplete. |
+| Low-resolution two-floor plan, 467×906 | 59 wall paths, 40 uncertain stretches, 8 openings, 1 connected space; extraction 0.786 s | Original/enhanced toggle works. Several curved and straight boundaries are visible, but the page border is also proposed. Floors are not registered or stacked; OCR finds no reliable sections. Local reader saved 173 estimates after 584.24 s, with six regions still pending and a resumable checkpoint. Partial 3D remains unverified. |
+| Mixed facade and three-plan presentation sheet, 896×1200 | 268 wall paths, 42 uncertain stretches, 0 openings, 4 connected spaces; extraction 6.728 s | **Failure:** facade, vegetation and sheet edges are extruded alongside plan strokes. No automatic panel isolation or reliable section assignment. Queued semantic analysis was cancelled through the dashboard after this failure was recorded; its semantic accuracy was not evaluated. |
+| Perspective interior negative control, 1200×1607 | 358 wall paths, 96 uncertain stretches, 6 openings, 1 connected space; extraction 8.322 s | **Failure:** source-type rejection is missing, producing a meaningless partial 3D draft from a non-plan image. Completion remains blocked. Queued semantic analysis was cancelled through the dashboard; cancellation retained the source and proposals. |
+| Autodesk architectural example, imperial DWG | No native geometry extracted | Dashboard rejected the file with an explicit unsupported-DWG message and offered DXF/PDF. No compatible local DWG reader/converter was found. This is a capability failure, not a successful CAD reconstruction. |
+| Autodesk architectural annotation/scaling DWG | No native geometry extracted | Same explicit rejection; original bytes retained locally. No conversion or cloud fallback attempted. |
+| Independently generated DXF control | Declared metre units, line/arc geometry, layers and transformed block metadata retained; 132 typed preview segments | Curved wall and window visible in partial 3D; dashboard GLB export downloaded successfully. Symbol metadata is retained, but a generic imported furniture block is not automatically a detailed 3D furniture asset. This control is not a converted Autodesk sample. |
+
+Pixel extraction timings are worker timings, excluding queue wait, OCR, semantic reading and review rendering. The single job queue delayed later CPU tasks behind the first visual-reader run by roughly nine minutes. The low-resolution job also encountered review-lock contention. A full 3D reconstruction has **not** succeeded on these supplied raster examples; candidate counts are not precision or recall.
+
+The real dashboard tests also exposed and fixed an isolated-Python worker import failure, repeated whole-report hashing during correction lookup, and a stale refresh race after undo/redo. The failed worker run was retained in Activity and retried successfully. Source-bound defer, undo and redo persisted; the UI reported both views updated. Diagnostic-only mode produced a separate partial draft while the normal mode used the shared scene. A chair was explicitly added as test furniture, saved without approving the geometry, retained after reopening, and found by stable ID in the dashboard-exported furnished GLB (305,672 bytes). The native control exported a valid GLB 2.0 file (100,888 bytes). All five imported original asset hashes matched their stored originals. Completion stayed disabled for the real plans. The complete validation lifecycle was exercised with synthetic automated regressions, not by falsely approving incomplete real plans.
+
+Remaining priorities are source/panel classification before tracing, trained local architecture-versus-furniture segmentation, opening/junction relationships, floor registration, non-Latin room labels, topology, and large-report responsiveness. Review response time on the curved sample was still about 8.34 s during queued local analysis after removing redundant hashing. The raster method has not been replaced by another vision prompt. A locally runnable trained segmenter plus licensed, reviewed annotations for walls, glazing, openings, symbols and mixed-sheet panels is a concrete missing dependency. These private samples have not been annotated or approved for training.
+
 ### Publication checks
 
-All 197 staged files were inspected with a local pattern scanner for credential formats, credential assignments, authenticated URLs, private filesystem paths, client identifiers and excluded file types. The public gazetteer was decompressed for inspection; the sole PNG is the UI logo and has no embedded metadata. The only retained credential-shaped strings are deliberately invalid dummy URLs in rejection tests. No sensitive-content findings remained. This is a pattern scan and manual review, not a guarantee of exhaustive secret detection.
+All 203 files in the current staged snapshot were inspected with a local pattern scanner for credential formats, credential assignments, authenticated URLs, private filesystem paths, client identifiers and excluded file types. The public gazetteer was decompressed for inspection; the sole PNG is the UI logo and has no embedded metadata. The only retained credential-shaped strings are deliberately invalid dummy URLs in rejection tests. No sensitive-content findings remained. This is a pattern scan and manual review, not a guarantee of exhaustive secret detection.
 
-Both original local commits were inspected and kept private. The publication branch starts with a single parentless commit; its reachable file contents are scanned again before pushing. Local test logs and audit manifests remain outside this repository.
+Both original private local commits were inspected and kept private. The publication branch starts with a clean parentless snapshot; this revision follows only that sanitized public history, whose reachable file contents are scanned again before pushing. Local samples, test logs and audit manifests remain outside this repository.
 
 ### Test commands
 
 After the developer dependencies in SOURCE_SETUP.md are installed, from the repository root:
 
 ```powershell
-python -m unittest discover -s tests -v
+python run_tests.py
 Get-ChildItem tests -Filter 'test_*.cjs' | ForEach-Object {
   node $_.FullName
   if ($LASTEXITCODE -ne 0) { throw "Test failed: $($_.Name)" }
 }
-python -m unittest discover -s tests -p test_raster_pixels.py -v
+python run_tests.py test_raster_pixels.py
 ```
 
 Use the Python runtime with SciPy for the pixel tests. `PIXELOID_NODE` can select an existing Node executable; otherwise Node is resolved from the bundled path or PATH. Do not execute fixture-export `.cjs` files as test suites: they print large geometry JSON.

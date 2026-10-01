@@ -2,31 +2,39 @@
 
 (() => {
 
- let session=null,scene=null,viewRoom=null,clickMode=0,cameraDraft=null,rotation=-35,visualJob=null,enhancedView=false;
+ let session=null,scene=null,viewRoom=null,clickMode=0,cameraDraft=null,rotation=-35,visualJob=null,enhancedView=false,diagnosticDraft=false;
 
  const button=(label,key,disabled=false)=>`<button type="button" class="btn small" data-structure="${key}" ${disabled?'disabled':''}>${label}</button>`;
 
  const route=key=>`/api/projects/${session.pid}/plans/${session.aid}/${key}`;
 
  const rooms=()=>state.projects[session.pid].rooms.filter(r=>r.plan_id===session.aid&&r.bbox);
+ const currentOwner=()=>session?.pid===pid&&session?.aid===(tab==='plan'?planId:R()?.plan_id||planId);
 
  function reviewStateKey(){const a=A(session?.aid);return JSON.stringify([a?.vision_report?.pipeline_key,a?.vision_report?.elapsed_seconds,a?.vision_report?.features?.length,a?.review_revision,a?.raster_revision,a?.raster_geometry?.pipeline_key,a?.drawing?.revision,a?.plan_reading?.revision,state.projects[session?.pid]?.map_revision])}
 
- async function load(){if(!session||session.loading)return;const target=session;target.loading=true;try{const report=await api(route('structure'),{},'GET');if(target!==session)return;session.report=report;await loadScene();session.stateKey=reviewStateKey();render()}finally{target.loading=false}}
+ async function load(force=false){
+  if(!session)return;const target=session;
+  if(target.loading){if(!force)return target.pending;await target.pending;if(target!==session)return}
+  target.loading=true;const stateKey=reviewStateKey();
+  target.pending=(async()=>{try{const report=await api(route('structure'),{},'GET');if(target!==session)return;session.report=report;await loadScene();if(target!==session)return;session.stateKey=stateKey;render()}finally{target.loading=false}})();
+  return target.pending;
+ }
 
- async function loadScene(){if(!rooms().some(r=>r.id===viewRoom))viewRoom=rooms()[0]?.id;scene=(session.report.raster_geometry||(!viewRoom&&(A(session.aid).plan_source?.vector||A(session.aid).cad_redraw_id)))?await api(route('raster-draft'),{},'GET'):viewRoom?await api(route('shared-scene')+'?room_id='+encodeURIComponent(viewRoom),{},'GET'):null;cameraDraft=null;clickMode=0}
+ async function loadScene(){const owner=session;if(!rooms().some(r=>r.id===viewRoom))viewRoom=rooms()[0]?.id;const target=reviewSceneTarget(A(session.aid),viewRoom,diagnosticDraft);const result=target?await api(route(target.endpoint)+target.query,{},'GET'):null;if(owner!==session||!currentOwner())return;scene=result;cameraDraft=null;clickMode=0}
 
  window.openStructureCheck=async function(){
 
   const aid=tab==='plan'?planId:R()?.plan_id||planId;if(!aid)return toast('Upload a full floor plan first.');
 
-  session={pid,aid,report:null};viewRoom=R()?.plan_id===aid?R().id:null;
+  session={pid,aid,report:null};diagnosticDraft=false;enhancedView=false;viewRoom=R()?.plan_id===aid?R().id:null;
 
   try{await load()}catch(err){toast(err.message)}
 
  };
 
  function render(){
+  if(!currentOwner())return;
 
   const d=session.report,rs=rooms(),safe=d.repairs.length,blocking=d.sections.filter(r=>!r.can_generate).length;
 
@@ -51,7 +59,7 @@ ${(d.vision_report?.review_issues||[]).filter(i=>!['accept','reject'].includes(i
 
 <p class="help">${d.vision_report?.coverage_complete===true?'Selected regions processed. Accuracy unverified.':d.vision_report?.coverage_complete===false?'Coverage incomplete. Resume analysis.':'Legacy analysis: coverage unverified.'}</p><p class="help">Scale estimated unless calibrated.</p>
 
-<a class="btn small" href="${route('scene-document')}" download="scene.json">Scene data</a>${scene?`<a class="btn small" href="${route('model.glb')}${viewRoom?'?room_id='+encodeURIComponent(viewRoom):''}" download="draft.glb">Export GLB</a>`:''}</aside>
+<a class="btn small" href="${route('scene-document')}" download="scene.json">Scene data</a>${scene?`<a class="btn small" href="${route('model.glb')}${viewRoom&&!diagnosticDraft?'?room_id='+encodeURIComponent(viewRoom):'?view=draft'}" download="draft.glb">Export GLB</a>`:''}</aside>
 
 <div class="structure-workspace">
 
@@ -83,7 +91,7 @@ ${(d.vision_report?.review_issues||[]).filter(i=>!['accept','reject'].includes(i
 
 <section>
 
-<h3>${scene?.partial?'Partial 3D draft — unverified':scene?'Shared 3D structure':'Enhanced reading copy'}</h3>${!scene?`<img src="${url(A(session.aid).enhanced_reading_id||session.aid)}" alt="Enhanced floor plan reading copy" style="width:100%;height:560px;object-fit:contain;background:white"/><p class="help">Reading aid · compare with the original. Scale remains estimated.</p>`:''}<div ${!scene?'hidden':''}>
+<h3>${viewRoom&&!diagnosticDraft?(scene?.partial?'Furnished scene — geometry needs review':'Shared furnished scene'):scene?'Partial 3D draft — unverified':'Enhanced reading copy'}</h3>${viewRoom&&(d.raster_geometry||A(session.aid).plan_source?.vector)?`<label class="help"><input id="review-diagnostic-draft" type="checkbox" ${diagnosticDraft?'checked':''}> Boundary draft only</label>`:''}${!scene?`<img src="${url(A(session.aid).enhanced_reading_id||session.aid)}" alt="Enhanced floor plan reading copy" style="width:100%;height:560px;object-fit:contain;background:white"/><p class="help">Reading aid · compare with the original. Scale remains estimated.</p>`:''}<div ${!scene?'hidden':''}>
 
 <canvas id="structure-3d" width="800" height="560" aria-label="Schematic 3D preview from typed drawing segments">
 
@@ -163,7 +171,7 @@ ${(d.vision_report?.review_issues||[]).filter(i=>!['accept','reject'].includes(i
 
   };
 
-  window.RasterReview?.attach(svg,session.report,async data=>{if(data.run){await api(route('reconstruct'));toast('Boundary tracing queued.');return}await api(route('raster-correction'),{...data,revision:session.report.raster_revision,source_sha256:session.report.raster_geometry.source_sha256});await refresh(false);await load();toast('Boundary saved. Both views updated.');});
+  window.RasterReview?.attach(svg,session.report,async data=>{if(data.run){await api(route('reconstruct'));toast('Boundary tracing queued.');return}if(data.validation){await api(route('raster-validation'),{...data,fingerprint:session.report.raster_validation.fingerprint})}else await api(route('raster-correction'),{...data,revision:session.report.raster_revision,source_sha256:session.report.raster_geometry.source_sha256});await refresh(false);await load(true);toast('Boundary review saved. Both views updated.');});
  }
 
  function draw3d(){
@@ -264,7 +272,7 @@ ${(d.vision_report?.review_issues||[]).filter(i=>!['accept','reject'].includes(i
 
  });
 
- document.addEventListener('change',async e=>{if(e.target.id==='detection-enhanced'){enhancedView=e.target.checked;drawMap();return}if(e.target.id==='structure-room'){viewRoom=e.target.value;try{await loadScene();render()}catch(err){toast(err.message)}}});
+ document.addEventListener('change',async e=>{if(e.target.id==='review-diagnostic-draft'){diagnosticDraft=e.target.checked;try{await loadScene();render()}catch(err){toast(err.message)}return}if(e.target.id==='detection-enhanced'){enhancedView=e.target.checked;drawMap();return}if(e.target.id==='structure-room'){viewRoom=e.target.value;try{await loadScene();render()}catch(err){toast(err.message)}}});
 
  document.addEventListener('input',e=>{if(e.target.id==='structure-rotate'){rotation=Number(e.target.value);draw3d()}});
 

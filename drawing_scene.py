@@ -116,7 +116,7 @@ def resolve(doc):
         try:
             root=ET.fromstring(e['svg']);m=matrix(transform(doc.get('edits',{}).get(e['id'],{})))
             kind='door' if e['kind']=='opening' else e['kind']
-            found=[door(root,m)] if kind=='door' else straight_nodes(root,m)
+            found=[door(root,m)] if kind=='door' and e.get('origin')!='raster_candidate' else straight_nodes(root,m)
             if not found:raise ValueError('Empty architecture')
             rows.extend({**f,'id':e['id']+(f':{i}' if len(found)>1 else ''),'source_id':e['id'],'native_source_id':e.get('native_source_id'),'kind':kind,'source_geometry':e['svg'],'curve_tolerance_px':.25} for i,f in enumerate(found))
         except (ValueError,TypeError,IndexError,ImportError,ET.ParseError):unresolved.append(e['id'])

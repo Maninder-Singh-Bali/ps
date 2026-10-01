@@ -2,6 +2,7 @@
 import copy,hashlib,json,math,subprocess,sys,time
 from pathlib import Path
 from store import now
+from raster_identity import correction_for, identified, indexed, reconcile
 
 
 def runtime(root):
@@ -59,9 +60,36 @@ def run(engine,job):
             for room in project['rooms']:
                 if room.get('plan_id')==aid:st.invalidate(pid,room)
         overlay=register_asset(st,pid,folder/'boundary-overlay.png','analysis_overlay',source_asset_id=aid)
-        result['overlay_asset_id']=overlay['id'];result['pipeline_key']=key;current['raster_geometry']=result
-        current.setdefault('raster_corrections',{});current.setdefault('raster_revision',0)
+        result['overlay_asset_id']=overlay['id'];result['pipeline_key']=key
+        apply_report(current,result)
         st.save();st.update_job(job['id'],status='completed',stage=f"{len(result['walls'])} wall paths proposed; partial draft ready for review",progress=100,finished=now())
+
+
+def apply_report(plan,result):
+    result=identified(result)
+    previous=plan.get('raster_geometry') or {}
+    corrections,orphaned=reconcile(plan,result)
+    if previous!=result:
+        old_index,new_index=indexed(previous),indexed(result)
+        by_identity={token:key for key,(_,token) in new_index.items()}
+        drawing=plan.setdefault('drawing',{})
+        # Transform/hidden edits are evidence-bound too. Keep unmatched edits
+        # in the local archive and block completion until reviewed.
+        edits=drawing.get('edits',{});remapped={}
+        for key,value in edits.items():
+            if key not in old_index:remapped[key]=value;continue
+            target=by_identity.get(old_index[key][1])
+            if target:remapped[target]=value
+            else:orphaned.append({'id':key,'correction':copy.deepcopy(value),'reason':'Transformed source path changed; drawing edit was archived.'})
+        drawing['edits']=remapped;drawing['revision']=drawing.get('revision',0)+1
+        plan.setdefault('raster_review_archive',[]).append({
+            'source_sha256':previous.get('source_sha256'),'corrections':copy.deepcopy(plan.get('raster_corrections',{})),
+            'undo':copy.deepcopy(plan.get('raster_undo',[])),'redo':copy.deepcopy(plan.get('raster_redo',[]))})
+        plan['raster_undo']=[];plan['raster_redo']=[]
+        plan['raster_revision']=plan.get('raster_revision',0)+1
+        plan.pop('raster_validation',None)
+    plan['raster_geometry']=result;plan['raster_corrections']=corrections
+    plan['raster_orphaned_corrections']=orphaned
 
 
 def candidates(plan):
@@ -80,7 +108,7 @@ def paths(plan,include_uncertain=False):
     items=candidates(plan) if include_uncertain else (plan.get('raster_geometry') or {}).get('walls',[])
     result=[]
     for item in items:
-        value=copy.deepcopy(item);correction=plan.get('raster_corrections',{}).get(item['id'],{})
+        value=copy.deepcopy(item);correction=correction_for(plan,item['id'])
         if correction.get('action')=='reject':continue
         if correction.get('points'):
             value['geometry']={'type':'polyline','points':correction['points'],'note':'User correction; original pixel trace retained separately.'}
@@ -93,7 +121,8 @@ def elements(plan):
     if not report:return []
     sx=plan['width']/report['analysis_size'][0];sy=plan['height']/report['analysis_size'][1];result=[]
     for wall in paths(plan,True):
-        correction=plan.get('raster_corrections',{}).get(wall['id'],{})
+        correction=correction_for(plan,wall['id'])
+        if correction.get('action')=='defer':continue
         if wall.get('candidate_opening') and correction.get('kind') not in ('door','window','sliding_door'):continue
         if not wall.get('width_px') and correction.get('kind') not in ('wall','window'):continue
         points=wall['geometry']['points'];d='M'+' L'.join(f'{x*sx:.4f},{y*sy:.4f}' for x,y in points)
@@ -124,10 +153,11 @@ def correct(st,pid,aid,data):
         allowed=(None,'door','window','sliding_door','open_transition') if known[data['id']].get('candidate_opening') else (None,'wall','window')
         if kind not in allowed:raise ValueError('Choose a supported classification for this boundary or opening.')
         plan.setdefault('raster_undo',[]).append(copy.deepcopy(plan.get('raster_corrections',{})));plan['raster_undo']=plan['raster_undo'][-40:];plan['raster_redo']=[]
-        plan.setdefault('raster_corrections',{})[data['id']]={**plan.get('raster_corrections',{}).get(data['id'],{}),'action':action,'updated':now(),**({'points':points} if points is not None else {}),**({'kind':kind} if kind else {})}
+        plan.setdefault('raster_corrections',{})[data['id']]={**correction_for(plan,data['id']),'source_identity':indexed(plan['raster_geometry'])[data['id']][1],'action':action,'updated':now(),**({'points':points} if points is not None else {}),**({'kind':kind} if kind else {})}
     project=st.project(pid);old_project=copy.deepcopy(project)
     try:
         plan['raster_revision']=plan.get('raster_revision',0)+1
+        plan.pop('raster_validation',None)
         plan.setdefault('drawing',{})['revision']=plan.get('drawing',{}).get('revision',0)+1
         project['map_confirmed']=False
         for room in project['rooms']:

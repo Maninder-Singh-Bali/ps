@@ -16,10 +16,44 @@ def applies(store,room):
     return bool(plan.get('raster_geometry') or plan.get('cad_redraw_id') or plan.get('vector_preview_id') or len(sections(store,room))>1 or room.get('block_layout',{}).get('items'))
 
 
+def unresolved_curves(plan,architecture,floor=None):
+    """Match each observation to reviewed curve geometry in its own location."""
+    from raster_identity import correction_for
+    groups={}
+    raster_ids={w['id'] for w in plan.get('raster_geometry',{}).get('walls',[])+plan.get('raster_geometry',{}).get('uncertain_spans',[])}
+    accepted={key for key in raster_ids if correction_for(plan,key).get('action')=='accept'}
+    for row in architecture:
+        if row['kind']!='wall':continue
+        key=row['source_id']
+        if key in raster_ids and key not in accepted:continue
+        groups.setdefault(key,[]).extend(row['points'])
+    curved=[]
+    for key,points in groups.items():
+        unique=list(dict.fromkeys(tuple(p) for p in points))
+        if len(unique)<3:continue
+        a=unique[0];b=max(unique,key=lambda p:math.dist(a,p));length=math.dist(a,b)
+        if length and max(abs((b[0]-a[0])*(p[1]-a[1])-(b[1]-a[1])*(p[0]-a[0]))/length for p in unique)>1:
+            curved.append((key,unique))
+    missing=[]
+    for feature in plan.get('plan_reading',{}).get('features',[]):
+        if feature.get('kind')!='curved_wall' or feature.get('review_status')=='rejected' or floor is not None and feature.get('floor')!=floor:continue
+        x,y,w,h=feature['bbox'];W,H=plan['width'],plan['height'];box=[x*W,y*H,(x+w)*W,(y+h)*H]
+        matches=[]
+        for key,points in curved:
+            xs,ys=zip(*points);extent=[min(xs),min(ys),max(xs),max(ys)]
+            intersection=max(0,min(box[2],extent[2])-max(box[0],extent[0]))*max(0,min(box[3],extent[3])-max(box[1],extent[1]))
+            area=max(1,(box[2]-box[0])*(box[3]-box[1]));other=max(1,(extent[2]-extent[0])*(extent[3]-extent[1]))
+            if intersection/area>=.45 and intersection/other>=.65:matches.append(key)
+        if feature.get('review_status')!='confirmed' or not matches:missing.append(feature['id'])
+    return missing
+
+
 def readiness(store,room):
     plan=store.asset(room['plan_id']);issues=[]
-    if plan.get('raster_geometry') and not plan.get('raster_geometry',{}).get('geometry_validated'):
-        issues.append('Raster reconstruction is a partial, unverified draft. Resolve missing architecture and review the reconstructed boundaries before image generation.')
+    if plan.get('raster_geometry'):
+        from raster_validation import status
+        review=status(store,plan['project_id'],plan['id'])
+        if not review['geometry_validated']:issues.append('Raster geometry review is '+review['state']+'. '+(review['issues'][0]['message'] if review['issues'] else 'Complete boundary review against the original before image generation.'))
     from drawing_editor import get_document
     doc=get_document(store,plan['project_id'],plan['id'])
     from drawing_scene import resolve
@@ -30,8 +64,8 @@ def readiness(store,room):
     def on_floor(f):return all(b[0]-.003<=v[0]/plan['width']<=b[2]+.003 and b[1]-.003<=v[1]/plan['height']<=b[3]+.003 for v in f['points'])
     if not any(f['kind']=='wall' and on_floor(f) for f in architecture):issues.append('Trace the actual walls on this floor in Refine drawing. Section boxes and open-space connections will never be made into walls.')
     if not plan.get('floor_cameras',{}).get(room['id']):issues.append('Set this section’s camera and viewing direction on the full plan in Structure check.')
-    relevant=[f for f in plan.get('plan_reading',{}).get('features',[]) if f.get('review_status')!='rejected' and f.get('floor')==room['floor']]
-    if any(f['kind']=='curved_wall' for f in relevant):issues.append('Curved architecture needs a curve-capable geometric guide; do not substitute straight walls.')
+    missing=unresolved_curves(plan,architecture,room['floor'])
+    if missing:issues.append('Curved architecture lacks matching reviewed curve geometry: '+', '.join(missing)+'. Review these particular paths; do not substitute straight walls.')
     return issues
 
 

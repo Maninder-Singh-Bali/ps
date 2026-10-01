@@ -23,6 +23,8 @@ The repository-root `node_modules/sharp` installed by npm is resolved by the dra
 
 ## Local models and services
 
+For developer checks, run `python run_tests.py` from this checkout, then the `tests/test_*.cjs` suites with Node. The Python runner anchors imports to this source tree so an embedded runtime cannot silently test a different installed copy. Use `python run_tests.py test_raster_pixels.py` with the configured SciPy runtime for pixel tests. See REVIEW_HANDOFF.md for actual results and limitations.
+
 Open **Setup** in the dashboard. For an existing installation, connect its local engine Python and ComfyUI folder, then use Start renderer / Start reader. Do not commit the resulting `studio.local.json`. Blank fields in the example are intentional; no guessed machine path is included. A separate SciPy Python can be configured with `geometry_python` if the dashboard Python lacks SciPy.
 
 Required ComfyUI workflow files are `templates/flux.json` and `templates/ltx.json`. The current templates expect these local filenames:

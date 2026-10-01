@@ -37,5 +37,19 @@ class StructureAPI(unittest.TestCase):
   room=self.st.room(self.pid,self.rid);self.assertEqual(room['block_layout']['items'][0]['label'],'Table');self.assertFalse(room['block_layout']['reviewed'])
   self.call(route,{'action':'save','revision':-1,'items':[item]},status=400)
   self.assertFalse(any(j['kind'] in ('image','video','reference') for j in self.st.db['jobs'].values()))
+ def test_raster_shared_scene_and_export_keep_furniture(self):
+  import json,struct
+  aid,other,base=self.prepare();a=self.st.asset(aid)
+  a['raster_geometry']={'source_sha256':a['sha256'],'analysis_size':[200,100],'walls':[{'id':'wall','width_px':4,'geometry':{'type':'line','points':[[0,0],[200,0]]}}],'openings':[],'uncertain_spans':[]}
+  self.st.room(self.pid,self.rid)['block_layout']={'items':[{'id':'chair','kind':'chair','preset_id':'chair','label':'Chair','x':.2,'y':.5,'width':.1,'depth':.1,'angle':0}]}
+  shared=self.call(base+'/shared-scene?room_id='+self.rid,{},'GET')
+  diagnostic=self.call(base+'/raster-draft',{},'GET')
+  self.assertTrue(shared['partial']);self.assertTrue(shared['products']);self.assertEqual(diagnostic['products'],[])
+  raw=self.client.get(self.url+base+'/model.glb?room_id='+self.rid).content
+  length=struct.unpack('<I',raw[12:16])[0];export=json.loads(raw[20:20+length])
+  self.assertTrue(any(n.get('extras',{}).get('stable_element_id','').endswith('chair') for n in export['nodes']))
+  self.assertFalse(export['extras']['geometry_validated'])
+  state=self.call(base+'/structure',{},'GET')['raster_validation']
+  self.call(base+'/raster-validation',{'fingerprint':state['fingerprint'],'source_checked':True,'estimates_acknowledged':True},status=400)
 
 if __name__=='__main__':unittest.main()

@@ -15,7 +15,7 @@ from scipy import ndimage as ndi
 from scipy.interpolate import splprep,splev
 from scipy.spatial import cKDTree
 
-VERSION=1
+VERSION=2
 
 
 def simplify(points,tolerance=.8):
@@ -212,6 +212,8 @@ def run(source,folder,enhanced=None):
             'analysis_to_source':[original_size[0]/width,0,0,original_size[1]/height,0,0],'walls':walls,'junctions':junctions,
             'candidate_exterior':outer[0] if outer else None,'uncertain_spans':uncertain_spans,'regions':regions,'openings':openings,'gap_repairs':repairs,
             'geometry_validated':False,'verified_model':False,'warnings':warnings,'elapsed_seconds':round(time.monotonic()-started,3)}
+    from raster_identity import identified
+    result=identified(result)
     Image.fromarray(mask.astype(np.uint8)*255).save(folder/'wall-mask.png')
     Image.fromarray((ink&~mask).astype(np.uint8)*255).save(folder/'excluded-thin-strokes.png')
     overlay=image.copy();draw=ImageDraw.Draw(overlay)
@@ -226,7 +228,9 @@ def run(source,folder,enhanced=None):
 
 
 if __name__=='__main__':
-    import argparse
+    import argparse,sys
+    # Isolated Windows runtimes do not put the script directory on sys.path.
+    sys.path.insert(0,str(Path(__file__).resolve().parent))
     parser=argparse.ArgumentParser();parser.add_argument('source');parser.add_argument('folder');parser.add_argument('--enhanced')
     args=parser.parse_args();r=run(args.source,args.folder,args.enhanced)
     print(json.dumps({'wall_candidates':len(r['walls']),'regions':len(r['regions']),'openings':len(r['openings']),'elapsed_seconds':r['elapsed_seconds']}))

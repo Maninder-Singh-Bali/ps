@@ -29,7 +29,8 @@ class ProductTests(unittest.TestCase):
         slug='synthetic-sectional-121'
         record={'slug':slug,'name':'Example Sectional (121")','media':[{'type':'image','url':'https://cdn.example/sofa.jpg'},{'type':'video','url':'https://example/video'}],'sizes':{'sellable':True,'size_details':[{'dimension':{'length':285,'width':168,'height':77,'unit':'cm'}}]}}
         page='<script>window.APP_DATA = {"product_details":'+json.dumps(record)+',"unused":undefined}; doNotExecute();</script>'
-        p=parse_listing(page,'https://shop.example/product/'+slug)
+        p=parse_listing(page,'https://westelm.in/product/'+slug)
         self.assertEqual(len(p['images']),1);self.assertEqual(p['dimensions_m']['length']['metres'],2.85)
         self.assertTrue(any('discrepancy' in v for v in p['dimension_notes']))
-        with self.assertRaises(ValueError):parse_listing(page,'https://shop.example/product/other-product')
+        with self.assertRaises(ValueError):parse_listing(page,'https://westelm.in/product/other-product')
+        with self.assertRaises(ValueError):parse_listing(page,'https://shop.example/product/'+slug)

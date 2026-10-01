@@ -39,7 +39,7 @@ The initial villa project contains imported draft areas and previous candidates.
 
 Uses the bundled `runtime/python` and `runtime/node` for the dashboard, including Pillow, requests, PyAV and sharp. Small dependencies websocket-client and pypdfium2 are bundled in `vendor/` with their package licences. Windows OCR provides default plan label reading. The separate ComfyUI installation uses its own configured Python and must have the FLUX.2 Klein 4B and LTX2.5 model files named in the templates. The release archive includes dashboard dependencies, but does not duplicate installed model weights or contain user projects.
 
-Run checks with the embedded Python: `python -m unittest discover -s tests -v`.
+Run checks with the selected Python: `python run_tests.py`. This anchors imports to the checkout, including when an embedded runtime has a different installation in its search path.
 
 This release generates and reviews individual room images and clips. Full-film assembly, piano soundtrack, Instagram export, guaranteed 3D consistency and a universal model installer are not included. Raster wall tracing is provisional and requires focused review.
 
