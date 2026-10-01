@@ -172,6 +172,7 @@ ${(d.vision_report?.review_issues||[]).filter(i=>!['accept','reject'].includes(i
 
   };
 
+  window.ConstructionArea?.overlay(svg,a);
   window.RasterReview?.attach(svg,session.report,async data=>{if(data.run){await api(route('reconstruct'));toast('Boundary tracing queued.');return}if(data.source){await api(route('source-panels'),{...data,revision:session.report.source_review?.revision||0})}else if(data.binding){await api(route('curve-binding'),{...data,fingerprint:session.report.curve_review.fingerprint})}else if(data.validation){await api(route('raster-validation'),{...data,fingerprint:session.report.raster_validation.fingerprint})}else await api(route('raster-correction'),{...data,revision:session.report.raster_revision,source_sha256:session.report.raster_geometry.source_sha256});await refresh(false);await load(true);toast('Boundary review saved. Both views updated.');});
  }
 
@@ -292,7 +293,7 @@ ${(d.vision_report?.review_issues||[]).filter(i=>!['accept','reject'].includes(i
 
    $('#modal').open&&$('#modal').close();modalType='';
 
-   $('#main').innerHTML=`<section id="review-workspace" data-view="${view}"><header class="review-top"><nav aria-label="Plan workflow"><button class="btn small" data-action="upload-plan">1 Upload</button><strong>2 Review & 3D</strong><button class="btn small" data-action="tab" data-tab="images">3 Images & Video</button></nav><div class="review-view-modes"><button class="btn small" data-local-setup>Setup</button><button class="btn small" data-review-view="2d">2D</button><button class="btn small" data-review-view="3d" ${!scene?'disabled':''}>3D</button><button class="btn small" data-review-view="split">Split</button></div></header><div class="review-content">${body}</div></section>`;
+   $('#main').innerHTML=`<section id="review-workspace" data-view="${view}"><header class="review-top"><nav aria-label="Plan workflow"><button class="btn small" data-action="upload-plan">1 Upload</button><strong>2 Review & 3D</strong><button class="btn small" data-action="construction-area">Select area to construct</button><button class="btn small" data-action="tab" data-tab="images">3 Images & Video</button></nav><div class="review-view-modes"><button class="btn small" data-local-setup>Setup</button><button class="btn small" data-review-view="2d">2D</button><button class="btn small" data-review-view="3d" ${!scene?'disabled':''}>3D</button><button class="btn small" data-review-view="split">Split</button></div></header><div class="review-content">${body}</div></section>`;
 
    const content=$('.review-content'),workspace=$('.structure-workspace'),issues=$('.review-issue-list');
 

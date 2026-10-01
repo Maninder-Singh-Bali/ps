@@ -36,6 +36,9 @@ def unresolved_curves(plan,architecture,floor=None):
 
 def readiness(store,room):
     plan=store.asset(room['plan_id']);issues=[]
+    import construction_scope as scope
+    if scope.required(plan) and not scope.current(plan):issues.append('Select area to construct and confirm the source outline.')
+    if scope.current(plan) and scope.current(plan)['floor']!=room['floor']:issues.append('This floor is outside the confirmed construction selection.')
     if plan.get('raster_geometry'):
         from raster_validation import status
         review=status(store,plan['project_id'],plan['id'])
@@ -67,7 +70,15 @@ def floor_rectangles(width,depth,openings):
 
 
 def build(store,room,preview_items=None,camera_override=None):
-    plan=store.asset(room['plan_id']);rs=sections(store,room);b=floor_bounds(store,room)
+    plan=store.asset(room['plan_id']);rs=sections(store,room)
+    import construction_scope as scope
+    selection=scope.current(plan)
+    if scope.required(plan) and (not selection or selection['floor']!=room['floor']):return scope.empty_scene(plan,room['floor'])
+    b=floor_bounds(store,room)
+    if selection:
+        points=[p for poly in selection['regions'] for p in poly]
+        b=[min(p[0] for p in points),min(p[1] for p in points),max(p[0] for p in points),max(p[1] for p in points)]
+        rs=[r for r in rs if scope.coverage(scope.room_polygon(r) or scope.box_polygon(r['bbox']),selection)>1e-7]
     span=[b[2]-b[0],b[3]-b[1]];synthetic={**room,'bbox':[b[0],b[1],*span]};dims=room_dimensions(store,synthetic)
     from scene_scale import settings,dimensions
     model=settings(plan,room['floor']); metric=dims or dimensions(store,synthetic)
@@ -90,7 +101,13 @@ def build(store,room,preview_items=None,camera_override=None):
         if not all(b[0]<=v[0]<=b[2] and b[1]<=v[1]<=b[3] for v in pts):continue
         p,q=map(xy,pts);openings.append([min(p[0],q[0]),min(p[1],q[1]),max(p[0],q[0]),max(p[1],q[1])])
     measurement=next((m for m in store.project(plan['project_id']).get('measurements',[]) if m['plan_id']==plan['id'] and m['floor']==room['floor']),None)
-    if measurement:
+    if selection:
+        holes=copy.deepcopy(measurement.get('exclusions',[])) if measurement else []
+        for f in plan.get('drawing',{}).get('features',[]):
+            if f['kind']=='floor_opening':
+                p,q=f['points'];x0,x1=sorted([p[0]/plan['width'],q[0]/plan['width']]);y0,y1=sorted([p[1]/plan['height'],q[1]/plan['height']]);holes.append([[x0,y0],[x1,y0],[x1,y1],[x0,y1]])
+        for poly in scope.faces(selection,[measurement['outline']] if measurement else [],holes):face([[*xy(v),0] for v in poly],[214,207,192],'floor')
+    elif measurement:
         from curve_geometry import floor_faces
         holes=copy.deepcopy(measurement.get('exclusions',[]))
         for left,top,right,bottom in openings:
@@ -101,12 +118,13 @@ def build(store,room,preview_items=None,camera_override=None):
             face([[x,y,0],[xx,y,0],[xx,yy,0],[x,yy,0]],[214,207,192],'floor_estimate')
     from drawing_scene import load,cut_walls
     architecture,unresolved=load(store,plan)
+    if selection:architecture=scope.architecture(architecture,plan,selection)
     for f in cut_walls(architecture):
         architecture_id=f.get('source_id',f.get('id'))
         if f['kind']=='line':continue
         pts=[[v[0]/plan['width'],v[1]/plan['height']] for v in f['points']]
         # Entire source segments must belong to this floor; never reinterpret another floor.
-        if not all(b[0]-.003<=v[0]<=b[2]+.003 and b[1]-.003<=v[1]<=b[3]+.003 for v in pts):continue
+        if not selection and not all(b[0]-.003<=v[0]<=b[2]+.003 and b[1]-.003<=v[1]<=b[3]+.003 for v in pts):continue
         a,z=map(xy,pts);kind=f['kind'];lines.append({'id':f.get('id'),'source_id':f.get('source_id',f.get('id')),'kind':kind,'points':pts,'thickness':f.get('thickness',1.5)})
         bands=[(0,H,[232,227,217])]
         if kind=='window':bands=[(0,.9,[232,227,217]),(.9,2.4,[182,212,218]),(2.4,H,[232,227,217])]
@@ -132,6 +150,7 @@ def build(store,room,preview_items=None,camera_override=None):
         from furniture_blocks import readiness as block_readiness
         from furniture_meshes import mesh
         for item in (preview_items if preview_items is not None and r['id']==room['id'] else r.get('block_layout',{}).get('items',[])):
+            if selection and scope.coverage(scope.footprint(item,plan),selection)<1-1e-6:continue
             object_key=r['id']+':'+item['id']
             for part in mesh(item,plan):
                 face([[*xy(v[:2]),v[2]] for v in part['points']],part['color'],'block',object_key)
@@ -146,6 +165,7 @@ def build(store,room,preview_items=None,camera_override=None):
                 size=item['size'];factor=1 if size['unit']=='m' else .3048;w=size['width']*factor;d=size['depth']*factor
             h=.45 if 'table' in cat else .8;t=math.radians(item['angle']);c,s=math.cos(t),math.sin(t)
             corners=[[cx+x*c-y*s,cy+x*s+y*c] for x,y in [(-w/2,-d/2),(w/2,-d/2),(w/2,d/2),(-w/2,d/2)]]
+            if selection and scope.coverage([[b[0]+x/W*span[0],b[1]+y/D*span[1]] for x,y in corners],selection)<1-1e-6:continue
             color=[178,156,123] if 'table' in cat else [184,186,153]
             for a,z in zip(corners,corners[1:]+corners[:1]):face([[*a,0],[*z,0],[*z,h],[*a,h]],color,'furniture')
             face([[*q,h] for q in corners],color,'furniture')
@@ -158,6 +178,7 @@ def build(store,room,preview_items=None,camera_override=None):
              'camera':world_camera,'saved_camera':camera,'room_id':room['id'],'room_name':room['name'],
              'limits':['3D uses visible classified source architecture and typed drawing segments, including saved edits; room/section rectangles are not walls.',f'Wall height {H:g} m; opening heights and door leaf poses are defaults unless measured. Wall thickness follows the drawing.','Low-poly furniture shows saved placement, size and seat counts. Models are library proxies; exact product appearance depends on reference conditioning.']+([] if dims else ['Scale is estimated from furniture or manually entered; calibrate a known plan dimension for measured accuracy.'])}
     from scene_document import from_plan
+    content['construction_selection']=copy.deepcopy(selection)
     content['scene_document']=from_plan(plan,rs,architecture)
     content['geometry_hash']=hashlib.sha256(json.dumps({k:content[k] for k in ('bounds','surfaces','products')},sort_keys=True).encode()).hexdigest()
     return content

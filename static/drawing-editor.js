@@ -38,9 +38,10 @@
  }
  function hitAreas(){
   const picker=$('#drawing-element-picker');if(picker)picker.innerHTML='<option value="">Choose a wall, opening or object…</option>'+[...d.elements.filter(v=>!v.absorbed_by&&!d.edits[v.id]?.hidden),...d.features.filter(v=>v.kind!=='floor_opening')].map((v,i)=>`<option value="${v.id}" ${v.id===d.selected?'selected':''}>${i+1} · ${esc(v.native_rectangle?'Filled vector rectangle · '+typeName(d.edits[v.id]?.kind||v.kind):typeName(v.kind))}</option>`).join('');
+  const sourceKinds=new Map(d.elements.map(v=>[v.id,v.kind]));
   document.querySelectorAll('#drawing-svg [data-element]').forEach(el=>{
    if(el.dataset.element===d.selected)el.classList.add('drawing-active');
-   if(d.elements.find(v=>v.id===el.dataset.element)?.kind==='wall')solidWall(el);
+   if(sourceKinds.get(el.dataset.element)==='wall')solidWall(el);
    for(const path of [...el.querySelectorAll('path,line,polyline,polygon,rect,circle,ellipse')]){const hit=path.cloneNode(false);hit.removeAttribute('id');hit.setAttribute('class','drawing-hit');hit.setAttribute('style','fill:none!important;stroke:transparent!important;stroke-width:12px!important;vector-effect:non-scaling-stroke;pointer-events:stroke');path.parentNode.insertBefore(hit,path)}
   });
  }
@@ -53,7 +54,14 @@
  // Inline geometry shares the editor's screen-sized strokes; an SVG <image>
  // scales its own viewport (and its strokes) again when the outer plan zooms.
  window.DrawingPreview={
-  markup(doc,editable=false){return `<g class="drawing-art" pointer-events="${editable?'auto':'none'}">${doc.elements.filter(e=>!e.absorbed_by&&!doc.edits[e.id]?.hidden).map(e=>`<g data-plan-kind="${esc(e.kind)}" ${editable?`data-plan-element="${esc(e.id)}"`:''} transform="${trans(doc.edits[e.id])}">${e.svg}</g>`).join('')}${doc.features.map(e=>`<g data-plan-feature="true" ${editable?`data-plan-element="${esc(e.id)}"`:''} data-plan-kind="${esc(e.kind)}">${feature(e)}</g>`).join('')}</g>`},
+  markup(doc,editable=false){
+   // Large, entirely unclassified vector sheets are reference art, not editable
+   // architecture. Keep their original vector asset as one background image;
+   // reviewed walls/openings remain individual editable features above it.
+   const referenceOnly=doc.base_asset_id&&doc.elements.length>3000&&!Object.keys(doc.edits).length&&doc.elements.every(e=>e.kind==='detail');
+   const art=referenceOnly?`<image href="${url(doc.base_asset_id)}" width="${doc.width}" height="${doc.height}" pointer-events="none"/>`:doc.elements.filter(e=>!e.absorbed_by&&!doc.edits[e.id]?.hidden).map(e=>`<g data-plan-kind="${esc(e.kind)}" ${editable?`data-plan-element="${esc(e.id)}"`:''} transform="${trans(doc.edits[e.id])}">${e.svg}</g>`).join('');
+   return `<g class="drawing-art" pointer-events="${editable?'auto':'none'}">${art}${doc.features.map(e=>`<g data-plan-feature="true" ${editable?`data-plan-element="${esc(e.id)}"`:''} data-plan-kind="${esc(e.kind)}">${feature(e)}</g>`).join('')}</g>`
+  },
   finish(root){root.querySelectorAll('[data-plan-kind="wall"]:not([data-plan-feature])').forEach(solidWall)}
  };
  function snapshot(){return {edits:clone(d.edits),features:clone(d.features),site:clone(d.site)}}

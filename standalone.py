@@ -81,9 +81,9 @@ def diagnostics(store,engine,root=ROOT):
     for label,module in [('Images','PIL'),('Drawing geometry','numpy'),('Video reader','av'),('Renderer connection','requests'),('Live progress','websocket'),('PDF import','pypdfium2'),('Vector PDF reader','pymupdf'),('CAD DXF reader','ezdxf')]:
         try:importlib.import_module(module);add(label,'ready','Local component available.')
         except ImportError:add(label,'error','Component missing. Restore runtime/ and vendor/ from the local application package.')
-    node=root/'runtime'/'node'/'node.exe'
+    node=Path(os.environ.get('PIXELOID_NODE') or root/'runtime'/'node'/'node.exe')
     try:
-        env=os.environ.copy();env['NODE_PATH']=str(node.parent/'node_modules')
+        env=os.environ.copy();env['NODE_PATH']=os.pathsep.join(filter(None,[str(node.parent/'node_modules'),env.get('NODE_PATH')]))
         r=run_hidden([str(node),'-e',"require('sharp')({create:{width:2,height:2,channels:3,background:'#fff'}}).png().toBuffer().then(b=>console.log(b.length)).catch(e=>{console.error(e);process.exitCode=1})"],cwd=str(root),env=env)
         if r.returncode:raise ValueError(r.stderr[:200])
         add('Vector drawing export','ready','Bundled drawing engine passed a live export check.')

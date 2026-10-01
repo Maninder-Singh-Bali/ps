@@ -12,7 +12,7 @@ def basis(store,room):
     project=store.project(p['project_id'])
     return digest({'plan':p['id'],'drawing':p.get('drawing'), 'study':p.get('plan_reading'),
                    'scale':[m for m in project.get('measurements',[]) if m.get('plan_id')==p['id'] and m.get('floor')==room['floor']],
-                   'bbox':room.get('bbox'),'polygon':room.get('area_polygon')})
+                   'construction_selection_revision':p.get('construction_selection_revision',0),'bbox':room.get('bbox'),'polygon':room.get('area_polygon')})
 
 def clean(items):
     if not isinstance(items,list) or len(items)>40:raise ValueError('Use up to 40 furniture blocks per section.')

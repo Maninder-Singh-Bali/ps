@@ -65,6 +65,11 @@ class StructureAPI(unittest.TestCase):
   aid,other,base=self.prepare();a=self.st.asset(aid)
   a['raster_geometry']={'source_sha256':a['sha256'],'analysis_size':[200,100],'walls':[{'id':'wall','width_px':4,'geometry':{'type':'line','points':[[0,0],[200,0]]}}],'openings':[],'uncertain_spans':[]}
   self.st.room(self.pid,self.rid)['block_layout']={'items':[{'id':'chair','kind':'chair','preset_id':'chair','label':'Chair','x':.2,'y':.5,'width':.1,'depth':.1,'angle':0}]}
+  blocked=self.call(base+'/shared-scene?room_id='+self.rid,{},'GET')
+  self.assertEqual(blocked['surfaces'],[])
+  selection={'floor':self.st.room(self.pid,self.rid)['floor'],'regions':[[[0,0],[1,0],[1,1],[0,1]]],'exclusions':[]}
+  preview=self.call(base+'/construction-selection',{**selection,'action':'preview'})
+  self.call(base+'/construction-selection',{**selection,'revision':preview['revision'],'preview_key':preview['preview_key'],'checked':True})
   shared=self.call(base+'/shared-scene?room_id='+self.rid,{},'GET')
   diagnostic=self.call(base+'/raster-draft',{},'GET')
   self.assertTrue(shared['partial']);self.assertTrue(shared['products']);self.assertEqual(diagnostic['products'],[])

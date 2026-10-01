@@ -2,7 +2,11 @@
 
 Tested source checkpoint, 1 October 2026. Start here when reviewing this repository with ChatGPT or another code-review tool.
 
-## Current checkpoint: real dimensioned vector-PDF draft
+## Current checkpoint: apartment construction selection
+
+See [CONSTRUCTION_SELECTION_EVALUATION.md](CONSTRUCTION_SELECTION_EVALUATION.md). A private typical-floor PDF now has a saved apartment-only draft with an editable selection, retained open-to-sky void, 2.50 m walls, twelve zones and nine source-visible fixture proxies. All selected floor faces exclude neighbouring areas. The source remains intact, and isolated-service restart preserved the saved scene. This required substantial manual architectural correction; automatic native-path semantics remain inadequate. Tests: 354 Python tests exercised across existing runtimes and 23 JavaScript suites passed. Private drawings, evidence, site information and models are excluded from publication.
+
+## Previous checkpoint: real dimensioned vector-PDF draft
 
 Starting from `3003de7`, completed a real first-floor PDF through dashboard import, explicit native-wall review, manual openings and room polygons, proposed furnishing, save and fresh-service reopening. See [VECTOR_PLAN_EVALUATION.md](VECTOR_PLAN_EVALUATION.md) for automatic versus manual results, timings, remaining failures and test evidence. **The saved editable draft is demonstrated; automatic semantic reconstruction and complete architectural fidelity are not.** Native extraction retained 2,474 paths but identified zero typed walls/openings/rooms. The corrected model contains nine room zones, six windows, eleven door/opening elements and seven explicitly proposed furniture assets. Source fixtures, stair detail and local vertical dimensions remain incomplete.
 

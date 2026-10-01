@@ -113,6 +113,10 @@ class Handler(BaseHTTPRequestHandler):
                     from model_export import glb
                     raw=glb(scene);self.send_response(200);self.send_header('Content-Type','model/gltf-binary');self.send_header('Content-Length',str(len(raw)));self.send_header('Content-Disposition','attachment; filename=Pixeloid-draft.glb');self.end_headers();self.wfile.write(raw);return
                 return self.reply(scene)
+            selection=re.fullmatch(r'/api/projects/([a-zA-Z0-9]+)/plans/([a-zA-Z0-9]+)/construction-selection',path)
+            if selection:
+                import construction_scope
+                return self.reply(construction_scope.inspect(self.store.review_snapshot(),selection[1],selection[2]))
             drawing=re.fullmatch(r'/api/projects/([a-zA-Z0-9]+)/plans/([a-zA-Z0-9]+)/drawing',path)
             if drawing:
                 with self.store.lock:return self.reply(get_document(self.store,drawing[1],drawing[2]))
@@ -216,6 +220,10 @@ class Handler(BaseHTTPRequestHandler):
             from job_control import recover
             return recover(self.server.engine,st.db['jobs'][s[2]])
         if s==['api','location-from-map'] and method=='POST':return maps_location.resolve(d.get('url',''))
+        if len(s)==6 and s[:2]==['api','projects'] and s[3]=='plans' and s[5]=='construction-selection':
+            import construction_scope
+            if d.get('action')=='preview':return construction_scope.inspect(st,s[2],s[4],d)
+            return construction_scope.save(st,s[2],s[4],d)
         if len(s)==6 and s[:2]==['api','projects'] and s[3]=='plans' and s[5]=='review-decision':
             from detection_review import save_decision
             return save_decision(st,s[2],s[4],d)
@@ -449,6 +457,7 @@ class Handler(BaseHTTPRequestHandler):
                 a=register_asset(st,pid,path,kind,rid,display_name=name,category=category,placement='',enabled=True);assets.append(a)
                 if kind=='plan':
                     p['floor_plans'].append(a['id'])
+                    a['construction_selection_required']=True
                     a['plan_reading']={'version':1,'revision':0,'features':[],'checks':{},'reviewed':False,'warnings':[]}
                     if str(path) in documents:
                         plan_import.attach(st,a,documents[str(path)],original)

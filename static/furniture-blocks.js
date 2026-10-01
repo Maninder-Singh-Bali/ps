@@ -64,7 +64,7 @@
   return state.projects[ctx.pid].rooms.filter(r=>r.plan_id===room().plan_id&&r.bbox).sort((a,b)=>(a.id===ctx.rid)-(b.id===ctx.rid)).flatMap(r=>(r.id===ctx.rid?items:ctx.drafts[r.id]?.items||r.block_layout?.items||[]).map(v=>({v,owner:r})));
  }
  async function switchSection(id,blockId=null,options={}){
-  if(busy){$('#block-room').value=ctx.rid;return}
+  if(busy){$('#block-room').value=ctx.rid;toast('Placement check in progress. Select the section again when it finishes.');return}
   if(id===ctx.rid){if(blockId){selected=blockId;popupOpen=true;libraryOpen=false;render()}return}
   const next=state.projects[ctx.pid].rooms.find(r=>r.id===id&&r.plan_id===room().plan_id&&r.bbox);if(!next)return;
   const floorChanged=next.floor!==room().floor;if(floorChanged&&!options.preserveModel)multi.clear();walls.clear();stashDraft();ctx.rid=id;if(floorChanged){ctx.view=window.InlinePlan?.planView(next.floor)||null;if(!options.preserveModel){ctx.resumeWalk=!!modelView.walk;modelView={...BlockModelViewer.defaults(),projection:modelView.projection}}}const draft=ctx.drafts[id];ctx.revision=draft?.revision??next.revision;
@@ -74,7 +74,7 @@
   render();await call('check');
  }
  async function call(action,extra={}){
-  if(busy)throw Error('Wait for the current placement check.');busy=true;
+  if(busy)throw Error('Wait for the current placement check.');busy=true;$('#plan-editor-inline')?.setAttribute('aria-busy','true');
   try{
    items=items.map(v=>{const corrected=FurnitureLibrary.consistentSofa(v,plan());if(corrected!==v)dirty=true;return corrected});
    const payload={action,revision:ctx.revision,items,selected,...extra};
@@ -92,7 +92,7 @@
    if(action==='suggest'||action==='propose')dirty=dirty||JSON.stringify(items)!==JSON.stringify(room().block_layout?.items||[]);
    if(selected&&!items.some(v=>v.id===selected))selected=items[0]?.id;
    render();if(ctx.resumeWalk){ctx.resumeWalk=false;startWalk()}return result;
-  }finally{busy=false}
+  }finally{busy=false;$('#plan-editor-inline')?.setAttribute('aria-busy','false')}
  }
 
  function libraryCards(){const list=FurnitureLibrary.presets.filter(p=>(libraryCategory==='All'||p.category===libraryCategory)&&p.label.toLowerCase().includes(libraryQuery.toLowerCase()));return list.map(p=>`<button type="button" draggable="true" data-furniture-preset="${p.id}" title="Drag ${p.label} onto the plan, or click to add" aria-label="Add ${p.label}"><svg viewBox="0 0 100 100" aria-hidden="true">${FurnitureLibrary.symbol(p)}</svg><span>${p.label}</span></button>`).join('')||'<span>No matching shapes</span>'}
@@ -313,7 +313,7 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
   svg.ondrop=async e=>{const key=e.dataTransfer.getData('application/x-pixeloid-furniture');if(!key)return;e.preventDefault();svg.classList.remove('library-drop-active');const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(svg.getScreenCTM().inverse());try{await addPreset(key,[Math.max(0,Math.min(1,p.x/a.width)),Math.max(0,Math.min(1,p.y/a.height))])}catch(err){toast(err.message)}};
 
   document.querySelectorAll('[data-block-select]').forEach(el=>el.classList.toggle('selected',el.dataset.blockSelect===selected));
-  draw3d();walls.decorate();window.InlinePlan?.applyFloorVisibility(svg);objectTools();if(!drag)popover();window.PlanLabels?.attach(svg,state.projects[ctx.pid].rooms.filter(r=>r.plan_id===a.id&&r.bbox&&(!window.InlinePlan||InlinePlan.floorVisible(r.floor))),a,ctx.rid);
+  draw3d();walls.decorate();window.InlinePlan?.applyFloorVisibility(svg);window.ConstructionArea?.overlay(svg,a);objectTools();if(!drag)popover();window.PlanLabels?.attach(svg,state.projects[ctx.pid].rooms.filter(r=>r.plan_id===a.id&&r.bbox&&(!window.InlinePlan||InlinePlan.floorVisible(r.floor))),a,ctx.rid);
 
  }
 
@@ -442,7 +442,7 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
  }
 
  function modelFloor(name=room().floor){
-  const floors=ctx.floors||[],base=floors[0]?.scene;if(!base)return null;
+  const floors=(ctx.floors||[]).filter(({scene})=>!scene.selection_required),base=floors[0]?.scene;if(!base)return null;
   const unit=(base.bounds[2]-base.bounds[0])*plan().width/base.width;let elevation=0;
   for(const row of floors){if(row.scene.floor===name)return {...row,unit,elevation};elevation+=row.scene.height||3}return null;
  }
@@ -544,7 +544,7 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
    }
    if(action==='fit-plan'){ctx.view=window.InlinePlan?.active()?InlinePlan.planView():[0,0,plan().width,plan().height];draw();return}
    if(action==='fit-section'){ctx.view=null;draw();return}
-   if(action==='library'){libraryOpen=true;render();return}
+   if(action==='library'){libraryOpen=true;popupOpen=false;render();return}
    if(action==='reference'){if(!active())return toast('Select a furniture object first.');libraryOpen=false;popupOpen=true;render();return}
 
    if(action==='hide-popup'){popupOpen=false;libraryOpen=true;popover();return}

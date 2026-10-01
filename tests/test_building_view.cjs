@@ -17,5 +17,9 @@ vm.createContext(context);vm.runInContext(fs.readFileSync('static/furniture-mesh
  assert.equal(M.building(floors,plan,blocks,{},()=>false).faces.length,0);
  const groundOnly=M.building(floors,plan,blocks,{},f=>f==='Ground');assert(groundOnly.faces.every(f=>f.floorName==='Ground'));
  assert.equal(JSON.stringify({floors,blocks}),before);
+ const excluded={room_id:'unassigned',scene:{selection_required:true,floor:'Unassigned',bounds:[0,0,1,1],width:1,depth:1,height:0,surfaces:[]}};
+ const scoped=M.building([excluded,...floors],plan,blocks,{wall:'first-wall'});
+ assert.equal(JSON.stringify(scoped),JSON.stringify(all),'Excluded scope cannot change the scale, elevation or ceiling of constructed floors');
+ assert.equal(M.building([excluded],plan,blocks).faces.length,0);
  console.log('Stacked floors: common origin, height, furniture, selection identities, independent visibility and immutable inputs passed');
 })().catch(e=>{console.error(e);process.exitCode=1});

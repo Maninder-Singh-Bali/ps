@@ -55,9 +55,10 @@
   const p=P(),rec=p.measurements?.find(m=>m.plan_id===ed.plan.id&&m.floor===floor);
   const rooms=p.rooms.filter(r=>r.plan_id===ed.plan.id&&r.floor===floor&&r.bbox);
   ed.floor=floor;ed.sections=rooms.map(r=>({room_id:r.id,name:r.name,kind:r.kind,polygon:structuredClone(r.area_polygon&&same(r.area_bbox,r.bbox)?r.area_polygon:rectPoly(r.bbox)),proposed:!(r.area_polygon&&same(r.area_bbox,r.bbox))}));
-  ed.holes=structuredClone(rec?.exclusions||[]);
+  const construction=ed.plan.construction_selection?.confirmed&&ed.plan.construction_selection.floor===floor?ed.plan.construction_selection:null;
+  ed.holes=structuredClone(rec?.exclusions||construction?.exclusions||[]);
   const suggestion=ed.plan.floor_outlines?.find(f=>f.floor===floor)?.polygon;
-  ed.outline=structuredClone(rec?.outline||suggestion||rectPoly(rooms.length?polyBounds(ed.sections.flatMap(r=>r.polygon)):[.05,.05,.9,.85]));
+  ed.outline=structuredClone(rec?.outline||suggestion||(construction?.regions.length===1?construction.regions[0]:null)||rectPoly(rooms.length?polyBounds(ed.sections.flatMap(r=>r.polygon)):[.05,.05,.9,.85]));
   ed.scale=structuredClone(rec?.scale||{mode:'percent',unit:'m'});ed.selected=-1;ed.mode=null;ed.draft=[];ed.summary=null;ed.dirty=false;ed.mapRevision=p.map_revision;ed.areaRevision=p.area_revision||0;fit();
  }
  function render(){
@@ -69,7 +70,7 @@
   const plan=A(tab==='plan'?planId||R()?.plan_id:R()?.plan_id||planId);if(!plan)return toast('Upload a floor plan first.');
   ed={project:pid,plan,original:false};const opened=ed;
   if(plan.cad_redraw_id){try{const raw=await (await fetch(url(plan.cad_redraw_id))).text();if(ed!==opened)return;const doc=new DOMParser().parseFromString(raw,'image/svg+xml');const allowed=new Set(['g','path','rect','circle','ellipse','text','polyline','line']),attrs=new Set(['class','d','x','y','width','height','rx','ry','cx','cy','r','transform','font-size','points','x1','x2','y1','y2']);const clean=node=>{if(!allowed.has(node.localName)||node.localName==='text'&&/^\d+$/.test(node.textContent.trim())||node.localName==='rect'&&node.getAttribute('style')?.includes('fill:white'))return '';return '<'+node.localName+' '+[...node.attributes].filter(a=>attrs.has(a.name)).map(a=>a.name+'="'+esc(a.value)+'"').join(' ')+'>'+(node.localName==='text'?esc(node.textContent):[...node.children].map(clean).join(''))+'</'+node.localName+'>'};ed.cadMarkup=[...doc.documentElement.children].map(clean).join('');}catch{}}
-  loadFloor(R()?.plan_id===plan.id?R().floor:P().rooms.find(r=>r.plan_id===plan.id)?.floor||'Ground floor');if(selectedRoomId){ed.selected=ed.sections.findIndex(s=>s.room_id===selectedRoomId);const b=R()?.bbox;if(b)ed.view=[Math.max(0,b[0]-.02),Math.max(0,b[1]-.02),b[2]+.04,b[3]+.04]}render();
+  loadFloor(!selectedRoomId&&plan.construction_selection?.confirmed?plan.construction_selection.floor:R()?.plan_id===plan.id?R().floor:P().rooms.find(r=>r.plan_id===plan.id)?.floor||'Ground floor');if(selectedRoomId){ed.selected=ed.sections.findIndex(s=>s.room_id===selectedRoomId);const b=R()?.bbox;if(b)ed.view=[Math.max(0,b[0]-.02),Math.max(0,b[1]-.02),b[2]+.04,b[3]+.04]}render();
  };
  function pointer(e){
   const svg=$('#area-svg'),r=svg.getBoundingClientRect(),vb=ed.view,w=ed.plan.width,h=ed.plan.height;

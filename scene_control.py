@@ -68,6 +68,8 @@ def scene_snapshot(store, project, room):
         'master': file_identity(store, control.get('source_id')),
         'plan': file_identity(store, room.get('plan_id')),
         'drawing': {k: copy.deepcopy(drawing.get(k)) for k in ('edits', 'features', 'site')},
+        'construction_selection': copy.deepcopy(plan.get('construction_selection')),
+        'construction_selection_revision': plan.get('construction_selection_revision',0),
         'plan_reading': copy.deepcopy(plan.get('plan_reading', {})),
         'floor_camera': copy.deepcopy(plan.get('floor_cameras',{}).get(room['id'])),
         'floor_sections': [{k:copy.deepcopy(r.get(k)) for k in ('id','floor','bbox','area_polygon','furniture_layout','block_layout','references')} for r in project['rooms'] if r.get('plan_id')==room.get('plan_id') and r.get('floor')==room.get('floor')],

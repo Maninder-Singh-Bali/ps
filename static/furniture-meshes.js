@@ -68,12 +68,13 @@
   }return out;
  }
  function building(floors,plan,blocks,selection={},visible=()=>true){
+  floors=floors.filter(({scene})=>!scene.selection_required);
   if(!floors.length)return {faces:[],levels:[]};
   const base=floors[0].scene,unit=(base.bounds[2]-base.bounds[0])*plan.width/base.width;
   const faces=[],levels=[];let elevation=0;
   for(const [index,{scene,room_id}] of floors.entries()){
    const z=elevation; elevation+=(scene.height||3)*unit;
-   if(!visible(scene.floor))continue;
+   if(!visible(scene.floor)||scene.selection_required)continue;
    const b=scene.bounds,sx=(b[2]-b[0])*plan.width/scene.width,sy=(b[3]-b[1])*plan.height/scene.depth;
    levels.push({name:scene.floor,elevation:z/unit});
    const point=p=>[p[0]*sx,p[1]*sy,z+p[2]*unit];
@@ -86,7 +87,7 @@
    // Ceiling underside follows the slab above, including open-to-below courtyards.
    const lid=floors[index+1]?.scene||scene,lb=lid.bounds,lx=(lb[2]-lb[0])*plan.width/lid.width,ly=(lb[3]-lb[1])*plan.height/lid.depth;
    for(const surface of lid.surfaces.filter(f=>f.kind==='floor'))faces.push({roomId:room_id,floorName:scene.floor,ceiling:true,architecture:true,surfaceKind:'ceiling',points:surface.points.map(p=>[p[0]*lx,p[1]*ly,z+((scene.height||3)-.01)*unit]),color:'rgb(239,236,225)'});
-   for(const {v,owner} of blocks.filter(({owner})=>owner.floor===scene.floor)){
+   for(const {v,owner} of blocks.filter(({owner,v})=>owner.floor===scene.floor&&(!scene.construction_selection||(scene.products.some(p=>p.object_key===owner.id+':'+v.id)&&window.ConstructionArea?.includesBlock(v,plan,scene.construction_selection))))){
     const chosen=owner.id===selection.room&&v.id===selection.object||selection.multi?.includes('f:'+owner.id+':'+v.id);
     for(const f of mesh(v,plan)){
      const color=chosen?f.color.map((c,i)=>Math.round(c*.45+[244,203,100][i]*.55)):f.color;

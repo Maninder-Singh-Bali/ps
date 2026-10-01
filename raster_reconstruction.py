@@ -197,9 +197,20 @@ def draft(st,pid,aid):
     from scene_document import from_plan
     plan=st.asset(aid)
     if aid not in st.project(pid)['floor_plans']:raise ValueError('Plan does not belong to project.')
+    import construction_scope as scope
+    selection=scope.current(plan)
+    if scope.required(plan) and not selection:return scope.empty_scene(plan)
     native=bool(plan.get('plan_source',{}).get('vector') or plan.get('cad_redraw_id'))
     rows,unresolved=resolve(get_document(st,pid,aid));scale,scale_source=estimate(st,plan)
-    height=settings(plan,'Unassigned')['wall_height_m'];surfaces=[]
+    if selection:rows=scope.architecture(rows,plan,selection)
+    height=settings(plan,selection['floor'] if selection else 'Unassigned')['wall_height_m'];surfaces=[]
+    if selection:
+        measurements=[m for m in st.project(pid).get('measurements',[]) if m['plan_id']==aid and m['floor']==selection['floor']]
+        holes=[h for m in measurements for h in m.get('exclusions',[])]
+        for f in plan.get('drawing',{}).get('features',[]):
+            if f['kind']=='floor_opening':
+                p,q=f['points'];x0,x1=sorted([p[0]/plan['width'],q[0]/plan['width']]);y0,y1=sorted([p[1]/plan['height'],q[1]/plan['height']]);holes.append([[x0,y0],[x1,y0],[x1,y1],[x0,y1]])
+        for poly in scope.faces(selection,[m['outline'] for m in measurements],holes):surfaces.append({'points':[[x*plan['width']*scale,y*plan['height']*scale,0] for x,y in poly],'color':[214,207,192],'kind':'floor'})
     for wall in cut_walls(rows):
         if wall['kind'] not in ('wall','window','door','sliding_door'):continue
         a,b=[np for np in wall['points']];dx,dy=b[0]-a[0],b[1]-a[1];length=math.hypot(dx,dy)
@@ -221,4 +232,5 @@ def draft(st,pid,aid):
            'issues':['Partial, unverified draft. Thin boundaries, openings, floor assignments and rooms still need review.'],
            'limits':[('Native paths with provisional classification; no room-box walls invented.' if native else 'Pixel-supported wall candidates only; no floor slab or room-box walls invented.'),scale_source,'Wall height is the editable project default.'],
            'partial':True,'geometry_validated':False,'scene_document':from_plan(plan,st.project(pid)['rooms'],rows)}
+    scene['construction_selection']=copy.deepcopy(selection)
     scene['geometry_hash']=hashlib.sha256(json.dumps(surfaces,sort_keys=True).encode()).hexdigest();return scene
