@@ -39,6 +39,18 @@ class StructureAPI(unittest.TestCase):
  def test_plan_errors_block_image_and_video_without_queueing(self):
   aid,other,base=self.prepare();self.call(self.route+'/generate-image',{},status=400);self.call(self.route+'/generate-video',{},status=400)
   self.assertFalse(any(j['kind'] in ('image','video','reference') for j in self.st.db['jobs'].values()))
+ def test_resume_preserves_original_scope_not_selected_preview_room(self):
+  from source_scope import capture
+  aid,other,base=self.prepare();a=self.st.asset(aid)
+  for original in ([],[other['id']]):
+   report={'pipeline_key':'key'+str(original),'source_scope':capture(a),'coverage_complete':False,'coverage':{'pending_regions':2}}
+   previous=self.st.new_job(self.pid,'vision_study',plan_id=aid,section_ids=original)
+   previous.update(status='completed',report=report);a['vision_report']=report
+   resumed=self.call(base+'/read-visual',{'resume':True,'section_ids':[self.rid]})
+   self.assertEqual(resumed['section_ids'],original)
+   self.st.db['jobs'][resumed['id']]['status']='completed'
+  a['vision_report']={**a['vision_report'],'pipeline_key':'missing'}
+  self.call(base+'/read-visual',{'resume':True},status=400)
  def test_block_scan_and_save_through_api(self):
   aid,other,base=self.prepare();route=self.route+'/blocks';before=self.st.snapshot()
   scan=self.call(route,{'action':'propose','revision':self.st.room(self.pid,self.rid)['revision'],'items':[]})

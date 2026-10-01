@@ -2,7 +2,11 @@
 
 Tested source checkpoint, 1 October 2026. Start here when reviewing this repository with ChatGPT or another code-review tool.
 
-## Latest checkpoint: source-scope fixes and bounded segmentation evaluation
+## Follow-up: whole ordinary-plan benchmark
+
+See [ORDINARY_PLAN_EVALUATION.md](ORDINARY_PLAN_EVALUATION.md) for the complete monochrome-plan comparison, actual timing, manual interventions and the resume-scope defect found and fixed in the dashboard. **This ordinary plan also failed acceptance; no corrected furnished 3D result is claimed.** The isolated dashboard now runs the source fixes after a controlled restart. Original projects and Plan 16 remain preserved.
+
+## Preceding checkpoint: source-scope fixes and bounded segmentation evaluation
 
 **Decision: no segmentation integration and no successful furnished-plan acceptance.** Benchmark 16 still fails. The untouched automatic baseline and its hashes are preserved locally; no new geometry corrections were made to that project during this evaluation. The earlier benchmark history below is retained and describes the state before this checkpoint.
 
@@ -14,7 +18,7 @@ Tested source checkpoint, 1 October 2026. Start here when reviewing this reposit
 - Exhausted detection with no remaining or failed regions cannot offer a useful resume. The Review control says Detector exhausted, Activity hides Retry for that terminal result, and both resume endpoints reject exhausted or obsolete work. Partial jobs with recoverable pending/failed regions retain recovery. No additional model calls were made against the saved benchmark-16 semantic detector.
 - Tests exercise actual crop pixel contents at mocked reader boundaries, two-panel coordinate mapping and floor identity, automatic resumption, duplicate suppression, edits/crops changing during OCR, visual analysis and raster completion, resized raster-coordinate mapping, undo, failed-save rollback, stale/exhausted retry and classifier self-approval prevention. These are lifecycle tests, not proof of detector accuracy.
 
-No candidate model, weight, added library, supplied image, annotation, overlay or private database is included in the repository. The working local Studio services were not restarted or reconfigured for this research evaluation. Backend fixes are in this source checkpoint; the already-running Python service needs a controlled restart before it uses the new backend modules. A browser reload verified that Detector exhausted is disabled and Resume analysis is absent. No new successful dashboard reconstruction is claimed.
+No candidate model, weight, added library, supplied image, annotation, overlay or private database is included in the repository. The original working Studio services remain unchanged. At this preceding checkpoint, the isolated service still needed a restart; the follow-up above has now deployed the fixes there and checked crop approval, automatic resumption, stale completion and saved-state reopening. Detector exhausted is disabled and Resume analysis is absent for the exhausted report. No successful furnished dashboard reconstruction is claimed.
 
 ### Isolated local candidate and separate licence checks
 
@@ -75,7 +79,7 @@ Review priorities: verify source-scope revision/rollback races, multi-panel tran
 
 ### Current verification
 
-**Python: 336 discovered; 332 passed in the primary runtime in 50.785 s, with four SciPy pixel tests skipped there. The same four passed in the isolated SciPy runtime in 0.153 s: all 336 distinct tests exercised across both runtimes. JavaScript: all 21 suites passed.** The live browser also verified the exhausted-state control after reload; no new inference or geometry edit was initiated. Test commands: `python run_tests.py`; in a compatible SciPy runtime, `python run_tests.py test_raster_pixels.py`; run each `tests/test_*.cjs` with the configured Node runtime and project dependencies. No private real-plan fixture is in these automated tests.
+**Preceding checkpoint:** 336 distinct Python tests exercised across two runtimes; all 21 JavaScript suites passed. **Current follow-up:** all 337 distinct Python tests exercised across the same two runtimes, and all 21 JavaScript suites passed; exact counts, durations and the corrected test-environment issue are in [ORDINARY_PLAN_EVALUATION.md](ORDINARY_PLAN_EVALUATION.md). Test commands: `python run_tests.py`; in a compatible SciPy runtime, `python run_tests.py test_raster_pixels.py`; run each `tests/test_*.cjs` with the configured Node runtime and project dependencies. No private real-plan fixture is in these automated tests.
 
 ## Real furnished-plan benchmark 16 — failed acceptance checkpoint
 

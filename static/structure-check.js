@@ -92,7 +92,7 @@ ${(d.vision_report?.review_issues||[]).filter(i=>!['accept','reject'].includes(i
 
 <section>
 
-<h3>${viewRoom&&!diagnosticDraft?(scene?.partial?'Furnished scene — geometry needs review':'Shared furnished scene'):scene?'Partial 3D draft — unverified':'Enhanced reading copy'}</h3>${viewRoom&&(d.raster_geometry||A(session.aid).plan_source?.vector)?`<label class="help"><input id="review-diagnostic-draft" type="checkbox" ${diagnosticDraft?'checked':''}> Boundary draft only</label>`:''}${!scene?`<img src="${url(A(session.aid).enhanced_reading_id||session.aid)}" alt="Enhanced floor plan reading copy" style="width:100%;height:560px;object-fit:contain;background:white"/><p class="help">Reading aid · compare with the original. Scale remains estimated.</p>`:''}<div ${!scene?'hidden':''}>
+<h3>${viewRoom&&!diagnosticDraft?(scene?.partial?'3D draft — geometry needs review':'Shared 3D scene'):scene?'Partial 3D draft — unverified':'Enhanced reading copy'}</h3>${viewRoom&&(d.raster_geometry||A(session.aid).plan_source?.vector)?`<label class="help"><input id="review-diagnostic-draft" type="checkbox" ${diagnosticDraft?'checked':''}> Boundary draft only</label>`:''}${!scene?`<img src="${url(A(session.aid).enhanced_reading_id||session.aid)}" alt="Enhanced floor plan reading copy" style="width:100%;height:560px;object-fit:contain;background:white"/><p class="help">Reading aid · compare with the original. Scale remains estimated.</p>`:''}<div ${!scene?'hidden':''}>
 
 <canvas id="structure-3d" width="800" height="560" aria-label="Schematic 3D preview from typed drawing segments">
 
@@ -221,7 +221,8 @@ ${(d.vision_report?.review_issues||[]).filter(i=>!['accept','reject'].includes(i
 
    if(action==='vision'){
 
-    const j=await api(route('read-visual'),{section_ids:viewRoom?[viewRoom]:[]});visualJob=j.id;
+    // The selected preview room must not silently narrow a whole-plan resume.
+    const j=await api(route('read-visual'),{resume:session.report.vision_report?.coverage_complete===false,section_ids:[]});visualJob=j.id;
 
     const context={...session};render();
 

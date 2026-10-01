@@ -240,7 +240,13 @@ class Handler(BaseHTTPRequestHandler):
         if len(s)==6 and s[3]=='plans' and s[5] in ('read-visual','import-visual') and method=='POST':
             if s[4] not in p['floor_plans']:raise ValueError('Choose a plan from this project.')
             if s[5]=='import-visual':return vision_study.import_proposals(st,pid,s[4],d)
+            report=st.asset(s[4]).get('vision_report') or {}
             ids=d.get('section_ids',[])
+            if d.get('resume'):
+                if report.get('coverage_complete') is not False:raise ValueError('No incomplete analysis to resume.')
+                previous=next((j for j in reversed(list(st.db['jobs'].values())) if j.get('plan_id')==s[4] and j.get('report',{}).get('pipeline_key') and j['report']['pipeline_key']==report.get('pipeline_key')),None)
+                if previous is None:raise ValueError('Original analysis scope is unavailable. Start a new whole-plan analysis.')
+                ids=previous.get('section_ids',[])
             if not isinstance(ids,list) or len(ids)>100 or any(not any(r['id']==i and r['plan_id']==s[4] and r.get('bbox') for r in p['rooms']) for i in ids):raise ValueError('Choose selected sections from this full plan (up to 100).')
             from source_scope import capture
             capture(st.asset(s[4]))
