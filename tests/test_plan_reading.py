@@ -13,6 +13,7 @@ class PlanReadingTests(unittest.TestCase):
  def setUp(self):
   self.tmp=tempfile.TemporaryDirectory(dir=ROOT/'tests');self.root=Path(self.tmp.name);self.st=Store(self.root/'data');self.p=self.st.create_project('Test')
   self.path=self.root/'plan.png';Image.new('RGB',(400,400),'white').save(self.path);self.a=register_asset(self.st,self.p['id'],self.path,'plan');self.p['floor_plans']=[self.a['id']]
+  self.a['source_review']={'kind':'plan','reviewed':True,'revision':0,'source_sha256':self.a['sha256'],'panels':[{'id':'plan','bbox':[0,0,1,1]}]}
  def tearDown(self):self.tmp.cleanup()
  def test_stair_runs_both_axes_not_solid_wall(self):
   im=Image.new('L',(400,400),255);d=ImageDraw.Draw(im)

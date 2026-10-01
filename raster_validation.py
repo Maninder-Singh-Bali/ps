@@ -48,6 +48,9 @@ def status(st,pid,aid):
         from source_panels import valid,digest
         if not valid(plan):issue('panels','Review the source type and plan panels before tracing.')
         elif report.get('source_scope')!=digest(plan['source_review']['panels']):issue('panels','Reconstruct the corrected source panels before completing review.')
+        from source_scope import current
+        if report.get('source_contract') and not current(plan,report['source_contract']):issue('scope','Source scope revision changed; reconstruct approved panels.')
+        elif not report.get('source_contract') and plan['source_review'].get('revision',0)>0:issue('scope','Legacy boundaries lack a scope revision; reconstruct approved panels.')
     pending=[]
     for item in candidates(plan):
         edit=correction_for(plan,item['id'])

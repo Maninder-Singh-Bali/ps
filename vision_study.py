@@ -77,62 +77,101 @@ def read(path,settings,sections,progress):
     from object_detection import read as read_objects
     return read_objects(path,path,settings,sections,progress)
 
+def read_scoped(plan,scope,settings,sections,progress,folder,root,cancelled):
+    import source_scope,plan_upscale,object_detection
+    panels,_=source_scope.materialize(plan,scope,folder/'Source_Panels')
+    panels=[p for p in panels if not sections or source_scope.local_sections(sections,p)]
+    reports=[];features=[];observations=[];warnings=[];passes=[]
+    for panel in panels:
+        if cancelled():break
+        panel_folder=folder/scope['key']/panel['id']
+        try:
+            enhanced,enhancement=plan_upscale.enhance(panel['path'],root,panel_folder,progress)
+        except (OSError,ValueError,KeyError,subprocess.SubprocessError) as exc:
+            enhanced=panel['path'];enhancement={'method':'native','warning':'Enhancement unavailable: '+str(exc)[:250]}
+        local=source_scope.local_sections(sections,panel)
+        if sections and not local:continue
+        identity={**scope,'panel_id':panel['id']}
+        report=object_detection.read(panel['path'],enhanced,settings,local,progress,panel_folder/'Detection_Cache',
+                                     cancelled=cancelled,source_scope=identity)
+        reports.append(report)
+        def mapped(row):
+            value=source_scope.map_row(row,panel,scope)
+            token=lambda key:'observation'+hashlib.sha256((scope['key']+panel['id']+key).encode()).hexdigest()[:24]
+            value['id']=token(row['id'])
+            if row.get('original_matches'):value['original_matches']=[token(key) for key in row['original_matches']]
+            return value
+        features.extend(mapped(row) for row in report['features'])
+        observations.extend(mapped(row) for row in report.get('original_observations',[]))
+        passes.extend({**row,'panel_id':panel['id'],'floor':panel.get('floor','')} for row in report.get('passes',[]))
+        warnings.extend(report.get('warnings',[]))
+        if enhancement.get('warning'):warnings.append(enhancement['warning'])
+    complete=bool(reports) and len(reports)==len([p for p in panels if not sections or source_scope.local_sections(sections,p)]) and all(r.get('coverage_complete') for r in reports)
+    unfinished=len(panels)-len(reports)
+    coverage={'pending_regions':sum(r.get('coverage',{}).get('pending_regions',0) for r in reports)+unfinished,
+              'failed_regions':sum(r.get('coverage',{}).get('failed_regions',0) for r in reports),
+              'saturated_regions':sum(r.get('coverage',{}).get('saturated_regions',0) for r in reports),
+              'network_calls':sum(r.get('coverage',{}).get('network_calls',0) for r in reports),
+              'resumable':bool(unfinished or any(r.get('coverage',{}).get('resumable') for r in reports))}
+    from detection_review import reconcile
+    return reconcile(dict(features=features,original_observations=observations,passes=passes,warnings=list(dict.fromkeys(warnings)),
+        pipeline_key=hashlib.sha256(json.dumps([scope['key'],settings.get('vision_model') or MODEL,sections,[r.get('pipeline_key') for r in reports]],sort_keys=True).encode()).hexdigest(),
+        reviewed=False,source_scope=scope,source_sha256=scope['source_sha256'],source_size=scope['source_size'],
+        coverage=coverage,coverage_complete=complete,complete=complete,processing_finished=not cancelled(),cancelled=cancelled(),
+        geometry_validated=False,accuracy_verified=False,scale_status='estimated',model=settings.get('vision_model') or MODEL,
+        elapsed_seconds=round(sum(r.get('elapsed_seconds',0) for r in reports),2)))
+
+
 def run(engine,job):
     from engine import memory_headroom,available_vram
-    import project_storage
-    st=engine.store;pid=job['project_id'];a=st.asset(job['plan_id']);p=st.project(pid)
-    if job['plan_id'] not in p['floor_plans']:raise ValueError('Plan no longer belongs to this project.')
+    import project_storage,source_scope
+    st=engine.store;pid=job['project_id'];aid=job['plan_id']
+    scope=source_scope.prepare(st,job)
+    if scope is None:return
+    with st.lock:
+        a=copy.deepcopy(st.asset(aid));p=copy.deepcopy(st.project(pid))
+        if aid not in p['floor_plans']:raise ValueError('Plan no longer belongs to this project.')
+        revisions=[p['map_revision'],a.get('plan_reading',{}).get('revision',0),a.get('drawing',{}).get('revision',0)]
+        st.update_job(job['id'],input_revision=revisions[0],study_revision=revisions[1],drawing_revision=revisions[2])
     while True:
         if engine.stop.is_set() or job['status']=='cancelled':return
         try:q=engine.get('/queue')
-        except requests.ConnectionError:q=None  # A stopped renderer owns no GPU models.
+        except requests.ConnectionError:q=None
         busy=q and (q['queue_running'] or q['queue_pending'])
         if not busy and q:engine.post('/free',{'unload_models':True,'free_memory':True})
         ram,commit=memory_headroom();vram=available_vram()
         if not busy and ram>=12 and commit>=20 and (vram is None or vram>=2):break
         st.update_job(job['id'],status='waiting',stage='Waiting for local renderer' if busy else 'Waiting for available RAM / GPU memory',progress=None)
         engine.stop.wait(3)
-    st.update_job(job['id'],status='running',started=now(),stage='Preparing local plan reader',progress=None)
-    if q:engine.post('/free',{'unload_models':True,'free_memory':True})
+    st.update_job(job['id'],status='running',started=now(),stage='Reading approved plan panels',progress=None)
     settings=copy.deepcopy(st.db['settings']);url=settings.get('vision_url','http://127.0.0.1:11434').rstrip('/')
     tags=ensure_service(engine.app_root,url);model=settings.get('vision_model') or MODEL
     if not any(v['name']==model for v in tags.get('models',[])):raise ValueError('Local vision model is not installed: '+model)
     sections=[copy.deepcopy(r) for r in p['rooms'] if r['id'] in job.get('section_ids',[])]
-    import plan_upscale, object_detection
-    from engine import register_asset
-    progress=lambda stage,value:st.update_job(job['id'],stage=stage,progress=value)
     folder=project_storage.project_root(st,pid)/'Supporting_Files'/'Enhanced_Plans'
-    path=a['path'];enhancement=None
-    input_drawing_revision=a.get('drawing',{}).get('revision',0)
-    try:
-        path,enhancement=plan_upscale.enhance(a['path'],engine.app_root,folder,progress)
-        if enhancement['scale']>1:
-            with st.lock:
-                existing=next((v for v in st.db['assets'].values() if v.get('project_id')==pid and v.get('path')==str(path)),None)
-                enhanced=existing or register_asset(st,pid,path,'plan_preview',source_asset_id=a['id'],enhancement=enhancement,output_upscaled=True)
-                a['enhanced_reading_id']=enhanced['id'];st.save()
-    except (OSError,ValueError,KeyError,subprocess.SubprocessError) as exc:
-        path=a['path']
-        enhancement={'method':'native','scale':1,'warning':'Enhancement unavailable: '+str(exc)[:250]}
-    report=object_detection.read(a['path'],path,settings,sections,progress,folder/'Detection_Cache',
-        cancelled=lambda: st.db['jobs'][job['id']]['status']=='cancelled' or engine.stop.is_set())
-    report['enhancement']=enhancement
-    if enhancement.get('warning'):report['warnings'].append(enhancement['warning'])
+    report=read_scoped(a,scope,settings,sections,lambda stage,value:st.update_job(job['id'],stage=stage,progress=value),
+                       folder,engine.app_root,lambda: st.db['jobs'][job['id']]['status']=='cancelled' or engine.stop.is_set())
     with st.lock:
-        a=st.asset(job['plan_id']);p=st.project(pid)
-        report['input_map_revision']=job['input_revision'];report['stale']=p['map_revision']!=job['input_revision'] or a.get('plan_reading',{}).get('revision',0)!=job.get('study_revision',0) or a.get('drawing',{}).get('revision',0)!=input_drawing_revision
-        report['input_study_revision']=job.get('study_revision',a.get('plan_reading',{}).get('revision',0))
+        current=st.asset(aid);project=st.project(pid)
+        live=[project['map_revision'],current.get('plan_reading',{}).get('revision',0),current.get('drawing',{}).get('revision',0)]
+        report.update(input_map_revision=revisions[0],input_study_revision=revisions[1],input_drawing_revision=revisions[2],
+                      stale=not source_scope.current(current,scope) or live!=revisions)
         folder=project_storage.project_root(st,pid)/'Supporting_Files'/'Vision_Studies';folder.mkdir(parents=True,exist_ok=True)
         (folder/(job['id']+'.json')).write_text(json.dumps(report,indent=2),encoding='utf8')
-        previous=a.get('vision_report') or {}
-        report['review_decisions']=copy.deepcopy(previous.get('review_decisions',{}))
-        a['vision_report']=report;st.save()
-        if not a.get('plan_source',{}).get('vector') and enhancement.get('scale',1)>1:
-            st.new_job(pid,'raster_reconstruction',plan_id=a['id'])
+        if report['stale']:
+            st.update_job(job['id'],status='cancelled',stage='Inputs changed; obsolete analysis discarded',finished=now(),report=report);return
+        previous=current.get('vision_report') or {}
+        if previous.get('source_scope')==scope:
+            report['review_decisions']=copy.deepcopy(previous.get('review_decisions',{}))
+        elif previous:
+            current.setdefault('vision_report_archive',[]).append(previous)
+        current['vision_report']=report;st.save()
         if report.get('cancelled') or job.get('status')=='cancelled':
-            st.update_job(job['id'],status='cancelled',stage='Analysis stopped; partial results retained',finished=now(),report=report);return
-        stage=('Visual proposals ready — review required' if report.get('coverage_complete') else 'Partial analysis saved — resume to cover remaining regions') if report['features'] else 'No usable symbols — needs attention'
-        st.update_job(job['id'],status='completed' if report['features'] else 'failed',stage=stage,progress=100 if report.get('coverage_complete') else None,error=None if report['features'] else 'No usable symbols were found. The plan has not been verified or changed.',finished=now(),report=report)
+            st.update_job(job['id'],status='cancelled',stage='Analysis stopped; current-scope partial results retained',finished=now(),report=report);return
+        resumable=report.get('coverage',{}).get('resumable')
+        stage='Visual proposals ready  -  review required' if report.get('coverage_complete') else ('Partial analysis saved  -  resume remaining regions' if resumable else 'Detector exhausted  -  correct evidence or change detection approach')
+        st.update_job(job['id'],status='completed' if report['features'] else 'failed',stage=stage,progress=100 if report.get('coverage_complete') else None,
+                      error=None if report['features'] else 'No usable symbols; inspect original and detector limitations.',finished=now(),report=report)
 
 def import_proposals(st,pid,aid,data):
     import plan_reading
@@ -140,7 +179,8 @@ def import_proposals(st,pid,aid,data):
     from detection_review import reconcile
     if report:report=reconcile(report)
     plan_reading._idle(st,pid)
-    if not report or report.get('stale') or report['input_map_revision']!=p['map_revision'] or report.get('input_study_revision',doc['revision'])!=doc['revision']:raise ValueError('Plan changed since this reading. Read it again before importing proposals.')
+    from source_scope import current
+    if not report or not current(a,report.get('source_scope')) or report.get('stale') or report['input_map_revision']!=p['map_revision'] or report.get('input_study_revision',doc['revision'])!=doc['revision']:raise ValueError('Plan changed since this reading. Read it again before importing proposals.')
     if data.get('revision')!=doc['revision']:raise ValueError('Study changed. Reopen it first.')
     if report.get('imported'):raise ValueError('These proposals are already in the study.')
     added=[]

@@ -79,17 +79,19 @@ class DetectionTests(unittest.TestCase):
             root=Path(folder).resolve();st=Store(root/'data');p=st.create_project('Detection test')
             source=root/'plan.png';Image.new('RGB',(100,100)).save(source)
             a=register_asset(st,p['id'],source,'plan');p['floor_plans'].append(a['id'])
+            a['source_review']={'kind':'plan','reviewed':True,'revision':0,'source_sha256':a['sha256'],'panels':[{'id':'plan','bbox':[0,0,1,1]}]}
             a['plan_reading']={'revision':3,'features':[{'id':'manual-correction'}]}
             before=copy.deepcopy(a['plan_reading']);original=source.read_bytes()
             job=st.new_job(p['id'],'vision_study',plan_id=a['id'],section_ids=[],input_revision=p['map_revision'],study_revision=3)
             engine=Engine(st,root)
-            report={'features':[{'label':'Chair'}],'warnings':[]}
+            report={'features':[{'id':'chair','kind':'furniture','object_type':'chair','label':'Chair','bbox':[.1,.1,.1,.1]}],'warnings':[]}
             with patch.object(engine,'get',side_effect=requests.ConnectionError),patch('vision_study.ensure_service',return_value={'models':[{'name':vision_study.MODEL}]}),patch('plan_upscale.enhance',side_effect=ValueError('Unavailable')),patch('object_detection.read',return_value=report):
                 vision_study.run(engine,job)
             self.assertEqual(source.read_bytes(),original)
             self.assertEqual(a['plan_reading'],before)
             self.assertEqual(job['status'],'completed')
-            self.assertEqual(a['vision_report']['enhancement']['scale'],1)
+            self.assertTrue(any('Enhancement unavailable' in w for w in a['vision_report']['warnings']))
+            self.assertEqual(a['vision_report']['source_scope']['panels'][0]['bbox'],[0,0,1,1])
             engine.session.close()
 
     def test_jobs_dedupe_per_page_not_per_project(self):

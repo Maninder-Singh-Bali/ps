@@ -25,6 +25,13 @@ def cancel(engine, job):
 def recover(engine, job):
     if job['status'] not in ('failed','cancelled'):
         raise ValueError('This activity is still active or already complete.')
+    if job.get('plan_id') and job['kind'] in ('plan_setup','vision_study','raster_reconstruction'):
+        from source_scope import current
+        if job.get('source_scope') and not current(engine.store.asset(job['plan_id']),job['source_scope']):
+            raise ValueError('Source panels changed. Continue the current-scope job; this obsolete activity cannot resume.')
+        report=job.get('report') or {}
+        if job['kind']=='vision_study' and report.get('coverage_complete') is False and not report.get('coverage',{}).get('pending_regions') and not report.get('coverage',{}).get('failed_regions'):
+            raise ValueError('Detector exhausted. Retry cannot recover saturated output; correct evidence or change the detection approach.')
     if job.get('submission_intent') and not job.get('prompt_id'):
         # Comfy returns the submitted extra_data in prompt records. Do not guess.
         matches=[]

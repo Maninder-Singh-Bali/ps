@@ -124,25 +124,40 @@ def _save(st,pid,aid,record):
 def study(st,pid,aid,data):
     doc=get_reading(st,pid,aid);_idle(st,pid)
     if data.get('revision')!=doc['revision']:raise ValueError('This plan study changed. Reopen it before scanning.')
+    from source_panels import ensure
+    if not ensure(st,pid,aid):raise ValueError('Approve source panels before scanning.')
     return _save(st,pid,aid,propose_reading(st.asset(aid),doc))
 
 
 def propose_reading(a,doc):
     """Build review evidence without writes, locks or automatic confirmation."""
-    start=time.monotonic();found=detect(a['path'])
+    start=time.monotonic()
+    import source_scope
+    scope=source_scope.capture(a)
+    panels,_=source_scope.materialize(a,scope,Path(a['path']).parent/'Scoped_Readers')
+    found=[]
+    for panel in panels:
+        found.extend(source_scope.map_row(f,panel,scope) for f in detect(panel['path']))
     # Native vector layer names provide evidence, not semantic truth.
-    found+=copy.deepcopy(a.get('plan_source',{}).get('symbol_candidates',[]))
+    for feature in a.get('plan_source',{}).get('symbol_candidates',[]):
+        x,y,w,h=feature['bbox']
+        for panel in scope['panels']:
+            px,py,pw,ph=panel['bbox']
+            if px<=x and py<=y and x+w<=px+pw and y+h<=py+ph:
+                value=copy.deepcopy(feature);value.update(panel_id=panel['id'],source_scope_key=scope['key'])
+                if panel.get('floor'):value['floor']=panel['floor']
+                found.append(value);break
     preserved=copy.deepcopy([f for f in doc.get('features',[]) if f.get('review_status')!='pending' or f.get('source')=='manual'])
     for f in found:
         if any((f['kind']==v['kind'] or f['kind']=='unknown' and v['kind'] in ('unknown','stair','furniture'))
                and overlap(f['bbox'],v['bbox'])>.65 for v in preserved):continue
-        f.update(id=uid(),floor='',room_id=None,connection_room_id=None,review_status='pending',source='local_inference',notes='',shape='unspecified')
+        f.update(id=uid(),floor=f.get('floor',''),room_id=None,connection_room_id=None,review_status='pending',source='local_inference',notes='',shape='unspecified')
         preserved.append(f)
     warnings=['Proposals require review: a scan cannot establish wall heights, structural loads or hidden connections.',
               'Curved furniture, wardrobes and hatching can resemble stairs. Confirm symbols against their surroundings.']
     if min(a['width'],a['height'])<700:warnings.insert(0,'Small original drawing: missing line detail cannot be recovered by enlargement. Prefer a vector PDF or DXF if available.')
     return {'version':1,'revision':doc.get('revision',0)+1,'features':preserved[:300],'checks':{},'reviewed':False,
-                            'warnings':warnings,'engine':'Local enclosure + repeated-stroke evidence + CAD layer hints',
+                            'warnings':warnings,'source_scope':scope,'engine':'Local enclosure + repeated-stroke evidence + CAD layer hints',
                             'elapsed_seconds':round(time.monotonic()-start,2),'updated':now()}
 
 def clean_features(data,project,aid):
@@ -178,7 +193,8 @@ def clean_features(data,project,aid):
                     'connection_room_id':arrival,'label':str(row.get('label',KINDS[kind]))[:120],
                     'shape':str(row.get('shape') or 'unspecified')[:60],'notes':str(row.get('notes') or '')[:1200],
                     'source':str(row.get('source','manual'))[:80],'confidence':str(row.get('confidence','user'))[:30],
-                    'evidence':str(row.get('evidence','Marked by user'))[:1000]})
+                    'evidence':str(row.get('evidence','Marked by user'))[:1000],
+                    'panel_id':str(row.get('panel_id',''))[:60], 'source_scope_key':str(row.get('source_scope_key',''))[:64]})
     return out
 
 def save_reading(st,pid,aid,data):

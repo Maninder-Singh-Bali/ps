@@ -40,6 +40,7 @@ def reconcile(report):
         if a.get('kind')=='space':continue
         for j in range(i+1,len(rows)):
             b=rows[j]
+            if a.get('panel_id')!=b.get('panel_id'):continue
             if b.get('kind')=='space' or category(a)==category(b):continue
             if {category(a),category(b)} in hierarchy:continue
             if iou(a['bbox'],b['bbox'])>=.8:
@@ -91,7 +92,7 @@ def save_decision(store,pid,aid,data):
     if data.get('revision')!=revision:raise ValueError('Review changed. Refresh before saving.')
     if data.get('source_sha256')!=report.get('source_sha256') or data.get('pipeline_key')!=report.get('pipeline_key'):
         raise ValueError('Analysis changed. Review the updated evidence.')
-    if report.get('stale'):raise ValueError('This analysis is outdated. Resume analysis first.')
+    if report.get('stale'):raise ValueError('This analysis is outdated. Review the source and wait for current-scope analysis.')
     current=reconcile(report);issue=next((v for v in current['review_issues'] if v['id']==data.get('issue_id')),None)
     if not issue:raise ValueError('This issue is no longer present.')
     action=data.get('action');element=data.get('element_id')

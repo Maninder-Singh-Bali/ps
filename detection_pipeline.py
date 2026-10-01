@@ -6,7 +6,7 @@ import requests
 from PIL import Image, ImageOps
 from detection_review import identity, compare_sources, reconcile
 
-VERSION=1
+VERSION=2
 PROMPT='Coordinates range from 0 to 1000 relative to this image. Use tight visible bounds. No prose outside JSON.'
 
 
@@ -37,14 +37,14 @@ def tiles(box,size,limit=1200):
             right=min(x+w,x+(ix+1)*dx+dx*.08);bottom=min(y+h,y+(iy+1)*dy+dy*.08)
             yield [left,top,right-left,bottom-top]
 
-def signature(path,enhanced,model,sections):
+def signature(path,enhanced,model,sections,source_scope=None):
     root=Path(__file__).parent
     modules=['detection_pipeline.py','detection_review.py','object_detection.py','object_knowledge.py','vision_study.py','plan_upscale.py']
-    return identity([VERSION,hashlib.sha256(Path(path).read_bytes()).hexdigest(),hashlib.sha256(Path(enhanced).read_bytes()).hexdigest(),model,sections,
+    return identity([VERSION,hashlib.sha256(Path(path).read_bytes()).hexdigest(),hashlib.sha256(Path(enhanced).read_bytes()).hexdigest(),model,sections,source_scope,
                      {name:hashlib.sha256((root/name).read_bytes()).hexdigest() for name in modules},
                      hashlib.sha256((root/'static/furniture-library.js').read_bytes()).hexdigest()])
 
-def read(path,enhanced,settings,sections,progress,cache_dir=None,cancelled=None):
+def read(path,enhanced,settings,sections,progress,cache_dir=None,cancelled=None,source_scope=None):
     from object_detection import encode_crop,parse_objects,map_box,merge_features
     from object_knowledge import RULES,quality_flags
     from vision_study import MODEL,check_observations
@@ -59,7 +59,7 @@ def read(path,enhanced,settings,sections,progress,cache_dir=None,cancelled=None)
     enhanced_hash=hashlib.sha256(Path(enhanced).read_bytes()).hexdigest();paired=source_hash!=enhanced_hash
     with Image.open(path) as im:original=ImageOps.exif_transpose(im).convert('RGB')
     with Image.open(enhanced) as im:detail=ImageOps.exif_transpose(im).convert('RGB')
-    key=signature(path,enhanced,model,sections)
+    key=signature(path,enhanced,model,sections,source_scope)
     checkpoint=Path(cache_dir)/(key+'.json') if cache_dir else None
     completed={}
     if checkpoint and checkpoint.exists():
@@ -155,10 +155,12 @@ def read(path,enhanced,settings,sections,progress,cache_dir=None,cancelled=None)
         children=[v for v in result['passes'] if v.get('parent_id')==p['id']]
         return p['status']=='saturated' and len(children)==4 and all(covered(v) for v in children)
     coverage=not queue and all(covered(v) for v in result['passes']) and bool(result['passes']) and not was_cancelled
-    result.update(processing_finished=not was_cancelled,coverage_complete=coverage,complete=coverage,cancelled=was_cancelled,
+    saturated=sum(p['status']=='saturated' and p['depth']>=2 for p in result['passes'])
+    failed=sum(p['status']=='failed' for p in result['passes'])
+    result.update(source_scope=source_scope,processing_finished=not was_cancelled,coverage_complete=coverage,complete=coverage,cancelled=was_cancelled,
         geometry_validated=False,user_reviewed=False,source_size=list(original.size),model=model,elapsed_seconds=round(time.monotonic()-started,2),
         coverage={'selected_sections':len(sections),'processed_sections':sorted({v['section_id'] for v in result['passes'] if v.get('section_id')}),
-                  'pending_regions':len(queue),'failed_regions':sum(v['status']=='failed' for v in result['passes']),'network_calls':network_calls,'resumable':bool(checkpoint)},
+                  'pending_regions':len(queue),'failed_regions':failed,'saturated_regions':saturated,'network_calls':network_calls,'resumable':bool(checkpoint and (queue or failed))},
         pipeline_key=key,scale_status='estimated',original_observations=native,scope='Visual estimates; processing coverage is not detection accuracy.')
     result['warnings']=list(dict.fromkeys(result['warnings']))
     return reconcile(result)

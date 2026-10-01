@@ -23,9 +23,9 @@ def fingerprint(plan):
 def run(engine,job):
     import project_storage
     st=engine.store;pid=job['project_id'];aid=job['plan_id']
-    from source_panels import ensure,digest
-    if not ensure(st,pid,aid):
-        st.update_job(job['id'],status='completed',stage='Source review needed: select top-down plan panels before tracing',finished=now(),progress=100);return
+    import source_scope
+    contract=source_scope.prepare(st,job)
+    if contract is None:return
     with st.lock:
         plan=copy.deepcopy(st.asset(aid));before=fingerprint(plan)
         if aid not in st.project(pid)['floor_plans']:raise ValueError('Plan is no longer in this project.')
@@ -33,15 +33,14 @@ def run(engine,job):
         st.update_job(job['id'],status='completed',stage='Native geometry retained; raster tracing skipped',finished=now(),progress=100);return
     st.update_job(job['id'],status='running',stage='Extracting wall strokes from original pixels',progress=None,started=now())
     python=runtime(engine.app_root);worker=Path(engine.app_root)/'raster_geometry.py'
-    enhanced=st.db['assets'].get(plan.get('enhanced_reading_id'))
     scope=plan['source_review']['panels']
-    key=hashlib.sha256(Path(plan['path']).read_bytes()+worker.read_bytes()+json.dumps(scope,sort_keys=True).encode()+(Path(enhanced['path']).read_bytes() if enhanced else b'')).hexdigest()[:24]
+    panels,masked=source_scope.materialize(plan,contract,project_storage.project_root(st,pid)/'Supporting_Files'/'Source_Panels')
+    key=hashlib.sha256(masked.read_bytes()+worker.read_bytes()+contract['key'].encode()).hexdigest()[:24]
     folder=project_storage.project_root(st,pid)/'Supporting_Files'/'Raster_Geometry'/key;folder.mkdir(parents=True,exist_ok=True)
     target=folder/'raster-geometry.json';cached=target.exists()
     if not cached:
         scope_path=folder/'panels.json';scope_path.write_text(json.dumps(scope),encoding='utf-8')
-        args=[str(python),str(worker),plan['path'],str(folder),'--panels',str(scope_path)]
-        if enhanced:args.extend(['--enhanced',enhanced['path']])
+        args=[str(python),str(worker),str(masked),str(folder),'--panels',str(scope_path)]
         process=subprocess.Popen(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env={**os.environ,'OMP_NUM_THREADS':'2','OPENBLAS_NUM_THREADS':'2','MKL_NUM_THREADS':'2'},creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
         started=time.monotonic()
         while process.poll() is None:
@@ -53,11 +52,17 @@ def run(engine,job):
         stdout,stderr=process.communicate()
         if process.returncode:raise ValueError('Boundary tracing failed: '+stderr.decode('utf-8',errors='replace')[-500:])
     result=json.loads(target.read_text(encoding='utf-8'));result['cached']=cached
+    result['source_sha256']=contract['source_sha256'];result['source_contract']=contract
+    sx=plan['width']/result['analysis_size'][0];sy=plan['height']/result['analysis_size'][1]
+    for group in ('walls','uncertain_spans','openings','regions'):
+        for item in result.get(group,[]):
+            points=item.get('geometry',{}).get('points') or item.get('points') or item.get('polygon') or []
+            matches=[p for p in contract['panels'] if points and all(p['pixel_box'][0]<=q[0]*sx<=p['pixel_box'][2] and p['pixel_box'][1]<=q[1]*sy<=p['pixel_box'][3] for q in points)]
+            if len(matches)==1:item.update(panel_id=matches[0]['id'],floor=matches[0].get('floor',''))
     with st.lock:
         current=st.asset(aid)
-        if fingerprint(current)!=before:
-            current['raster_suggestion']=result
-            st.update_job(job['id'],status='completed',stage='New boundaries saved separately; your edits were preserved',progress=100,finished=now());return
+        if fingerprint(current)!=before or not source_scope.current(current,contract) or job.get('status')=='cancelled':
+            st.update_job(job['id'],status='cancelled',stage='Inputs changed; obsolete boundaries discarded',finished=now());return
         from engine import register_asset
         previous=current.get('raster_geometry',{})
         if previous and any(previous.get(k)!=result.get(k) for k in ('walls','uncertain_spans','openings','regions')):
@@ -74,7 +79,8 @@ def apply_report(plan,result):
     result=identified(result)
     previous=plan.get('raster_geometry') or {}
     corrections,orphaned=reconcile(plan,result)
-    if previous!=result:
+    evidence=('source_sha256','analysis_size','source_contract','source_scope','walls','uncertain_spans','openings','regions')
+    if any(previous.get(k)!=result.get(k) for k in evidence):
         old_index,new_index=indexed(previous),indexed(result)
         by_identity={token:key for key,(_,token) in new_index.items()}
         drawing=plan.setdefault('drawing',{})
@@ -126,7 +132,10 @@ def elements(plan):
     if not report:return []
     if plan.get('source_review'):
         from source_panels import valid,digest
+        from source_scope import current
         if not valid(plan) or report.get('source_scope')!=digest(plan['source_review']['panels']):return []
+        if report.get('source_contract') and not current(plan,report['source_contract']):return []
+        if not report.get('source_contract') and plan['source_review'].get('revision',0)>0:return []
     sx=plan['width']/report['analysis_size'][0];sy=plan['height']/report['analysis_size'][1];result=[]
     for wall in paths(plan,True):
         correction=correction_for(plan,wall['id'])

@@ -88,6 +88,10 @@ def inspect(store,pid,aid):
     from drawing_scene import resolve
     from source_panels import valid,digest
     active=not plan.get('source_review') or valid(plan) and (plan.get('raster_geometry') or {}).get('source_scope')==digest(plan['source_review']['panels'])
+    from source_scope import current
+    rg=plan.get('raster_geometry') or {}
+    if rg.get('source_contract'):active=active and current(plan,rg['source_contract'])
+    elif plan.get('source_review',{}).get('revision',0)>0:active=False
     observations=[{'id':f['id'],'label':f.get('label','Curved wall')} for f in plan.get('plan_reading',{}).get('features',[]) if f.get('kind')=='curved_wall' and f.get('review_status')=='confirmed']
     return {'plan_id':aid,'fingerprint':fingerprint(plan,p),'can_generate':bool(checks) and all(c['can_generate'] for c in checks),
             'source_review':copy.deepcopy(plan.get('source_review')),'wall_runs':groups(plan),

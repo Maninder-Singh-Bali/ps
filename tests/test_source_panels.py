@@ -26,7 +26,7 @@ class SourcePanels(unittest.TestCase):
         s=source.classify(self.path);self.assertEqual(s['kind'],'mixed');self.assertTrue(s['panels']);self.assertFalse(s['automatic_trace'])
         self.assertTrue(all(p['bbox'][1]>.45 for p in s['panels']))
     def test_source_change_stale_form_and_undo_preserve_saved_drawing(self):
-        source.ensure(self.st,self.p['id'],self.a['id']);self.a['drawing']={'features':[{'id':'saved'}]}
+        source.ensure(self.st,self.p['id'],self.a['id']);self.a['source_review']['reviewed']=True;self.a['drawing']={'features':[{'id':'saved'}]}
         old=copy.deepcopy(self.a['drawing'])
         source.save(self.st,self.p['id'],self.a['id'],dict(revision=0,kind='perspective_or_photo',panels=[],checked=True))
         self.assertFalse(source.valid(self.a));self.assertEqual(old,self.a['drawing'])
@@ -36,7 +36,7 @@ class SourcePanels(unittest.TestCase):
             source.save(self.st,self.p['id'],self.a['id'],dict(revision=2,kind='plan',panels=[None],checked=True))
         self.a['sha256']='changed';self.assertFalse(source.valid(self.a))
     def test_old_report_cannot_extrude_after_crop_change(self):
-        source.ensure(self.st,self.p['id'],self.a['id']);self.a['raster_geometry']={'analysis_size':[600,600],'walls':[{'id':'w','width_px':8,'geometry':{'points':[[60,60],[540,60]],'type':'line'}}]}
+        source.ensure(self.st,self.p['id'],self.a['id']);self.a['source_review']['reviewed']=True;self.a['raster_geometry']={'analysis_size':[600,600],'walls':[{'id':'w','width_px':8,'geometry':{'points':[[60,60],[540,60]],'type':'line'}}]}
         self.assertEqual(elements(self.a),[])
         self.a['raster_geometry']['source_scope']=source.digest(self.a['source_review']['panels']);self.assertEqual(len(elements(self.a)),1)
         self.a['source_review']['kind']='perspective_or_photo';self.assertEqual(elements(self.a),[])

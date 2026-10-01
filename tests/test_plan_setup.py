@@ -21,6 +21,7 @@ class PlanSetup(unittest.TestCase):
         self.st=Store(self.root/'data');self.p=self.st.create_project('Import test');self.pid=self.p['id']
         self.path=self.root/'plan.png';im=Image.new('RGB',(400,200),'white');ImageDraw.Draw(im).rectangle((30,30,370,170),outline='black',width=5);im.save(self.path)
         self.a=register_asset(self.st,self.pid,self.path,'plan');self.p['floor_plans'].append(self.a['id'])
+        self.a['source_review']={'kind':'plan','reviewed':True,'revision':0,'source_sha256':self.a['sha256'],'panels':[{'id':'plan','bbox':[0,0,1,1]}]}
         self.a['plan_reading']={'features':[],'revision':0};plan_setup.initialize(self.a)
         self.engine=Engine(self.st,ROOT)
         self.job=self.st.new_job(self.pid,'plan_setup',plan_id=self.a['id'])

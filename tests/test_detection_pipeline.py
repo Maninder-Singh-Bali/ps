@@ -65,7 +65,17 @@ class PipelineTests(unittest.TestCase):
             self.assertFalse(r['coverage_complete']);second=FakeSession();r=self.run_reader(root,second)
             self.assertTrue(r['coverage_complete']);self.assertEqual(second.calls,1)
             before=detection_pipeline.signature(root/'plan.png',root/'plan.png','m',[])
-            with patch('detection_pipeline.VERSION',2):self.assertNotEqual(before,detection_pipeline.signature(root/'plan.png',root/'plan.png','m',[]))
+            with patch('detection_pipeline.VERSION',999):self.assertNotEqual(before,detection_pipeline.signature(root/'plan.png',root/'plan.png','m',[]))
+    def test_exhausted_dense_regions_are_not_resumable(self):
+        rows=[{'name':'chair','kind':'furniture','bbox_2d':[i*20,10,i*20+10,20]} for i in range(20)]
+        with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as temp:
+            result=self.run_reader(Path(temp),FakeSession(rows),settings={'detection_max_passes':128})
+            self.assertFalse(result['coverage_complete']);self.assertEqual(result['coverage']['pending_regions'],0)
+            self.assertGreater(result['coverage']['saturated_regions'],0);self.assertFalse(result['coverage']['resumable'])
+    def test_scope_revision_is_part_of_cache_identity(self):
+        with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as temp:
+            path=Path(temp)/'plan.png';Image.new('RGB',(8,8)).save(path)
+            self.assertNotEqual(detection_pipeline.signature(path,path,'m',[],{'revision':1}),detection_pipeline.signature(path,path,'m',[],{'revision':2}))
     def test_cancel_retains_completed_passes(self):
         with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as temp:
             session=FakeSession();r=self.run_reader(Path(temp),session,cancelled=lambda:session.calls>=1)

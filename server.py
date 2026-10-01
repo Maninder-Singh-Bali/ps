@@ -242,7 +242,11 @@ class Handler(BaseHTTPRequestHandler):
             if s[5]=='import-visual':return vision_study.import_proposals(st,pid,s[4],d)
             ids=d.get('section_ids',[])
             if not isinstance(ids,list) or len(ids)>100 or any(not any(r['id']==i and r['plan_id']==s[4] and r.get('bbox') for r in p['rooms']) for i in ids):raise ValueError('Choose selected sections from this full plan (up to 100).')
-            if not st.asset(s[4]).get('plan_source',{}).get('vector'):st.new_job(pid,'raster_reconstruction',plan_id=s[4])
+            from source_scope import capture
+            capture(st.asset(s[4]))
+            report=st.asset(s[4]).get('vision_report') or {}
+            if (not report.get('source_scope') or report.get('source_scope')==capture(st.asset(s[4]))) and report.get('coverage_complete') is False and not report.get('coverage',{}).get('pending_regions') and not report.get('coverage',{}).get('failed_regions'):
+                raise ValueError('This detector exhausted the selected regions. Correct the evidence or change the detection approach; Resume cannot recover saturated output.')
             return st.new_job(pid,'vision_study',plan_id=s[4],section_ids=ids,input_revision=p['map_revision'],study_revision=st.asset(s[4]).get('plan_reading',{}).get('revision',0))
         if len(s)==6 and s[3]=='plans' and s[5] in ('repair-structure','undo-structure','floor-camera','camera-preview') and method=='POST':
             if s[5]=='camera-preview':return shared_floor.preview_camera(st,pid,s[4],d)

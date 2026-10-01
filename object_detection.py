@@ -63,6 +63,6 @@ def parse_objects(raw,mode):
     return clean_result({'features':features,'uncertainties':raw.get('uncertainties',[])})
 
 
-def read(path,enhanced,settings,sections,progress,cache_dir=None,cancelled=None):
+def read(path,enhanced,settings,sections,progress,cache_dir=None,cancelled=None,source_scope=None):
     from detection_pipeline import read as run_pipeline
-    return run_pipeline(path,enhanced,settings,sections,progress,cache_dir,cancelled)
+    return run_pipeline(path,enhanced,settings,sections,progress,cache_dir,cancelled,source_scope)

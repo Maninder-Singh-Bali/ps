@@ -62,9 +62,17 @@ class Store:
     def new_job(self,pid,kind,room_id=None,**extra):
         with self.lock:
             p=self.project(pid)
+            scoped=kind in ('plan_setup','vision_study','raster_reconstruction') and extra.get('plan_id') in self.db['assets']
+            if scoped:
+                from source_scope import capture
+                extra['source_scope']=capture(self.asset(extra['plan_id']),approved=False)
+            if kind=='analysis':
+                from source_scope import capture
+                extra['source_scopes']={aid:capture(self.asset(aid)) for aid in extra.get('plan_ids',[])}
             for job in self.db['jobs'].values():
                 if job['project_id']==pid and job['kind']==kind and job.get('room_id')==room_id and job['status'] in ('queued','waiting','running'):
                     if kind in ('plan_setup','vision_study','raster_reconstruction') and job.get('plan_id')!=extra.get('plan_id'):continue
+                    if scoped and job.get('source_scope',{}).get('key')!=extra['source_scope']['key']:continue
                     if kind=='component_download' and job.get('component_id')!=extra.get('component_id'):continue
                     return job
             j={'id':uid(),'project_id':pid,'room_id':room_id,'kind':kind,'status':'queued','stage':'Queued','progress':None,'created':now(),'updated':now(),'error':None,'prompt_id':None,'events':[],**extra}

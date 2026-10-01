@@ -56,19 +56,19 @@ def classify(path):
     # Mixed/uncertain crops require a quick source review; they never trace until
     # the user confirms/corrects the proposed panels in the dashboard.
     return {'version':VERSION,'kind':kind,'panels':panels,'metrics':m,'source_sha256':hashlib.sha256(Path(path).read_bytes()).hexdigest(),
-            'revision':0,'reviewed':False,'automatic_trace':kind=='plan','source_size':list(size),
+            'revision':0,'reviewed':False,'automatic_trace':False,'source_size':list(size),
             'method':'CPU whiteness/chroma, long orthogonal strokes and whitespace panel proposals; uncertain sources require crop review.'}
 
 def valid(plan):
     s=plan.get('source_review') or {}
-    return s.get('source_sha256')==plan.get('sha256') and s.get('kind') in ('plan','mixed') and bool(s.get('panels')) and (s.get('reviewed') or s.get('automatic_trace'))
+    return s.get('source_sha256')==plan.get('sha256') and s.get('kind') in ('plan','mixed') and bool(s.get('panels')) and s.get('reviewed') is True
 
 
 def ensure(st,pid,aid):
     """Classify outside the store lock, then attach only to unchanged evidence."""
     with st.lock:
         plan=copy.deepcopy(st.asset(aid))
-        if plan.get('plan_source',{}).get('vector'):return True
+        if plan.get('plan_source',{}).get('vector'):return valid(plan) if plan.get('source_review') else True
         if plan.get('source_review',{}).get('source_sha256')==plan.get('sha256'):return valid(plan)
     result=classify(plan['path'])
     with st.lock:
@@ -80,6 +80,33 @@ def ensure(st,pid,aid):
         return valid(current)
 
 def save(st,pid,aid,data):
+    """Commit crop revision, invalidation and follow-up jobs as one saved change."""
+    with st.lock:
+        plan=st.asset(aid);project=st.project(pid)
+        staged=copy.copy(st)
+        staged.db={**st.db,'assets':{**st.db['assets'],aid:copy.deepcopy(plan)},
+                   'projects':{**st.db['projects'],pid:copy.deepcopy(project)},'jobs':copy.deepcopy(st.db['jobs'])}
+        staged.save=lambda:None
+        _save(staged,pid,aid,data)
+        old_plan=copy.deepcopy(plan);old_project=copy.deepcopy(project)
+        changed={key:value for key,value in staged.db['jobs'].items() if value!=st.db['jobs'].get(key)}
+        old_jobs={key:copy.deepcopy(st.db['jobs'].get(key)) for key in changed}
+        try:
+            plan.clear();plan.update(staged.asset(aid));project.clear();project.update(staged.project(pid))
+            for key,value in changed.items():
+                if key in st.db['jobs']:st.db['jobs'][key].clear();st.db['jobs'][key].update(value)
+                else:st.db['jobs'][key]=value
+            st.save()
+        except Exception:
+            plan.clear();plan.update(old_plan);project.clear();project.update(old_project)
+            for key,value in old_jobs.items():
+                if value is None:st.db['jobs'].pop(key,None)
+                else:st.db['jobs'][key].clear();st.db['jobs'][key].update(value)
+            raise
+        return plan['source_review']
+
+
+def _save(st,pid,aid,data):
     from store import editing_busy,now
     plan=st.asset(aid)
     if aid not in st.project(pid)['floor_plans']:raise ValueError('Choose this project’s source.')
@@ -101,7 +128,9 @@ def save(st,pid,aid,data):
             if not isinstance(b,list) or len(b)!=4 or any(type(v) not in (int,float) or not math.isfinite(v) for v in b):raise ValueError('Mark a rectangular plan panel.')
             x,y,w,h=b
             if min(x,y)<0 or min(w,h)<.02 or x+w>1.00001 or y+h>1.00001:raise ValueError('Keep plan panels inside the original.')
-            clean.append({'id':f'panel{i+1}','bbox':b,'status':'reviewed'})
+            panel_id=str(p.get('id') or f'panel{i+1}')
+            if not panel_id.replace('-','').replace('_','').isalnum() or len(panel_id)>60 or any(v['id']==panel_id for v in clean):raise ValueError('Use unique panel identities.')
+            clean.append({'id':panel_id,'bbox':b,'floor':str(p.get('floor') or '')[:80],'status':'reviewed'})
         if kind in ('plan','mixed') and not clean:raise ValueError('Mark at least one plan panel.')
         if data.get('checked') is not True:raise ValueError('Confirm that the selected panels contain top-down plans only.')
         plan.setdefault('source_review_undo',[]).append(copy.deepcopy(current))
@@ -114,7 +143,19 @@ def save(st,pid,aid,data):
             if room.get('plan_id')==aid:st.invalidate(pid,room)
         st.save()
     except Exception:plan.clear();plan.update(before);project.clear();project.update(old_project);raise
-    if valid(plan):st.new_job(pid,'raster_reconstruction',plan_id=aid)
+    # Cancel superseded work without deleting its report or manually reviewed data.
+    from source_scope import capture
+    scope=capture(plan,approved=False)
+    for job in list(st.db['jobs'].values()):
+        if job.get('plan_id')==aid and job['kind'] in ('plan_setup','vision_study','raster_reconstruction') and job['status'] in ('queued','waiting','running'):
+            if job.get('source_scope',{}).get('key')!=scope['key']:
+                st.update_job(job['id'],status='cancelled',stage='Superseded by source panel review',finished=now())
+    if plan.get('vision_report'):plan['vision_report']['stale']=True
+    plan.setdefault('setup',{})['status']='queued' if valid(plan) else 'blocked_source'
+    st.save()
+    if valid(plan):
+        st.new_job(pid,'raster_reconstruction',plan_id=aid)
+        st.new_job(pid,'plan_setup',plan_id=aid)
     return review
 
 def mask_for(size,panels):

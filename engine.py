@@ -349,20 +349,28 @@ class Engine:
         self.store.update_job(job['id'],status='completed',stage='Ready for review',progress=100,eta=None,result_asset_id=a['id'],finished=now())
     def run_analysis(self,job):
         from analysis import analyze_local,analyze_vision
+        import source_scope
         p=self.store.project(job['project_id']);plan_ids=list(job['plan_ids']);combined=[];warnings=[];engines=[]
+        scopes={aid:source_scope.capture(self.store.asset(aid)) for aid in plan_ids}
+        if job.get('source_scopes') and scopes!=job['source_scopes']:raise ValueError('Source panels changed while queued.')
         self.store.update_job(job['id'],status='running',stage='Reading floor plan',progress=None)
         def progress(stage,value):self.store.update_job(job['id'],stage=stage,progress=value)
         for i,aid in enumerate(plan_ids):
             a=self.store.asset(aid);folder=project_storage.analysis_folder(self.store,p['id'],job['id'],aid);folder.mkdir(parents=True,exist_ok=True)
-            if self.store.db['settings'].get('vision_model'):result=analyze_vision(a['path'],aid,self.store.db['settings'],progress)
-            else:result=analyze_local(a['path'],aid,folder,progress)
-            combined+=result['rooms'];warnings+=result.get('warnings',[]);engines.append(result['engine']);progress(f'Read {i+1} of {len(plan_ids)} plan pages',round(100*(i+1)/len(plan_ids)))
+            panels,_=source_scope.materialize(a,scopes[aid],folder/'Source_Panels')
+            for panel in panels:
+                if self.store.db['settings'].get('vision_model'):result=analyze_vision(panel['path'],aid,self.store.db['settings'],progress)
+                else:result=analyze_local(panel['path'],aid,folder/panel['id'],progress)
+                combined.extend(source_scope.map_row(row,panel,scopes[aid]) for row in result['rooms'])
+                warnings+=result.get('warnings',[]);engines.append(result['engine'])
+            progress(f'Read {i+1} of {len(plan_ids)} plan pages',round(100*(i+1)/len(plan_ids)))
         with self.store.lock:
+            if any(not source_scope.current(self.store.asset(aid),scope) for aid,scope in scopes.items()):raise ValueError('Source panels changed; analysis results discarded.')
             if p['map_revision']!=job['input_revision']:raise ValueError('The room map changed while analysis was running. Results were not applied; analyze again when ready.')
             # Preserve user edits: analysis is only allowed on an empty map.
             if p['rooms']:raise ValueError('Rooms already exist. Create another project to analyze a replacement plan without losing your work.')
             for row in combined:
-                r=self.store.add_room(p['id'],row['name'],row['floor'],row['plan_id'],row.get('bbox'),row.get('kind','room'),confidence=row.get('confidence','medium'),detection_note=row.get('detection_note','Review this proposal.'))
+                r=self.store.add_room(p['id'],row['name'],row['floor'],row['plan_id'],row.get('bbox'),row.get('kind','room'),confidence=row.get('confidence','medium'),detection_note=row.get('detection_note','Review this proposal.'),panel_id=row.get('panel_id'),source_scope_key=row.get('source_scope_key'))
             p['analysis']={'engine':', '.join(sorted(set(engines))),'warnings':list(dict.fromkeys(warnings)),'label_count':len(combined),'reviewed':False};self.store.save()
         self.store.update_job(job['id'],status='completed',stage=f'{len(combined)} suggested sections Â· review required',progress=100,finished=now())
     def worker(self):

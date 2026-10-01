@@ -16,6 +16,7 @@ class SharedFloorHealth(unittest.TestCase):
   self.a['drawing']={'revision':0,'features':[{'id':'newwall','kind':'wall','points':[[100,0],[100,100]]},{'id':'newoutside','kind':'wall','points':[[0,0],[200,0]]}],'edits':{}}
   self.f={'id':'passage','kind':'space','label':'Living to kitchen','bbox':[.49,.3,.02,.4],'floor':'Lower','room_id':self.r['id'],'connection_room_id':self.other['id'],'review_status':'confirmed','shape':'unspecified','notes':'No dividing wall'}
   self.a['plan_reading']={'revision':0,'reviewed':True,'features':[self.f],'checks':{},'warnings':[]};self.p['map_confirmed']=True;self.st.save()
+  self.a['source_review']={'kind':'plan','reviewed':True,'revision':0,'source_sha256':self.a['sha256'],'panels':[{'id':'plan','bbox':[0,0,1,1]}]}
  def tearDown(self):self.tmp.cleanup()
  def fake_raster(self,source,dest):Image.new('RGB',(200,100),'white').save(dest)
  def test_explicit_courtyard_void_only_cuts_its_own_floor(self):
@@ -147,7 +148,7 @@ class SharedFloorHealth(unittest.TestCase):
   self.assertEqual(len(scene['lines']),3)
  def test_vision_predictions_remain_pending_and_do_not_overwrite_verified_feature(self):
   row={**self.f,'seat_count':None,'object_type':''};fresh={**row,'id':'visionchair','kind':'furniture','label':'Sofa','bbox':[.1,.1,.1,.2],'seat_count':3}
-  self.a['vision_report']={'input_map_revision':self.p['map_revision'],'features':[row,fresh]}
+  self.a['vision_report']={'input_map_revision':self.p['map_revision'],'features':[row,fresh],'source_scope':__import__('source_scope').capture(self.a)}
   result=vision_study.import_proposals(self.st,self.pid,self.aid,{'revision':0})
   self.assertEqual(result['added'],1);self.assertFalse(self.a['plan_reading']['reviewed']);self.assertEqual(self.a['plan_reading']['features'][0]['review_status'],'confirmed')
   self.assertEqual(self.a['plan_reading']['features'][1]['review_status'],'pending')
@@ -171,7 +172,7 @@ class SharedFloorHealth(unittest.TestCase):
   self.assertIn('seats: 3',plan_reading.instruction(self.a,self.r))
  def test_room_sized_furniture_prediction_is_not_imported(self):
   report=vision_study.clean_result({'features':[{'kind':'furniture','bbox':self.r['bbox'],'label':'sofa','seat_count':3}]})
-  report=vision_study.check_observations(report,[self.r]);report['input_map_revision']=self.p['map_revision'];self.a['vision_report']=report
+  report=vision_study.check_observations(report,[self.r]);report['input_map_revision']=self.p['map_revision'];self.a['vision_report']=report;report['source_scope']=__import__('source_scope').capture(self.a)
   self.assertTrue(report['features'][0]['location_unresolved']);self.assertFalse(report['accuracy_verified'])
   with self.assertRaisesRegex(ValueError,'No new usable'):vision_study.import_proposals(self.st,self.pid,self.aid,{'revision':0})
  def test_neighbour_product_changes_invalidate_shared_scene(self):

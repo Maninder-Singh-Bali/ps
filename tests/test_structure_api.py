@@ -14,6 +14,7 @@ class StructureAPI(unittest.TestCase):
   self.assertEqual(res.status_code,200);aid=res.json()['assets'][0]['id']
   self.call(self.route,{'plan_id':aid,'bbox':[0,0,.5,1]},'PATCH')
   other=self.call(f'/api/projects/{self.pid}/rooms',{'name':'Kitchen','floor':'Ground floor','plan_id':aid,'bbox':[.5,0,.5,1]})
+  a=self.st.asset(aid);a['source_review']={'kind':'plan','reviewed':True,'revision':0,'source_sha256':a['sha256'],'panels':[{'id':'plan','bbox':[0,0,1,1]}]}
   return aid,other,f'/api/projects/{self.pid}/plans/{aid}'
  def test_structure_and_scene_endpoints_do_not_change_plan(self):
   aid,other,base=self.prepare();before=self.st.snapshot()
@@ -25,6 +26,16 @@ class StructureAPI(unittest.TestCase):
   self.assertEqual(one['id'],two['id']);self.assertEqual(one['kind'],'vision_study')
   self.call(base+'/read-visual',{'section_ids':['missing']},status=400)
   self.call(base+'/import-visual',{'revision':0},status=400)
+ def test_exhausted_analysis_cannot_queue_a_misleading_resume(self):
+  from source_scope import capture
+  aid,other,base=self.prepare();a=self.st.asset(aid)
+  for scope in (None,capture(a)):
+   a['vision_report']={'source_scope':scope,'coverage_complete':False,'coverage':{'pending_regions':0,'failed_regions':0,'saturated_regions':4}}
+   response=self.call(base+'/read-visual',{},status=400)
+   self.assertIn('exhausted',response['error'])
+  self.assertFalse(any(j['kind']=='vision_study' for j in self.st.db['jobs'].values()))
+  a['vision_report']['coverage']['pending_regions']=1
+  self.assertEqual(self.call(base+'/read-visual',{})['kind'],'vision_study')
  def test_plan_errors_block_image_and_video_without_queueing(self):
   aid,other,base=self.prepare();self.call(self.route+'/generate-image',{},status=400);self.call(self.route+'/generate-video',{},status=400)
   self.assertFalse(any(j['kind'] in ('image','video','reference') for j in self.st.db['jobs'].values()))

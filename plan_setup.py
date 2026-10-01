@@ -52,13 +52,13 @@ def normalized_rooms(rows,aid):
 
 def run(engine,job):
     st=engine.store;pid=job['project_id'];aid=job['plan_id']
-    from source_panels import ensure
-    if not ensure(st,pid,aid):
-        st.update_job(job['id'],status='completed',stage='Review source panels before architectural analysis',progress=100,finished=now());return
+    import source_scope
+    scope=source_scope.prepare(st,job)
+    if scope is None:return
     with st.lock:
         p=st.project(pid);a=st.asset(aid)
         if aid not in p['floor_plans']:raise ValueError('The imported plan is no longer in this project.')
-        if a.get('setup',{}).get('status') in ('ready','needs_review'):
+        if a.get('setup',{}).get('status') in ('ready','needs_review') and a.get('setup',{}).get('source_scope')==scope:
             st.update_job(job['id'],status='completed',stage='Plan already prepared',progress=100,finished=now());return
         original=fingerprint(a,p);plan=copy.deepcopy(a)
     st.update_job(job['id'],status='running',stage='Preparing floor plan',progress=None)
@@ -67,10 +67,12 @@ def run(engine,job):
     except Exception as exc:warnings.append('Structure reading needs review: '+str(exc)[:250])
     try:
         folder=project_storage.analysis_folder(st,pid,job['id'],aid)
-        result=analysis.analyze_local(plan['path'],aid,folder,
-             lambda stage,value:st.update_job(job['id'],stage=stage,progress=value))
-        rooms=normalized_rooms(result.get('rooms',[]),aid)
-        warnings.extend(result.get('warnings',[]))
+        panels,_=source_scope.materialize(plan,scope,folder/'Source_Panels')
+        for panel in panels:
+            result=analysis.analyze_local(panel['path'],aid,folder/panel['id'],
+                 lambda stage,value:st.update_job(job['id'],stage=stage,progress=value))
+            rooms.extend(source_scope.map_row(row,panel,scope) for row in normalized_rooms(result.get('rooms',[]),aid))
+            warnings.extend(result.get('warnings',[]))
     except Exception as exc:warnings.append('Room labels need review: '+str(exc)[:250])
     warnings.extend((reading or {}).get('warnings',[]))
     if not plan.get('plan_source',{}).get('metres_per_pixel'):
@@ -78,8 +80,10 @@ def run(engine,job):
     with st.lock:
         # An editor/save or another reader wins over background proposals.
         current=st.asset(aid);project=st.project(pid)
+        if not source_scope.current(current,scope) or job.get('status')=='cancelled':
+            st.update_job(job['id'],status='cancelled',stage='Source scope changed; setup result discarded',finished=now());return
         if fingerprint(current,project)!=original or any(r.get('plan_id')==aid for r in project['rooms']):
-            current['setup']={**current.get('setup',{}),'status':'needs_review','warnings':warnings,
+            current['setup']={**current.get('setup',{}),'status':'needs_review','source_scope':scope,'warnings':warnings,
                               'suggested_rooms':rooms,'suggested_reading':reading,'reviewed':False,
                               'note':'Plan changed during setup; existing edits were preserved.'}
             st.update_job(job['id'],status='completed',stage='Suggestions ready; existing edits kept',progress=100,finished=now())
@@ -91,7 +95,7 @@ def run(engine,job):
         target=staged.asset(aid)
         if reading:target['plan_reading']=reading
         target['setup']={'protocol_version':PROTOCOL_VERSION,'status':'needs_review',
-                         'warnings':list(dict.fromkeys(warnings)),'reviewed':False,'completed':now()}
+                         'source_scope':scope,'warnings':list(dict.fromkeys(warnings)),'reviewed':False,'completed':now()}
         staged.project(pid)['map_confirmed']=False
         staged.update_job(job['id'],status='completed',stage=f'{len(rooms)} suggested sections · review required',progress=100,finished=now())
         # Preserve live job identities for cancellation in the concurrent model
