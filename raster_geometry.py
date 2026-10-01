@@ -114,13 +114,16 @@ def fit_path(points):
     return {'type':'polyline','points':simple,'max_error_px':.8,'note':'Curve retained as a tolerance-bounded pixel trace; no reliable single-circle fit.'}
 
 
-def run(source,folder,enhanced=None):
+def run(source,folder,enhanced=None,panels=None):
     started=time.monotonic();folder=Path(folder);folder.mkdir(parents=True,exist_ok=True)
     source=Path(source);source_hash=hashlib.sha256(source.read_bytes()).hexdigest()
     with Image.open(source) as im:image=ImageOps.exif_transpose(im).convert('RGB')
     original_size=image.size;ratio=min(1,1600/max(image.size))
     if ratio<1:image=image.resize(tuple(round(v*ratio) for v in image.size),Image.Resampling.LANCZOS)
-    gray=np.asarray(image.convert('L'));height,width=gray.shape
+    gray=np.asarray(image.convert('L')).copy();height,width=gray.shape
+    if panels is not None:
+        from source_panels import mask_for
+        gray[~mask_for(image.size,panels)]=255
     ink=gray<180;distance=ndi.distance_transform_edt(ink)
     # Core width excludes most single-pixel furniture, text and dimension strokes.
     core=distance>=2.25;mask=ndi.binary_dilation(core,iterations=3)&ink
@@ -213,6 +216,9 @@ def run(source,folder,enhanced=None):
             'candidate_exterior':outer[0] if outer else None,'uncertain_spans':uncertain_spans,'regions':regions,'openings':openings,'gap_repairs':repairs,
             'geometry_validated':False,'verified_model':False,'warnings':warnings,'elapsed_seconds':round(time.monotonic()-started,3)}
     from raster_identity import identified
+    if panels is not None:
+        from source_panels import digest
+        result['source_scope']=digest(panels)
     result=identified(result)
     Image.fromarray(mask.astype(np.uint8)*255).save(folder/'wall-mask.png')
     Image.fromarray((ink&~mask).astype(np.uint8)*255).save(folder/'excluded-thin-strokes.png')
@@ -231,6 +237,6 @@ if __name__=='__main__':
     import argparse,sys
     # Isolated Windows runtimes do not put the script directory on sys.path.
     sys.path.insert(0,str(Path(__file__).resolve().parent))
-    parser=argparse.ArgumentParser();parser.add_argument('source');parser.add_argument('folder');parser.add_argument('--enhanced')
-    args=parser.parse_args();r=run(args.source,args.folder,args.enhanced)
+    parser=argparse.ArgumentParser();parser.add_argument('source');parser.add_argument('folder');parser.add_argument('--enhanced');parser.add_argument('--panels')
+    args=parser.parse_args();r=run(args.source,args.folder,args.enhanced,json.loads(Path(args.panels).read_text()) if args.panels else None)
     print(json.dumps({'wall_candidates':len(r['walls']),'regions':len(r['regions']),'openings':len(r['openings']),'elapsed_seconds':r['elapsed_seconds']}))

@@ -11,9 +11,10 @@
  const rooms=()=>state.projects[session.pid].rooms.filter(r=>r.plan_id===session.aid&&r.bbox);
  const currentOwner=()=>session?.pid===pid&&session?.aid===(tab==='plan'?planId:R()?.plan_id||planId);
 
- function reviewStateKey(){const a=A(session?.aid);return JSON.stringify([a?.vision_report?.pipeline_key,a?.vision_report?.elapsed_seconds,a?.vision_report?.features?.length,a?.review_revision,a?.raster_revision,a?.raster_geometry?.pipeline_key,a?.drawing?.revision,a?.plan_reading?.revision,state.projects[session?.pid]?.map_revision])}
+ function reviewStateKey(){const a=A(session?.aid);return JSON.stringify([a?.vision_report?.pipeline_key,a?.vision_report?.elapsed_seconds,a?.vision_report?.features?.length,a?.review_revision,a?.raster_revision,a?.source_review?.revision,a?.raster_geometry?.pipeline_key,a?.drawing?.revision,a?.plan_reading?.revision,state.projects[session?.pid]?.map_revision])}
 
  async function load(force=false){
+  if(!force&&window.SourcePanels?.pending())return;
   if(!session)return;const target=session;
   if(target.loading){if(!force)return target.pending;await target.pending;if(target!==session)return}
   target.loading=true;const stateKey=reviewStateKey();
@@ -53,9 +54,9 @@
 
 ${d.vision_report?`<details><summary>Local visual reading · ${d.vision_report.elapsed_seconds}s · ${d.vision_report.features.length} estimates${d.vision_report.complete===false?' · incomplete':''}</summary><p>Estimated sections and objects. Review against the original before using their bounds.</p><ul>${d.vision_report.features.map(f=>`<li>${esc(f.label)}${f.seat_count?` · ${f.seat_count} seats`:''} · ${esc(f.confidence)} confidence${f.suggested_asset_id?' · library match: '+esc(f.suggested_asset_id):' · no exact library match'} — ${esc(f.evidence)}</li>`).join('')}</ul><p>${d.vision_report.warnings.map(esc).join(' · ')}</p>${button('Add predictions to review','import-vision',!d.vision_report.features.length||!!d.vision_report.imported||d.vision_report.input_map_revision!==state.projects[session.pid].map_revision)}</details>`:''}
 
-<aside class="review-issue-list" aria-label="Unresolved items">${window.RasterReview?.panel(d)||''}<h2>Needs your review</h2>
+<aside class="review-issue-list" aria-label="Unresolved items">${window.SourcePanels?.panel(d)||''}${window.RasterReview?.panel(d)||''}<h2>Needs your review</h2>
 
-${(d.vision_report?.review_issues||[]).filter(i=>!['accept','reject'].includes(i.status)).map(i=>`<article data-review-issue="${esc(i.id)}"><button class="review-locate" data-review-focus="${esc(i.id)}">${esc(i.message)}</button><p>Compare the highlighted source before choosing.</p>${(i.alternatives||[]).map(a=>`<button class="btn small" data-review-decision="accept" data-issue="${esc(i.id)}" data-element="${esc(a.id)}">Use ${esc(a.label)}</button>`).join('')}<div>${button('Change in study','study')}<button class="btn small" data-review-decision="reject" data-issue="${esc(i.id)}">Reject</button><button class="btn small" data-review-decision="defer" data-issue="${esc(i.id)}">Defer</button></div>${i.status==='defer'?'<small>Deferred · still unresolved</small>':''}</article>`).join('')||`<p>${rs.length?'No classification conflicts found. Geometry still needs review.':'Room analysis incomplete. No validated room boundaries yet.'}</p>`}
+${(d.vision_report?.review_issues||[]).filter(i=>!['accept','reject'].includes(i.status)).map(i=>`<article data-review-issue="${esc(i.id)}"><button class="review-locate" data-review-focus="${esc(i.id)}">${esc(i.message)}</button><p>Compare the highlighted source before choosing.</p>${(i.alternatives||[]).map(a=>`<button class="btn small" data-review-decision="accept" data-issue="${esc(i.id)}" data-element="${esc(a.id)}">Use ${esc(a.label)}</button>`).join('')}<div>${button('Change in study','study')}<button class="btn small" data-review-decision="reject" data-issue="${esc(i.id)}">Reject</button><button class="btn small" data-review-decision="defer" data-issue="${esc(i.id)}">Defer</button></div>${i.status==='defer'?'<small>Deferred · still unresolved</small>':''}</article>`).join('')||`<p>${rs.length?(d.raster_validation?.geometry_validated?'No classification conflicts remain. Estimated dimensions still need verification.':'No classification conflicts found. Geometry still needs review.'):'Room analysis incomplete. No validated room boundaries yet.'}</p>`}
 
 <p class="help">${d.vision_report?.coverage_complete===true?'Selected regions processed. Accuracy unverified.':d.vision_report?.coverage_complete===false?'Coverage incomplete. Resume analysis.':'Legacy analysis: coverage unverified.'}</p><p class="help">Scale estimated unless calibrated.</p>
 
@@ -171,7 +172,7 @@ ${(d.vision_report?.review_issues||[]).filter(i=>!['accept','reject'].includes(i
 
   };
 
-  window.RasterReview?.attach(svg,session.report,async data=>{if(data.run){await api(route('reconstruct'));toast('Boundary tracing queued.');return}if(data.validation){await api(route('raster-validation'),{...data,fingerprint:session.report.raster_validation.fingerprint})}else await api(route('raster-correction'),{...data,revision:session.report.raster_revision,source_sha256:session.report.raster_geometry.source_sha256});await refresh(false);await load(true);toast('Boundary review saved. Both views updated.');});
+  window.RasterReview?.attach(svg,session.report,async data=>{if(data.run){await api(route('reconstruct'));toast('Boundary tracing queued.');return}if(data.source){await api(route('source-panels'),{...data,revision:session.report.source_review?.revision||0})}else if(data.binding){await api(route('curve-binding'),{...data,fingerprint:session.report.curve_review.fingerprint})}else if(data.validation){await api(route('raster-validation'),{...data,fingerprint:session.report.raster_validation.fingerprint})}else await api(route('raster-correction'),{...data,revision:session.report.raster_revision,source_sha256:session.report.raster_geometry.source_sha256});await refresh(false);await load(true);toast('Boundary review saved. Both views updated.');});
  }
 
  function draw3d(){
@@ -194,7 +195,7 @@ ${(d.vision_report?.review_issues||[]).filter(i=>!['accept','reject'].includes(i
 
   if(scene.camera){const a=point(scene.camera.position),b=point(scene.camera.target);ctx.strokeStyle='#c68c00';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke()}
 
-  if(!scene.lines.length){ctx.fillStyle='#485246';ctx.font='18px sans-serif';ctx.fillText('No typed architecture yet — trace the original plan',50,45)}
+  if(!scene.lines.length){ctx.fillStyle='#485246';ctx.font='18px sans-serif';ctx.fillText(session.report.raster_active===false?'No wall draft — review source type and plan panels':'No typed architecture yet — trace the original plan',50,45)}
 
  }
 

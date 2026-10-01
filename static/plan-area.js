@@ -31,7 +31,7 @@
   document.querySelectorAll('[data-area-select]').forEach(el=>el.closest('tr')?.classList.toggle('selected',Number(el.dataset.areaSelect)===ed.selected));hints();
  }
  function fit(){const b=polyBounds(ed.outline),pad=.018;ed.view=[Math.max(0,b[0]-pad),Math.max(0,b[1]-pad),Math.min(1,b[0]+b[2]+pad)-Math.max(0,b[0]-pad),Math.min(1,b[1]+b[3]+pad)-Math.max(0,b[1]-pad)]}
- function fmt(n){return n.toLocaleString(undefined,{maximumFractionDigits:2})}
+ function fmt(n){return Number.isFinite(n)?n.toLocaleString(undefined,{maximumFractionDigits:2}):'—'}
  function areaText(n){return ed.scale.unit==='ft'?`${fmt(n/.09290304)} ft²`:`${fmt(n)} m²`}
  function list(){
   const result=ed.summary;
@@ -112,7 +112,7 @@
   if(action==='remove'){if(ed.selected<-1){ed.holes.splice(-2-ed.selected,1)}else if(ed.selected>=0&&!ed.sections[ed.selected].room_id){ed.sections.splice(ed.selected,1)}else return toast('Only unsaved new sections or exclusions can be removed here.');ed.selected=-1;ed.mode=null;ed.draft=[];list();draw();dirty()}
   if(action==='add'){
    const name=$('#area-new-name').value.trim();if(!name)return toast('Enter a name for the new section.');
-   ed.sections.push({room_id:null,name,kind:'room',polygon:[],proposed:false});ed.selected=ed.sections.length-1;ed.mode='draw';ed.draft=[];$('#area-new-name').value='';list();draw();dirty();
+   ed.sections.push({room_id:null,name,kind:'room',polygon:[],proposed:false});ed.selected=ed.sections.length-1;ed.mode='draw';ed.draft=[];ed.summary=null;$('#area-new-name').value='';list();draw();dirty();
   }
   if(action==='save'){
    if(ed.mode)return toast('Finish the outline before saving.');

@@ -80,9 +80,19 @@ def inspect(store,pid,aid):
             links.append({'id':f['id'],'from':names.get(f.get('room_id'),'Unassigned'),'to':names.get(f['connection_room_id'],'Missing section'),
                           'kind':f['kind'],'label':f['label'],'status':f['review_status'],'floor':f['floor'],
                           'constraint':'Continuous space — no partition' if f['kind']=='space' else 'One shared feature for both sections'})
-    from raster_validation import status
+    from raster_validation import status,signature
     from raster_identity import correction_for
+    from wall_runs import groups
+    from curve_review import curves
+    from drawing_editor import get_document
+    from drawing_scene import resolve
+    from source_panels import valid,digest
+    active=not plan.get('source_review') or valid(plan) and (plan.get('raster_geometry') or {}).get('source_scope')==digest(plan['source_review']['panels'])
+    observations=[{'id':f['id'],'label':f.get('label','Curved wall')} for f in plan.get('plan_reading',{}).get('features',[]) if f.get('kind')=='curved_wall' and f.get('review_status')=='confirmed']
     return {'plan_id':aid,'fingerprint':fingerprint(plan,p),'can_generate':bool(checks) and all(c['can_generate'] for c in checks),
+            'source_review':copy.deepcopy(plan.get('source_review')),'wall_runs':groups(plan),
+            'raster_active':bool(active),
+            'curve_review':{'observations':observations,'sources':list(curves(plan,resolve(get_document(store,pid,aid))[0])) if observations else [],'fingerprint':signature(plan,p)},
             'raster_validation':status(store,pid,aid) if plan.get('raster_geometry') else None,
             'raster_orphaned_corrections':copy.deepcopy(plan.get('raster_orphaned_corrections',[])),
             'review_revision':plan.get('review_revision',0),'analysis_status':'Room analysis incomplete' if not checks else 'Review unresolved items',

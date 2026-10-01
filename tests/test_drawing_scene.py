@@ -10,6 +10,13 @@ from PIL import Image
 def element(key,kind,svg,**kw):return dict(id=key,kind=kind,svg=svg,**kw)
 
 class DrawingScene(unittest.TestCase):
+ def test_duplicate_index_preserves_reversed_nearby_and_distinct_spans(self):
+  rows,_=resolve({'features':[
+   {'id':'first','kind':'window','points':[[-.011,0],[10,0]],'thickness':2},
+   {'id':'reverse','kind':'window','points':[[10.005,0],[-.006,0]],'thickness':4},
+   {'id':'distinct','kind':'window','points':[[-.011,.02],[10,.02]],'thickness':2},
+   {'id':'other','kind':'wall','points':[[-.011,0],[10,0]],'thickness':2}]})
+  self.assertEqual([r['id'] for r in rows],['first','distinct','other']);self.assertEqual(rows[0]['thickness'],4)
  def test_saved_source_and_typed_geometry_share_transforms_and_visibility(self):
   doc={'elements':[element('wall','wall','<rect x="0" y="0" width="100" height="4"/>'),element('hidden','wall','<path d="M0 10 H100"/>'),element('paired','wall','<path d="M0 4 H100"/>',absorbed_by='wall')],
    'edits':{'wall':{'dx':10,'dy':20,'sx':2,'sy':3,'rotation':90},'hidden':{'hidden':True}},'features':[{'id':'typed','kind':'wall','points':[[50,50],[60,50]],'thickness':2}]}

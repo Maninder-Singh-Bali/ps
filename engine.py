@@ -45,7 +45,7 @@ def register_asset(store,pid,path,kind,room_id=None,**extra):
 class Engine:
     def __init__(self,store,app_root):
         self.store=store;self.app_root=Path(app_root);self.session=requests.Session();self.session.trust_env=False
-        self.health_cache={};self.stop=threading.Event()
+        self.health_cache={};self.stop=threading.Event();self._worker_guard=threading.Lock();self._worker_started=False
     @property
     def url(self):return self.store.db['settings']['comfy_url']
     def get(self,route,timeout=20):
@@ -366,11 +366,28 @@ class Engine:
             p['analysis']={'engine':', '.join(sorted(set(engines))),'warnings':list(dict.fromkeys(warnings)),'label_count':len(combined),'reviewed':False};self.store.save()
         self.store.update_job(job['id'],status='completed',stage=f'{len(combined)} suggested sections Â· review required',progress=100,finished=now())
     def worker(self):
+        # One bounded CPU lane and one existing model-owning lane. Re-entering
+        # startup must not create additional GPU owners.
+        with self._worker_guard:
+            if self._worker_started:return
+            self._worker_started=True
+        cpu=threading.Thread(target=self._worker_lane,args=(True,),daemon=True,name='plan-cpu')
+        cpu.start()
+        try:self._worker_lane(False)
+        finally:self.stop.set();cpu.join(6)
+
+    def _worker_lane(self,cpu):
         while not self.stop.is_set():
             with self.store.lock:
-                candidates=sorted([j for j in self.store.db['jobs'].values() if j['status'] in ('queued','waiting','running')],key=lambda j:j['created'])
+                candidates=sorted([j for j in self.store.db['jobs'].values() if j['status'] in ('queued','waiting','running') and (j['kind'] in ('raster_reconstruction','plan_setup'))==cpu],key=lambda j:j['created'])
             if not candidates:self.stop.wait(1);continue
+            if cpu and memory_headroom()[0]<2:self.stop.wait(1);continue
             job=candidates[0]
+            with self.store.lock:
+                job=self.store.db['jobs'][job['id']]
+                if job['status'] not in ('queued','waiting','running'):continue
+                first=job.get('first_dispatch_at',time.time())
+                self.store.update_job(job['id'],status='running',lane='cpu' if cpu else 'model',first_dispatch_at=first,queue_wait_seconds=round(first-job['created'],3))
             try:
                 if job['kind']=='plan_setup':
                     import plan_setup

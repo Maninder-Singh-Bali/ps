@@ -17,35 +17,8 @@ def applies(store,room):
 
 
 def unresolved_curves(plan,architecture,floor=None):
-    """Match each observation to reviewed curve geometry in its own location."""
-    from raster_identity import correction_for
-    groups={}
-    raster_ids={w['id'] for w in plan.get('raster_geometry',{}).get('walls',[])+plan.get('raster_geometry',{}).get('uncertain_spans',[])}
-    accepted={key for key in raster_ids if correction_for(plan,key).get('action')=='accept'}
-    for row in architecture:
-        if row['kind']!='wall':continue
-        key=row['source_id']
-        if key in raster_ids and key not in accepted:continue
-        groups.setdefault(key,[]).extend(row['points'])
-    curved=[]
-    for key,points in groups.items():
-        unique=list(dict.fromkeys(tuple(p) for p in points))
-        if len(unique)<3:continue
-        a=unique[0];b=max(unique,key=lambda p:math.dist(a,p));length=math.dist(a,b)
-        if length and max(abs((b[0]-a[0])*(p[1]-a[1])-(b[1]-a[1])*(p[0]-a[0]))/length for p in unique)>1:
-            curved.append((key,unique))
-    missing=[]
-    for feature in plan.get('plan_reading',{}).get('features',[]):
-        if feature.get('kind')!='curved_wall' or feature.get('review_status')=='rejected' or floor is not None and feature.get('floor')!=floor:continue
-        x,y,w,h=feature['bbox'];W,H=plan['width'],plan['height'];box=[x*W,y*H,(x+w)*W,(y+h)*H]
-        matches=[]
-        for key,points in curved:
-            xs,ys=zip(*points);extent=[min(xs),min(ys),max(xs),max(ys)]
-            intersection=max(0,min(box[2],extent[2])-max(box[0],extent[0]))*max(0,min(box[3],extent[3])-max(box[1],extent[1]))
-            area=max(1,(box[2]-box[0])*(box[3]-box[1]));other=max(1,(extent[2]-extent[0])*(extent[3]-extent[1]))
-            if intersection/area>=.45 and intersection/other>=.65:matches.append(key)
-        if feature.get('review_status')!='confirmed' or not matches:missing.append(feature['id'])
-    return missing
+    from curve_review import unresolved
+    return unresolved(plan,architecture,floor)
 
 
 def readiness(store,room):
@@ -54,10 +27,8 @@ def readiness(store,room):
         from raster_validation import status
         review=status(store,plan['project_id'],plan['id'])
         if not review['geometry_validated']:issues.append('Raster geometry review is '+review['state']+'. '+(review['issues'][0]['message'] if review['issues'] else 'Complete boundary review against the original before image generation.'))
-    from drawing_editor import get_document
-    doc=get_document(store,plan['project_id'],plan['id'])
-    from drawing_scene import resolve
-    architecture,unresolved=resolve(doc)
+    from drawing_scene import load
+    architecture,unresolved=load(store,plan)
     if unresolved:issues.append(f'{len(unresolved)} architectural outlines need review before 3D generation: '+', '.join(unresolved)+'. Trace their actual geometry; they are not replaced by boxes.')
     rs=sections(store,room)
     b=[min(r['bbox'][0] for r in rs),min(r['bbox'][1] for r in rs),max(r['bbox'][0]+r['bbox'][2] for r in rs),max(r['bbox'][1]+r['bbox'][3] for r in rs)]

@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from PIL import Image
+from PIL import Image,ImageDraw
 
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT))
 from store import Store
@@ -19,7 +19,7 @@ class PlanSetup(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory(dir=ROOT/'tests');self.root=Path(self.tmp.name)
         self.st=Store(self.root/'data');self.p=self.st.create_project('Import test');self.pid=self.p['id']
-        self.path=self.root/'plan.png';Image.new('RGB',(400,200),'white').save(self.path)
+        self.path=self.root/'plan.png';im=Image.new('RGB',(400,200),'white');ImageDraw.Draw(im).rectangle((30,30,370,170),outline='black',width=5);im.save(self.path)
         self.a=register_asset(self.st,self.pid,self.path,'plan');self.p['floor_plans'].append(self.a['id'])
         self.a['plan_reading']={'features':[],'revision':0};plan_setup.initialize(self.a)
         self.engine=Engine(self.st,ROOT)

@@ -52,6 +52,9 @@ def normalized_rooms(rows,aid):
 
 def run(engine,job):
     st=engine.store;pid=job['project_id'];aid=job['plan_id']
+    from source_panels import ensure
+    if not ensure(st,pid,aid):
+        st.update_job(job['id'],status='completed',stage='Review source panels before architectural analysis',progress=100,finished=now());return
     with st.lock:
         p=st.project(pid);a=st.asset(aid)
         if aid not in p['floor_plans']:raise ValueError('The imported plan is no longer in this project.')
@@ -82,7 +85,7 @@ def run(engine,job):
             st.update_job(job['id'],status='completed',stage='Suggestions ready; existing edits kept',progress=100,finished=now())
             queue_visual(engine,pid,aid);return
         staged=copy.copy(st);staged.db={**st.db,'projects':{**st.db['projects'],pid:copy.deepcopy(project)},
-            'assets':{**st.db['assets'],aid:copy.deepcopy(current)},'jobs':copy.deepcopy(st.db['jobs'])}
+            'assets':{**st.db['assets'],aid:copy.deepcopy(current)},'jobs':{**st.db['jobs'],job['id']:copy.deepcopy(st.db['jobs'][job['id']])}}
         staged.save=lambda:None
         for row in rooms:staged.add_room(pid,**row)
         target=staged.asset(aid)
@@ -91,7 +94,15 @@ def run(engine,job):
                          'warnings':list(dict.fromkeys(warnings)),'reviewed':False,'completed':now()}
         staged.project(pid)['map_confirmed']=False
         staged.update_job(job['id'],status='completed',stage=f'{len(rooms)} suggested sections · review required',progress=100,finished=now())
-        previous=st.db
-        try:st.db=staged.db;st.save()
-        except Exception:st.db=previous;raise
+        # Preserve live job identities for cancellation in the concurrent model
+        # lane. Commit only this job/page/project, never replace the entire DB.
+        live_job=st.db['jobs'][job['id']]
+        targets=[project,current,live_job];old=[copy.deepcopy(v) for v in targets]
+        values=[staged.project(pid),staged.asset(aid),staged.db['jobs'][job['id']]]
+        try:
+            for target,value in zip(targets,values):target.clear();target.update(value)
+            st.save()
+        except Exception:
+            for target,value in zip(targets,old):target.clear();target.update(value)
+            raise
         queue_visual(engine,pid,aid)

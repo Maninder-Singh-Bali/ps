@@ -122,11 +122,20 @@ def resolve(doc):
         except (ValueError,TypeError,IndexError,ImportError,ET.ParseError):unresolved.append(e['id'])
     rows.extend({**copy.deepcopy(f),'source_id':f.get('id',f'typed:{i}')} for i,f in enumerate(doc.get('features',[])) if f['kind'] not in ('line','floor_opening'))
     # Window rectangles often also contain a center stroke. Keep one volume.
-    unique=[]
+    unique=[];endpoints={}
     for row in rows:
-        duplicate=next((p for p in unique if p['kind']==row['kind'] and min(max(math.dist(a,b) for a,b in zip(p['points'],row['points'])),max(math.dist(a,b) for a,b in zip(p['points'],row['points'][::-1])))<.01),None)
+        if len(row.get('points',[]))!=2 or any(not math.isfinite(v) for p in row['points'] for v in p):
+            unique.append(row);continue # retain invalid evidence for validation
+        # Index both endpoints so reversed spans retain the same tolerance and
+        # first-source precedence without comparing every pair on every review.
+        x,y=row['points'][0];gx,gy=math.floor(x/.01),math.floor(y/.01);near=set()
+        for dx in (-1,0,1):
+            for dy in (-1,0,1):near.update(endpoints.get((row['kind'],gx+dx,gy+dy),()))
+        duplicate=next((unique[i] for i in sorted(near) if min(max(math.dist(a,b) for a,b in zip(unique[i]['points'],row['points'])),max(math.dist(a,b) for a,b in zip(unique[i]['points'],row['points'][::-1])))<.01),None)
         if duplicate:duplicate['thickness']=max(duplicate.get('thickness',1.5),row.get('thickness',1.5))
-        else:unique.append(row)
+        else:
+            index=len(unique);unique.append(row)
+            for x,y in row['points']:endpoints.setdefault((row['kind'],math.floor(x/.01),math.floor(y/.01)),[]).append(index)
     return unique,unresolved
 
 def cut_walls(rows):
@@ -152,5 +161,9 @@ def cut_walls(rows):
 
 def load(store,plan):
     from drawing_editor import get_document
+    cache=getattr(store,'_review_cache',None);key=('architecture',plan['id'])
+    if cache is not None and key in cache:return copy.deepcopy(cache[key])
     doc=get_document(store,plan['project_id'],plan['id'])
-    return resolve(doc)
+    result=resolve(doc)
+    if cache is not None:cache[key]=copy.deepcopy(result)
+    return result

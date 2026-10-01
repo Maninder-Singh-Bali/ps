@@ -47,7 +47,7 @@ def status(engine):
             renderer.update(state='attention',detail='Renderer connected; component check failed: '+str(exc)[:180])
     components.append(renderer)
     components.append({'name':'DWG','state':'unsupported','detail':'No configured, validated local DWG adapter. DXF and PDF are supported. No online conversion is used.'})
-    components.append({'name':'Trained architectural segmentation','state':'unavailable','detail':'No trained wall/room segmentation model or reviewed annotation set is installed. Pixel tracing stays explicitly provisional.'})
+    components.append({'name':'Trained architectural segmentation','state':'unavailable','detail':'No trained wall/room model installed. Research candidate: CubiCasa5K (CC BY-NC 4.0; published Python 3.6 / PyTorch 1.0 stack). A compatible isolated runtime, verified weights and reviewed wall/furniture/opening masks are required before accuracy can be measured. Weight download size is not verified; no installer or download is enabled. Pixel tracing remains provisional.'})
     gpu=[]
     try:
         proc=subprocess.run(['nvidia-smi','--query-gpu=name,memory.total,memory.free','--format=csv,noheader,nounits'],capture_output=True,text=True,timeout=5,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))

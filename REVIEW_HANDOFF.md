@@ -2,6 +2,51 @@
 
 Tested source checkpoint, 1 October 2026. Start here when reviewing this repository with ChatGPT or another code-review tool.
 
+## Follow-up milestone after d5337c2 — 1 October 2026
+
+This is a tested **partial milestone**, not a claim that the supplied real raster plans now reconstruct accurately. The earlier evaluation below is retained as the baseline. Source rejection, crop correction, grouped review and responsiveness were exercised in an isolated local dashboard; the original running Studio and saved client edits were not restarted or replaced.
+
+### Implemented and verified
+
+- Curve validation now requires native arc/Bezier or accepted raster arc/spline provenance, continuous curved samples, and an explicit observation-to-source link made in the dashboard. Geometry and observation fingerprints invalidate that link after edits. Bounding-box locality is only a rejection check, never identity. The exact 100×100 `L-wall` reproduction stays unresolved; a straight L, unbound unrelated curve and changed linked geometry cannot clear the observation. Curve linking and its undo are under boundary review. This is reviewed correspondence, not automatic semantic matching from a box.
+- Original-image source triage runs before raster preparation/tracing. It uses CPU whiteness/chroma, long orthogonal strokes and whitespace bands. Mixed/uncertain sheets require reviewed plan crops. Crop rectangles mask evidence; they never become walls. The dashboard supports drawing/removing crops, source-type correction and undo. Old candidates become inactive when their source scope no longer matches, while saved drawing edits remain intact.
+- Adjacent collinear wall paths can be selected as one connected run; Control/Command-click also selects individual paths. Keep/exclude/defer is atomic and undoable. Endpoint/tangent tests do not bridge doorway gaps. Openings and uncertain exterior contours retain individual review; completeness checks and estimate acknowledgement remain mandatory.
+- A single bounded CPU lane handles plan setup and raster reconstruction independently of the serialized model lane. Tracing numerical-library threads are capped at two, with a RAM guard. Duplicate worker startup is suppressed. Plan-setup commits no longer replace the entire live database, preserving concurrent job changes. Review/export endpoints copy a read-only snapshot under the lock and do expensive geometry work afterward. Endpoint indexing replaces quadratic segment deduplication; per-request caches remove repeat architecture/validation work.
+- Dashboard testing found and fixed an area-editor crash when a newly added section briefly had no calculated percentages. No approval or reconstruction checks were removed.
+
+### Actual dashboard demonstrations
+
+| Example | Result at this checkpoint |
+| --- | --- |
+| Supplied perspective negative case | Classified `perspective_or_photo`; no plan panels, no active wall draft and **zero typed segments**. Its previous erroneous report remains preserved but inactive. |
+| Supplied mixed presentation sheet | Classified mixed and blocked from tracing until crop review. Automatic proposal was one broad band, not a correct final split. Two dashboard-corrected plan regions exclude the facade and footer. Retrace produced 27 wall paths, 32 uncertain stretches and 53 typed segments; geometry remains partial/unverified. This demonstrates assisted isolation, not fully automatic panel segmentation. |
+| Independent clear raster control | Synthetic 400×400 single closed room with a thin chair symbol, intentionally no openings. One wall path/eight spans; thin chair outline was not extruded. Three unsupported semantic conflicts were rejected individually. A floor/section was outlined and a chair positioned/saved through the dashboard; geometry review completed and the shared scene retained the chair after reopening. Scale/product dimensions remain estimates; no image-generation approval was asserted. |
+| Supplied real furnished/curved plans | Still incomplete. No supplied real raster plan reached an accurately reviewed, fully furnished 3D reconstruction in this milestone. The synthetic control must not be substituted for that acceptance criterion. |
+
+Private screenshots show the actual source overlays, negative case and furnished control. They stay local with the evaluation data. No supplied source, crop, overlay, CAD file, model or private report is in Git.
+
+Correction timing was measured as agent browser wall-clock, including tool/inspection latency: the successful two-crop operation took **19.417 s**; including an initial misplaced crop and undo, **96.936 s**. The control's room/furniture/save/review sequence took **152.206 s** after the area-editor fix; total control review including debugging was **519.301 s**. These are not measured human hands-on times or a usability benchmark. A timed human review and a real furnished-plan completion remain required.
+
+### Responsiveness evidence
+
+The baseline local reader occupied the old single queue for roughly 565–584 seconds; that delayed lightweight preparation, rather than indicating nine minutes of pixel tracing. A regression now holds the model lane blocked while CPU preparation completes within two seconds and asserts one owner per lane. This does not accelerate model inference itself or establish cross-process GPU exclusion against unrelated applications.
+
+On the same saved curved sample, three final localhost structure-review requests took **0.615, 0.478 and 0.456 seconds**. The previous dashboard observation was approximately 8.34 seconds under queued analysis, so load conditions differ. Profiling separately fell from 7.320 to 1.311 seconds after indexing/caching; profiling timings must not be confused with HTTP latency. Long review computations no longer hold the editing lock; snapshot copying still scales with database size.
+
+### Segmentation dependency and remaining failures
+
+The active wall extractor is still SciPy/NumPy/Pillow masks, skeletons and line/arc/spline fits. No trained architecture/furniture segmenter was installed or evaluated against annotated examples. Thick furniture, thin glazing, junctions, opening hosts, non-Latin labels and room topology remain failure cases. Source triage is a conservative heuristic, not a general perspective detector: sparse monochrome perspectives or facade drawings can resemble plans. Legacy reports without source-review metadata require a recheck; the new guard runs on preparation/reconstruction rather than rewriting existing projects on startup.
+
+[CubiCasa5K](https://github.com/CubiCasa/CubiCasa5k) is a locally runnable research candidate for multi-class floor-plan segmentation, but its documented environment is old (Python 3.6/PyTorch 1.0). Its [licence](https://github.com/CubiCasa/CubiCasa5k/blob/master/LICENSE) is CC BY-NC 4.0, so it cannot be silently bundled as an unrestricted commercial dependency. Evaluation needs a compatible isolated runtime, verified pretrained weights/checksum and reviewed held-out masks for walls, furniture, openings and panels. Download size/checksum have not been verified; the dashboard reports the missing dependency rather than offering an unverified installer. No weight/dataset download or training use of supplied examples was performed. A different suitably licensed model may be necessary.
+
+### Tests and next review targets
+
+- Python: 322 discovered; 318 passed in the primary runtime and four SciPy-dependent pixel tests skipped there. Those same four passed in the installed SciPy runtime: **all 322 exercised across the two runtimes**, not 326 distinct tests.
+- JavaScript: all 20 suites passed; browser-script syntax checks passed. Actual crop correction/undo, connected-run selection, individual conflict rejection, section creation, furniture persistence and boundary completion were tested through the dashboard.
+- Regression additions cover the exact curve false positive, binding invalidation, source gates/scope changes, crop masks, atomic group undo, GPU/CPU lane ownership and endpoint-index tolerance.
+
+Review `curve_review.py` for provenance/correspondence; `source_panels.py` for false plan classifications and safe crop scope; `wall_runs.py` for grouping; `engine.py`, `plan_setup.py` and snapshot endpoints for concurrency. Priority gaps remain a licensed local segmentation benchmark, real-plan furnished completion, human correction timing and automatic floor registration. DWG conversion remains a separate unsupported capability. Existing startup instructions and model limitations below still apply.
+
 ## Scope and publication boundary
 
 This is the complete reviewable application source, UI, workflows and tests, not a runnable bundle containing models or client projects. It is a fresh Git root snapshot of the tested local checkpoint `01b123d`, with publication-specific sanitization. The private local commits are not ancestors of this branch. The original working installation, commits and client files were preserved unchanged.

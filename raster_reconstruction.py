@@ -1,5 +1,5 @@
 """Dashboard jobs and reversible corrections for original-pixel reconstruction."""
-import copy,hashlib,json,math,subprocess,sys,time
+import copy,hashlib,json,math,os,subprocess,sys,time
 from pathlib import Path
 from store import now
 from raster_identity import correction_for, identified, indexed, reconcile
@@ -17,12 +17,15 @@ def runtime(root):
 
 
 def fingerprint(plan):
-    return [plan.get('sha256'),plan.get('drawing',{}).get('revision',0),plan.get('raster_revision',0)]
+    return [plan.get('sha256'),plan.get('drawing',{}).get('revision',0),plan.get('raster_revision',0),plan.get('source_review')]
 
 
 def run(engine,job):
     import project_storage
     st=engine.store;pid=job['project_id'];aid=job['plan_id']
+    from source_panels import ensure,digest
+    if not ensure(st,pid,aid):
+        st.update_job(job['id'],status='completed',stage='Source review needed: select top-down plan panels before tracing',finished=now(),progress=100);return
     with st.lock:
         plan=copy.deepcopy(st.asset(aid));before=fingerprint(plan)
         if aid not in st.project(pid)['floor_plans']:raise ValueError('Plan is no longer in this project.')
@@ -31,16 +34,18 @@ def run(engine,job):
     st.update_job(job['id'],status='running',stage='Extracting wall strokes from original pixels',progress=None,started=now())
     python=runtime(engine.app_root);worker=Path(engine.app_root)/'raster_geometry.py'
     enhanced=st.db['assets'].get(plan.get('enhanced_reading_id'))
-    key=hashlib.sha256(Path(plan['path']).read_bytes()+worker.read_bytes()+(Path(enhanced['path']).read_bytes() if enhanced else b'')).hexdigest()[:24]
+    scope=plan['source_review']['panels']
+    key=hashlib.sha256(Path(plan['path']).read_bytes()+worker.read_bytes()+json.dumps(scope,sort_keys=True).encode()+(Path(enhanced['path']).read_bytes() if enhanced else b'')).hexdigest()[:24]
     folder=project_storage.project_root(st,pid)/'Supporting_Files'/'Raster_Geometry'/key;folder.mkdir(parents=True,exist_ok=True)
     target=folder/'raster-geometry.json';cached=target.exists()
     if not cached:
-        args=[str(python),str(worker),plan['path'],str(folder)]
+        scope_path=folder/'panels.json';scope_path.write_text(json.dumps(scope),encoding='utf-8')
+        args=[str(python),str(worker),plan['path'],str(folder),'--panels',str(scope_path)]
         if enhanced:args.extend(['--enhanced',enhanced['path']])
-        process=subprocess.Popen(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+        process=subprocess.Popen(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env={**os.environ,'OMP_NUM_THREADS':'2','OPENBLAS_NUM_THREADS':'2','MKL_NUM_THREADS':'2'},creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
         started=time.monotonic()
         while process.poll() is None:
-            if engine.stop.is_set() or job['status']=='cancelled' or time.monotonic()-started>90:
+            if engine.stop.is_set() or st.db['jobs'][job['id']]['status']=='cancelled' or time.monotonic()-started>90:
                 process.terminate();process.communicate(timeout=5)
                 if time.monotonic()-started>90:raise ValueError('Boundary tracing reached its 90-second limit. Retry with a smaller page or inspect Setup.')
                 st.update_job(job['id'],status='cancelled',stage='Boundary tracing stopped; saved corrections retained',finished=now());return
@@ -119,6 +124,9 @@ def paths(plan,include_uncertain=False):
 def elements(plan):
     report=plan.get('raster_geometry')
     if not report:return []
+    if plan.get('source_review'):
+        from source_panels import valid,digest
+        if not valid(plan) or report.get('source_scope')!=digest(plan['source_review']['panels']):return []
     sx=plan['width']/report['analysis_size'][0];sy=plan['height']/report['analysis_size'][1];result=[]
     for wall in paths(plan,True):
         correction=correction_for(plan,wall['id'])
@@ -145,15 +153,20 @@ def correct(st,pid,aid,data):
         plan['raster_corrections']=plan[src].pop()
     else:
         known={v['id']:v for v in candidates(plan)}
-        if data.get('id') not in known or action not in ('accept','reject','edit','defer'):raise ValueError('Choose a boundary and a valid correction.')
+        ids=data.get('ids',[data.get('id')])
+        if not isinstance(ids,list) or not 1<=len(ids)<=200 or any(not isinstance(k,str) or k not in known for k in ids) or len(set(ids))!=len(ids) or action not in ('accept','reject','edit','defer'):raise ValueError('Choose boundaries and a valid correction.')
+        if len(ids)>1 and (action=='edit' or data.get('points') is not None or any(known[k].get('candidate_opening') or not known[k].get('width_px') for k in ids)):
+            raise ValueError('Review wall paths together. Classify openings and uncertain exterior stretches individually.')
         points=data.get('points');width,height=plan['raster_geometry']['analysis_size']
         if points is not None and (not isinstance(points,list) or not 2<=len(points)<=500 or any(not isinstance(p,list) or len(p)!=2 or any(type(v) not in (int,float) or not math.isfinite(v) for v in p) or not 0<=p[0]<=width or not 0<=p[1]<=height for p in points)):
             raise ValueError('Keep boundary points inside the source image.')
         kind=data.get('kind')
-        allowed=(None,'door','window','sliding_door','open_transition') if known[data['id']].get('candidate_opening') else (None,'wall','window')
+        allowed=(None,'door','window','sliding_door','open_transition') if known[ids[0]].get('candidate_opening') else (None,'wall','window')
         if kind not in allowed:raise ValueError('Choose a supported classification for this boundary or opening.')
         plan.setdefault('raster_undo',[]).append(copy.deepcopy(plan.get('raster_corrections',{})));plan['raster_undo']=plan['raster_undo'][-40:];plan['raster_redo']=[]
-        plan.setdefault('raster_corrections',{})[data['id']]={**correction_for(plan,data['id']),'source_identity':indexed(plan['raster_geometry'])[data['id']][1],'action':action,'updated':now(),**({'points':points} if points is not None else {}),**({'kind':kind} if kind else {})}
+        identities=indexed(plan['raster_geometry'])
+        for key in ids:
+            plan.setdefault('raster_corrections',{})[key]={**correction_for(plan,key),'source_identity':identities[key][1],'action':action,'updated':now(),**({'points':points} if points is not None else {}),**({'kind':kind} if kind else {})}
     project=st.project(pid);old_project=copy.deepcopy(project)
     try:
         plan['raster_revision']=plan.get('raster_revision',0)+1

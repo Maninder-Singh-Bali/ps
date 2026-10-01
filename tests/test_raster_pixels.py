@@ -31,4 +31,13 @@ class PixelTests(unittest.TestCase):
    ImageDraw.Draw(im).line([(150,30),(150,220)],fill='black',width=9);im.save(enhanced)
    raster_geometry.run(original,root/'out',enhanced)
    self.assertEqual(Image.open(root/'out/wall-mask.png').getpixel((150,100)),0)
+ def test_crop_masks_evidence_without_drawing_a_crop_boundary(self):
+  with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as tmp:
+   root=Path(tmp);source=root/'mixed.png';im=Image.new('RGB',(400,400),'white');d=ImageDraw.Draw(im)
+   d.rectangle((20,20,380,160),fill='black');d.line([(60,240),(340,240)],fill='black',width=9);im.save(source)
+   panels=[{'bbox':[.1,.5,.8,.4]}];result=raster_geometry.run(source,root/'out',panels=panels)
+   mask=Image.open(root/'out/wall-mask.png')
+   self.assertEqual(mask.getpixel((100,100)),0);self.assertEqual(mask.getpixel((40,300)),0)
+   self.assertGreater(mask.getpixel((100,240)),0)
+   self.assertTrue(all(p[1]>=200 for w in result['walls'] for p in w['geometry']['points']))
 if __name__=='__main__':unittest.main()

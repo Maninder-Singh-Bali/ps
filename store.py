@@ -26,6 +26,12 @@ class Store:
                 except OSError as e:self.storage_errors[pid]=str(e)
     def snapshot(self):
         with self.lock:return copy.deepcopy(self.db)
+    def review_snapshot(self):
+        """Read-only request view: expensive geometry work does not lock edits."""
+        view=copy.copy(self);view.db=self.snapshot();view.lock=threading.RLock();view._review_cache={}
+        def readonly():raise RuntimeError('A review snapshot cannot save changes.')
+        view.save=readonly
+        return view
     def project(self,pid):
         if pid not in self.db['projects']:raise ValueError('Project not found')
         return self.db['projects'][pid]

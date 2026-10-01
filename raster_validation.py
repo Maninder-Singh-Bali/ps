@@ -9,7 +9,7 @@ from raster_identity import correction_for
 
 def signature(plan, project):
     keys=('sha256','width','height','raster_revision','raster_corrections','drawing',
-          'plan_reading','review_revision','scale','scene_settings','floor_settings')
+          'plan_reading','review_revision','scale','scene_settings','floor_settings','source_review','curve_bindings')
     data={k:plan.get(k) for k in keys}
     report=plan.get('raster_geometry') or {}
     data['evidence']={k:report.get(k) for k in ('source_sha256','analysis_size','walls','uncertain_spans','openings','regions')}
@@ -29,6 +29,9 @@ def _on_span(p,a,b,tolerance):
 
 
 def status(st,pid,aid):
+    cache=getattr(st,'_review_cache',None)
+    key=('validation',pid,aid)
+    if cache is not None and key in cache:return cache[key]
     from drawing_editor import get_document
     from drawing_scene import resolve
     from raster_reconstruction import candidates
@@ -41,6 +44,10 @@ def status(st,pid,aid):
     def issue(code,message,ids=()):issues.append({'code':code,'message':message,'ids':list(ids)})
     if not report:issue('missing','Trace the original pixels before completing boundary review.')
     if report.get('source_sha256')!=plan.get('sha256'):issue('source','Source evidence changed. Recheck the original pixels.')
+    if plan.get('source_review'):
+        from source_panels import valid,digest
+        if not valid(plan):issue('panels','Review the source type and plan panels before tracing.')
+        elif report.get('source_scope')!=digest(plan['source_review']['panels']):issue('panels','Reconstruct the corrected source panels before completing review.')
     pending=[]
     for item in candidates(plan):
         edit=correction_for(plan,item['id'])
@@ -50,7 +57,8 @@ def status(st,pid,aid):
             elif not item.get('width_px') and edit.get('kind') not in ('wall','window'):pending.append(item['id'])
     if pending:issue('pending',f'Review {len(pending)} pending, deferred or edited paths; keep or exclude each.',pending)
     if plan.get('raster_orphaned_corrections'):issue('orphaned','A rescan changed previously corrected evidence. Review the archived corrections, then acknowledge them.')
-    doc=get_document(st,pid,aid);architecture,unresolved=resolve(doc)
+    from drawing_scene import load
+    architecture,unresolved=load(st,plan)
     if unresolved:issue('unresolved','Resolve architectural paths that cannot be built.',unresolved)
     if not any(v['kind']=='wall' for v in architecture):issue('walls','No supported wall geometry remains. Add or review the actual walls.')
     walls=[v for v in architecture if v['kind']=='wall']
@@ -91,10 +99,12 @@ def status(st,pid,aid):
         if conflicts:issue('conflicts','Resolve the conflicting source observations before completing geometry review.',conflicts)
     token=signature(plan,project);saved=plan.get('raster_validation') or {}
     valid=not issues and saved.get('fingerprint')==token and saved.get('complete') is True
-    return {'fingerprint':token,'geometry_validated':bool(valid),'can_complete':not issues,
+    result={'fingerprint':token,'geometry_validated':bool(valid),'can_complete':not issues,
             'state':'reviewed' if valid else 'stale' if saved else 'incomplete',
             'issues':issues,'reviewed_at':saved.get('at') if valid else None,
             'scope':'User-reviewed geometry, not measured accuracy or generated-image approval.'}
+    if cache is not None:cache[key]=result
+    return result
 
 
 def save(st,pid,aid,data):

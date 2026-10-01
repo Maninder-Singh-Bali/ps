@@ -115,13 +115,32 @@ class GeometryReview(unittest.TestCase):
         self.p['rooms'].append({**copy.deepcopy(self.r),'id':'overlap'})
         self.assertIn('overlap',' '.join(i['message'] for i in self.state()['issues']))
     def test_curved_observation_requires_its_specific_curve(self):
-        self.a['plan_reading']={'features':[{'id':'curve-observation','kind':'curved_wall','floor':'Ground','bbox':[.1,.1,.6,.6],'review_status':'confirmed'}]}
-        matching=[{'source_id':'curve','kind':'wall','points':[[10,10],[40,20]]},{'source_id':'curve','kind':'wall','points':[[40,20],[70,70]]}]
+        from drawing_scene import resolve
+        from curve_review import bind
+        self.a['plan_reading']={'features':[{'id':'curve-observation','kind':'curved_wall','floor':'Ground','bbox':[.1,.1,.8,.8],'review_status':'confirmed'}]}
+        matching,_=resolve({'elements':[{'id':'curve','kind':'wall','svg':'<path d="M10 10 A80 80 0 0 1 90 90"/>'}]})
+        self.assertEqual(shared_floor.unresolved_curves(self.a,matching),['curve-observation'])
+        bind(self.a,matching,'curve-observation','curve')
         self.assertEqual(shared_floor.unresolved_curves(self.a,matching),[])
         for rows in ([{'source_id':'straight','kind':'wall','points':[[10,10],[70,70]]}],
                      [{**v,'points':[[p[0]+100,p[1]+100] for p in v['points']]} for v in matching]):
             self.assertEqual(shared_floor.unresolved_curves(self.a,rows),['curve-observation'])
         self.a['plan_reading']['features'][0]['review_status']='pending'
         self.assertEqual(shared_floor.unresolved_curves(self.a,matching),['curve-observation'])
+
+    def test_L_polyline_and_unrelated_curve_cannot_resolve_observation(self):
+        from curve_review import bind
+        self.a['plan_reading']={'features':[{'id':'curve','kind':'curved_wall','floor':'Ground','bbox':[.1,.1,.8,.8],'review_status':'confirmed'}]}
+        rows=[{'source_id':'L-wall','kind':'wall','points':p} for p in ([[10,10],[90,10]],[[90,10],[90,90]])]
+        self.assertEqual(shared_floor.unresolved_curves(self.a,rows),['curve'])
+        with self.assertRaises(ValueError):bind(self.a,rows,'curve','L-wall')
+        from drawing_scene import resolve
+        real,_=resolve({'elements':[{'id':'real','kind':'wall','svg':'<path d="M10 10 A80 80 0 0 1 90 90"/>'}]})
+        bind(self.a,real,'curve','real')
+        self.assertEqual(shared_floor.unresolved_curves(self.a,real),[])
+        unrelated=[{**r,'source_id':'other'} for r in real]
+        self.assertEqual(shared_floor.unresolved_curves(self.a,unrelated),['curve'])
+        altered=[{**r,'points':[[p[0]+1,p[1]] for p in r['points']]} for r in real]
+        self.assertEqual(shared_floor.unresolved_curves(self.a,altered),['curve'])
 
 if __name__=='__main__':unittest.main()
