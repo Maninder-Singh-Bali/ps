@@ -351,7 +351,7 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
 
  }
 
- window.addEventListener('resize',()=>{if(modalType==='blocks')objectTools()});
+ window.addEventListener('resize',()=>{if(ctx&&typeof modalType!=='undefined'&&modalType==='blocks')objectTools()});
 
  function popover(){
 

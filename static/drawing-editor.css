@@ -33,3 +33,20 @@
 @media(max-width:1000px){.drawing-layout{grid-template-columns:1fr}.drawing-aside{padding:12px 0 0;max-height:none}#drawing-site{max-width:420px}.drawing-tool-rail{gap:2px}.drawing-tool-rail .drawing-icon{height:29px;min-height:29px}#drawing-svg{min-height:355px}}
 
 .drawing-library-furniture path,.drawing-library-furniture rect,.drawing-library-furniture circle,.drawing-library-furniture ellipse,.drawing-library-furniture line{fill:#edf1e8;stroke:#40554a;stroke-width:1;vector-effect:non-scaling-stroke}
+
+/* Optional source-backed structure review; ordinary plan editing is unchanged. */
+.structure-draft-panel{padding:10px 14px;background:#f1f6ee;border:1px solid #c6d8bc;border-radius:8px;margin-bottom:10px}
+.structure-draft-panel details{font-size:12px;max-height:180px;overflow:auto}
+.structure-draft-panel p{margin:6px 0}
+#drawing-svg .structure-draft-art .wall{stroke:#008a72;fill:#00b395;stroke-width:.45}
+#drawing-svg .structure-draft-art .opening{stroke:#c16c00;fill:none;stroke-width:.9}
+#drawing-svg .structure-draft-art .window{stroke:#0078db;fill:none;stroke-width:.9}
+#modal.drawing-review-dialog .drawing-mode-tabs{display:none}
+#modal.drawing-review-dialog .drawing-aside{padding:0;border:0;max-height:65vh}
+#modal.drawing-review-dialog .structure-draft-panel{height:auto}
+#modal.drawing-review-dialog .structure-draft-panel details{max-height:46vh}
+#modal.drawing-review-dialog .structure-draft-panel .drawing-tools{display:grid;gap:10px;margin-top:14px}
+#modal.drawing-review-dialog .structure-draft-panel label{display:block}
+#modal.drawing-review-dialog .structure-draft-panel select{width:100%;margin-top:5px}
+#modal.drawing-review-dialog #drawing-svg{height:calc(95vh - 250px);min-height:260px}
+#drawing-svg .structure-previous-art .wall{stroke:#be3029;fill:#e44435}

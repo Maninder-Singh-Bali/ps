@@ -145,7 +145,7 @@ def run(engine,job):
         engine.stop.wait(3)
     st.update_job(job['id'],status='running',started=now(),stage='Reading approved plan panels',progress=None)
     settings=copy.deepcopy(st.db['settings']);url=settings.get('vision_url','http://127.0.0.1:11434').rstrip('/')
-    tags=ensure_service(engine.app_root,url);model=settings.get('vision_model') or MODEL
+    tags=engine.services.reader_ready() if getattr(engine,'services',None) else ensure_service(engine.app_root,url);model=settings.get('vision_model') or MODEL
     if not any(v['name']==model for v in tags.get('models',[])):raise ValueError('Local vision model is not installed: '+model)
     sections=[copy.deepcopy(r) for r in p['rooms'] if r['id'] in job.get('section_ids',[])]
     folder=project_storage.project_root(st,pid)/'Supporting_Files'/'Enhanced_Plans'

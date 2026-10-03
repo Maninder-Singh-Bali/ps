@@ -3,6 +3,9 @@ from store import now
 
 
 def cancel(engine, job):
+    if job.get('remote_job_id'):
+        result=engine.remote.post('/v1/jobs/'+job['remote_job_id']+'/cancel',{})
+        return engine.store.update_job(job['id'],status='waiting' if result['status']=='cancelling' else result['status'],stage=result['stage'])
     if job['status'] not in ('queued','waiting','running'):
         raise ValueError('This activity has already stopped.')
     if job.get('submission_intent') and not job.get('prompt_id'):
@@ -23,7 +26,15 @@ def cancel(engine, job):
 
 
 def recover(engine, job):
-    if job['status'] not in ('failed','cancelled'):
+    if job.get('single_submission') and job['status'] in ('failed','cancelled','interrupted','completed'):
+        raise ValueError('This single technical attempt is closed. No retry is authorised.')
+    from generation_phase import assert_dispatch
+    assert_dispatch(engine.store,job)
+    if job.get('remote_job_id'):
+        result=engine.remote.get('/v1/jobs/'+job['remote_job_id'])
+        if result['status'] in ('interrupted','failed','cancelled'):raise ValueError('PC inference stopped. No automatic rerun; create a new version deliberately.')
+        return engine.store.update_job(job['id'],status='queued',stage='Reconnecting to existing PC job',error=None)
+    if job['status'] not in ('failed','cancelled','interrupted'):
         raise ValueError('This activity is still active or already complete.')
     if job.get('plan_id') and job['kind'] in ('plan_setup','vision_study','raster_reconstruction'):
         from source_scope import current

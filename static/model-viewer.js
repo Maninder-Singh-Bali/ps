@@ -58,7 +58,7 @@
    const vertex=(p,c,a)=>[p[0]/w*2-1,1-p[1]/h*2,-p[2]/(radius*1.1),...c,a];
    const batch=(rows,alpha,write)=>{
     const triangles=[],edges=[];
-    for(const f of rows){const c=color(f.color),edge=f.selected?[.67,.50,.10]:c.map(v=>v*.72);for(let i=1;i<f.points.length-1;i++)for(const p of [f.points[0],f.points[i],f.points[i+1]])triangles.push(...vertex(p,c,alpha));for(let i=0;i<f.points.length;i++)for(const p of [f.points[i],f.points[(i+1)%f.points.length]])edges.push(...vertex(p,edge,alpha))}
+    for(const f of rows){const c=color(f.color),edge=f.selected?[.67,.50,.10]:c.map(v=>v*.72);for(let i=1;i<f.points.length-1;i++)for(const p of [f.points[0],f.points[i],f.points[i+1]])triangles.push(...vertex(p,c,alpha));for(let i=0;i<f.points.length;i++)if(!f.edge_mask||f.edge_mask[i])for(const p of [f.points[i],f.points[(i+1)%f.points.length]])edges.push(...vertex(p,edge,alpha))}
     gl.depthMask(write);gl.enable(gl.POLYGON_OFFSET_FILL);gl.polygonOffset(1,1);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(triangles),gl.DYNAMIC_DRAW);gl.drawArrays(gl.TRIANGLES,0,triangles.length/7);gl.disable(gl.POLYGON_OFFSET_FILL);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(edges),gl.DYNAMIC_DRAW);gl.drawArrays(gl.LINES,0,edges.length/7);
    };
    batch(faces.filter(f=>!transparent||!f.architecture),1,true);
@@ -102,7 +102,7 @@
    if(this.renderer===undefined){try{this.renderer=new DepthRenderer(c)}catch(_){this.renderer=null}}
    this.hits=faces.filter(f=>f.id||!f.architecture||!this.view.transparent);
    if(this.renderer)this.renderer.draw(faces,w,h,this.bounds.radius,transparent);
-   else{const g=c.getContext('2d');if(!g)return;g.setTransform(dpr,0,0,dpr,0,0);g.fillStyle='#f1f3ef';g.fillRect(0,0,w,h);for(const f of faces){g.beginPath();f.points.forEach((p,i)=>i?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]));g.closePath();g.globalAlpha=f.architecture&&transparent?.24:1;g.fillStyle=f.color;g.fill();g.strokeStyle=f.selected?'#ac801a':'#78847c';g.lineWidth=f.selected?1.1:.6;g.stroke()}g.globalAlpha=1}
+   else{const g=c.getContext('2d');if(!g)return;g.setTransform(dpr,0,0,dpr,0,0);g.fillStyle='#f1f3ef';g.fillRect(0,0,w,h);for(const f of faces){g.beginPath();f.points.forEach((p,i)=>i?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]));g.closePath();g.globalAlpha=f.architecture&&transparent?.24:1;g.fillStyle=f.color;g.fill();g.strokeStyle=f.selected?'#ac801a':'#78847c';g.lineWidth=f.selected?1.1:.6;if(f.edge_mask){g.beginPath();f.points.forEach((p,i)=>{if(f.edge_mask[i]){g.moveTo(p[0],p[1]);const q=f.points[(i+1)%f.points.length];g.lineTo(q[0],q[1]);}});}g.stroke()}g.globalAlpha=1}
    c.dataset.renderer=this.renderer?'depth':'basic';c.dataset.walking=String(walking);if(walking)c.dataset.walkPosition=JSON.stringify(this.view.walk.position);else delete c.dataset.walkPosition;
    c.setAttribute('aria-label',walking?'Walk inside · WASD or arrow keys to move · Drag to look · Escape to exit':`3D floor model, ${this.view.projection||'orthographic'}, ${Math.round(this.view.zoom*100)}% zoom. Drag to rotate 360 degrees, Shift-drag or middle-drag to pan. Scroll to zoom.`);
   }

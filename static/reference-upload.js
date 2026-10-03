@@ -44,7 +44,7 @@ function uploadDestination(spec,projectId,roomId) {
 
 if(typeof module!=='undefined') module.exports={readImageDrop,validateReferenceFile,studioDropSource,uploadDestination};
 
-if(typeof document!=='undefined') {
+if(typeof document!=='undefined'&&!document.querySelector('#design-reference-file')) {
   const pendingUploads=new Map();
   const lastAdded=new Map();
   const revealedUploads=new Set();

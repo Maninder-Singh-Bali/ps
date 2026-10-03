@@ -41,6 +41,12 @@ def sanitized(node):
     tag=node.tag.split('}')[-1]
     if tag not in TAGS or tag=='rect' and 'fill:white' in node.get('style','').replace(' ',''):return ''
     attrs={k:v for k,v in node.attrib.items() if k in ATTRS and not re.search(r'url\s*\(|javascript:|[<>]',v,re.I)}
+    paint={}
+    allowed_paint={'fill','stroke','stroke-width','stroke-opacity','fill-opacity','fill-rule','stroke-dasharray','stroke-dashoffset'}
+    for declaration in node.get('style','').split(';'):
+        key,sep,value=declaration.partition(':');key=key.strip();value=value.strip()
+        if sep and key in allowed_paint and re.fullmatch(r'[a-zA-Z0-9#., +%-]+',value):paint[key]=value
+    if paint:attrs['style']=';'.join(k+':'+v for k,v in paint.items())
     return '<'+tag+' '+ ' '.join(k+'="'+escape(v,quote=True)+'"' for k,v in attrs.items())+'>'+ (escape(node.text or '') if tag=='text' else ''.join(sanitized(n) for n in node))+'</'+tag+'>'
 
 def get_document(st,pid,aid):
@@ -63,7 +69,7 @@ def get_document(st,pid,aid):
     from raster_reconstruction import elements as raster_elements
     elements.extend(raster_elements(a))
     elements=combine_wall_edges(elements,saved.get('edits',{}),a['width'],a['height'])
-    return {'revision':saved.get('revision',0),'base_asset_id':base,'elements':elements,'edits':copy.deepcopy(saved.get('edits',{})),'features':copy.deepcopy(saved.get('features',[])),'site':copy.deepcopy(saved.get('site',{})),'width':a['width'],'height':a['height'],'map_revision':p['map_revision']}
+    return {'review':copy.deepcopy(a.get('structure_review')), 'revision':saved.get('revision',0),'base_asset_id':base,'elements':elements,'edits':copy.deepcopy(saved.get('edits',{})),'features':copy.deepcopy(saved.get('features',[])),'site':copy.deepcopy(saved.get('site',{})),'width':a['width'],'height':a['height'],'map_revision':p['map_revision']}
 
 def clean_changes(doc,data):
     edits=data.get('edits',{});features=data.get('features',[])
@@ -91,6 +97,15 @@ def clean_changes(doc,data):
         if math.dist(*points)<.2:raise ValueError('Draw a longer element.')
         if v['kind']=='floor_opening' and any(abs(points[0][i]-points[1][i])<.2 for i in (0,1)):raise ValueError('A floor opening needs a nonzero width and depth.')
         out.append({'id':key,'kind':v['kind'],'points':points,'thickness':number(v.get('thickness',1.5),.1,50,'line separation'),'flip':v.get('flip') is True})
+    previous={f['id']:f for f in doc.get('features',[])}
+    for original,feature in zip(features,out):
+        note=original.get('review_note','')
+        if not isinstance(note,str):raise ValueError('Review note must be text.')
+        if note:feature['review_note']=note[:1000]
+        evidence=previous.get(feature['id'],{}).get('evidence')
+        if evidence:
+            feature['evidence']=copy.deepcopy(evidence)
+            feature['evidence']['manually_changed']=(feature['points']!=evidence.get('source_points') or feature['thickness']!=evidence.get('source_thickness',feature['thickness']))
     return clean,out
 
 def transform(v):

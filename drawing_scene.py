@@ -107,6 +107,24 @@ def door(node,edit):
     dx,dy=closed[0]-hinge[0],closed[1]-hinge[1]
     return {'points':[hinge,closed],'leaf_points':[hinge,tip],'thickness':leaves[0]['thickness'],'flip':dx*(tip[1]-hinge[1])-dy*(tip[0]-hinge[0])<0}
 
+def hosted_features(features):
+    """Resolve attached openings from host coordinates without changing saved evidence."""
+    rows=copy.deepcopy(features);walls={f['id']:f for f in rows if f['kind']=='wall'}
+    for f in rows:
+        if not f.get('host_wall_id'):continue
+        wall=walls.get(f['host_wall_id'])
+        if not wall:continue
+        a,b=wall['points'];length=math.dist(a,b)
+        if length<1e-8:continue
+        u=[(b[i]-a[i])/length for i in range(2)];offset=f['offset'];width=f['width']
+        normal=f.get('normal_offset',0);n=[-u[1],u[0]]
+        f['points']=[[a[i]+u[i]*t+n[i]*normal for i in range(2)] for t in (offset,offset+width)]
+        if f.get('hinge_end'):f['points'].reverse()
+        f['thickness']=f.get('frame_thickness',wall.get('thickness',1.5))
+        f['height_m']=wall.get('height_m') if wall.get('height_m') is not None else f.get('height_m')
+        if f['height_m'] is None:f.pop('height_m')
+    return rows
+
 def resolve(doc):
     from drawing_editor import transform
     rows=[];unresolved=[]
@@ -120,7 +138,7 @@ def resolve(doc):
             if not found:raise ValueError('Empty architecture')
             rows.extend({**f,'id':e['id']+(f':{i}' if len(found)>1 else ''),'source_id':e['id'],'native_source_id':e.get('native_source_id'),'kind':kind,'source_geometry':e['svg'],'curve_tolerance_px':.25} for i,f in enumerate(found))
         except (ValueError,TypeError,IndexError,ImportError,ET.ParseError):unresolved.append(e['id'])
-    rows.extend({**copy.deepcopy(f),'source_id':f.get('id',f'typed:{i}')} for i,f in enumerate(doc.get('features',[])) if f['kind'] not in ('line','floor_opening'))
+    rows.extend({**copy.deepcopy(f),'source_id':f.get('id',f'typed:{i}')} for i,f in enumerate(hosted_features(doc.get('features',[]))) if f['kind'] not in ('line','floor_opening'))
     # Window rectangles often also contain a center stroke. Keep one volume.
     unique=[];endpoints={}
     for row in rows:
@@ -147,6 +165,7 @@ def cut_walls(rows):
         if length<1e-8:continue
         u=[(b[i]-a[i])/length for i in range(2)];cuts=[]
         for o in openings:
+            if o.get('host_wall_id') and o['host_wall_id']!=wall.get('id'):continue
             p,q=o['points'];ol=math.dist(p,q)
             if ol<1e-8 or abs(u[0]*(q[1]-p[1])-u[1]*(q[0]-p[0]))/ol>.01:continue
             tolerance=(wall.get('thickness',1.5)+o.get('thickness',1.5))/2+.05

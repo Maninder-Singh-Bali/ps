@@ -1,0 +1,20 @@
+const assert=require('node:assert/strict'),G=require('../static/trace-geometry.js');
+const wall=(id,a,b,t=10)=>({id,kind:'wall',points:[a,b],thickness:t,height_m:3.2,review_note:'preserve '+id});
+let fs=[wall('a',[0,0],[100,0],10),wall('b',[103,2],[103,100],24),wall('near',[105,5],[200,5],30)];
+const snap=G.junctionTarget([101,1],fs,8,[{id:'a',index:1}]);assert.equal(snap.wall,'b');
+let joined=G.connectEndpoint(fs,'a',1,snap,'s');assert.equal(G.members(joined,'a',1).length,2);assert.deepEqual(joined[0].points[1],joined[1].points[0]);assert.deepEqual(joined[2].points,fs[2].points);
+let moved=G.moveEndpoint(joined,'a',1,[120,20]);assert.deepEqual(moved[0].points[1],moved[1].points[0]);assert.deepEqual(moved.map(f=>f.thickness),[10,24,30]);assert.deepEqual(G.members(JSON.parse(JSON.stringify(moved)),'b',0).map(m=>m.id),['a','b']);
+let detached=G.detachEndpoint(moved,'a',1,'detach');assert.equal(G.members(detached,'a',1).length,1);detached=G.moveEndpoint(detached,'a',1,[110,25]);assert.deepEqual(detached[1].points[0],[120,20]);
+let exact=G.junctions([wall('a',[0,0],[100,0]),wall('b',[100,0],[100,100])]);assert.equal(G.members(exact,'a',1).length,2);assert.equal(new Set(exact.flatMap(w=>w.junction_ids)).size,3);
+const host=wall('host',[0,0],[400,0],30),branch=wall('branch',[200,-100],[200,-2],12),o={id:'door',kind:'door',host_wall_id:'host',offset:270,width:80,head_m:2.2,sill_m:0,hinge_end:true,flip:true,review_note:'keep opening',points:[[350,0],[270,0]],thickness:30};
+const t=G.junctionTarget([200,-2],[host,branch,o],8,[{id:'branch',index:1}]);assert.equal(t.wall,'host');assert.equal(t.index,undefined);
+const tj=G.connectEndpoint([host,branch,o],'branch',1,t,'half');assert.equal(G.members(tj,'branch',1).length,3);assert.equal(tj.find(f=>f.id==='door').host_wall_id,'half');assert.equal(tj.find(f=>f.id==='door').offset,70);assert.deepEqual(tj.find(f=>f.id==='door').points,o.points);
+for(const k of ['width','head_m','sill_m','hinge_end','flip','review_note'])assert.equal(tj.find(f=>f.id==='door')[k],o[k]);assert.equal(tj.find(f=>f.id==='half').review_note,host.review_note);
+const tm=G.moveEndpoint(tj,'branch',1,[205,10]);assert.equal(G.members(tm,'branch',1).length,3);for(const e of G.members(tm,'branch',1))assert.deepEqual(e.point,[205,10]);
+assert.throws(()=>G.connectEndpoint([host,branch,{...o,offset:160}],'branch',1,t,'bad'),/opening/);
+assert.equal(G.junctionTarget([200,20],[host],8),null);assert.equal(G.junctionTarget([100,0],fs,8,[],false),null);
+assert.throws(()=>G.moveEndpoint(exact,'a',1,[0,0]),/collapse/);
+assert.deepEqual(G.hosted(JSON.parse(JSON.stringify(tj))),tj);
+console.log('Passed explicit/legacy L joins, shared movement, detach, separate neighbours, unequal thickness, T split with opening metadata, prohibited opening split, persistence and collapse guards.');
+
+assert.throws(()=>G.split([host,{id:'legacy-window',kind:'window',points:[[160,5],[240,5]],thickness:20}], 'host',200,'split-through'),/source opening/);

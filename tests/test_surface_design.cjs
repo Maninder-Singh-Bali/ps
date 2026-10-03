@@ -1,0 +1,14 @@
+const assert=require('node:assert/strict'),D=require('../static/surface-design-geometry.js');
+const w={id:'wall',kind:'wall',points:[[100,100],[500,100]],thickness:20,height_m:3},s={id:'face',kind:'wall',wall_id:'wall',side:-1},o={id:'picture',kind:'painting',surface_id:'face',x:1,y:1.5,width:.6,height:.8,depth:.03,rotation:0};
+const d={features:[w],calibration:{metres_per_pixel:.01},wall_height_m:3,surface_design:{version:1,surfaces:[s],items:[o]}};
+assert.deepEqual(D.world(d,s,o),[2,.897,1.5]);assert.deepEqual(D.world(d,{...s,side:1},o),[2,1.103,1.5]);
+const moved=D.copy(d);moved.features[0].points=[[200,200],[600,200]];assert.deepEqual(D.world(moved,s,o),[3,1.897,1.5]);assert.deepEqual(moved.surface_design,d.surface_design);
+const angled=D.copy(d);angled.features[0].points=[[100,100],[100,500]];assert.deepEqual(D.world(angled,s,o),[1.103,2,1.5]);
+assert.deepEqual(D.conflicts(d,s,o),[]);assert(D.conflicts(d,s,{...o,x:0}).includes('Outside wall face'));
+d.features.push({id:'door',kind:'door',host_wall_id:'wall',offset:70,width:80,head_m:2.2});assert(D.conflicts(d,s,o).some(x=>x.includes('Opening')));
+const lost=D.copy(d);lost.features=[];assert.match(D.conflicts(lost,s,o)[0],/missing/);assert.equal(lost.surface_design.items.length,1);
+const aligned=D.align([o,{...o,id:'b',x:2,y:2,width:.3}],'bottom');assert.equal(aligned[0].y-aligned[0].height/2,aligned[1].y-aligned[1].height/2);
+const snapped=D.snap(d,s,{...o,x:1.02},.03);assert(snapped.guides.length);assert.equal(D.copy(d).surface_design.items[0].x,1);
+const ceiling={id:'ceiling',kind:'ceiling',boundary:[[100,100],[500,100],[500,500],[100,500]],holes:[[[250,250],[350,250],[350,350],[250,350]]],elevation_m:3};
+assert.deepEqual(D.world(d,ceiling,{...o,x:1,y:1,drop:.4},[0,0],.2),[2,2,2.4]);assert(D.conflicts(d,ceiling,{...o,x:2,y:2}).some(x=>/void/.test(x)));
+assert.deepEqual(JSON.parse(JSON.stringify(d)),d);console.log('Surface geometry: face sides, angled/moving host, missing host retention, dimensions, opening/void conflicts, alignment, snapping and persistence passed.');

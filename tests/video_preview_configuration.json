@@ -1,0 +1,81 @@
+{
+  "sampling": {
+    "dimensions": [
+      768,
+      448
+    ],
+    "requested_sequence_frames": 49,
+    "batch_size": 1,
+    "seed": 2909202661,
+    "sampler": "euler_ancestral",
+    "steps": 8,
+    "sigmas": [
+      1.0,
+      0.99375,
+      0.9875,
+      0.98125,
+      0.975,
+      0.909375,
+      0.725,
+      0.421875,
+      0.0
+    ],
+    "video_cfg": 1,
+    "audio_cfg": 1,
+    "audio_branch": "retain existing joint AV latent workflow; no decoded audio output"
+  },
+  "source": {
+    "requires_explicit_current_image_approval": true,
+    "transferred_dimensions": [
+      1920,
+      1080
+    ],
+    "conditioning_downsample": [
+      768,
+      432
+    ],
+    "downsample_method": "lanczos",
+    "padding": {
+      "left": 0,
+      "right": 0,
+      "top": 8,
+      "bottom": 8
+    },
+    "mutates_source_file": false
+  },
+  "guidance": {
+    "motion": "still",
+    "camera_prompt": "locked camera",
+    "first_image_strength": 1.0,
+    "end_image": "same downsampled approved input",
+    "end_frame_index": 48,
+    "end_strength": 1.0,
+    "preprocess_img_compression": 0,
+    "crop_guide_tokens_before_decode": true,
+    "camera_path_enforced": false
+  },
+  "decoding": {
+    "node": "VAEDecodeTiled",
+    "tile_size": 512,
+    "overlap": 64,
+    "temporal_size": 16,
+    "temporal_overlap": 4
+  },
+  "output": {
+    "crop": {
+      "x": 0,
+      "y": 8,
+      "width": 768,
+      "height": 432
+    },
+    "frames": 48,
+    "fps": 24,
+    "duration_seconds": 2,
+    "format": "mp4",
+    "codec": "auto",
+    "bit_depth": 8,
+    "upscaled": false,
+    "native_1080p": false,
+    "automatic_approval": false
+  }
+}

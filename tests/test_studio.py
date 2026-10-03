@@ -35,14 +35,24 @@ class StudioTests(unittest.TestCase):
     def test_scene_control_api_stale_edits_and_running_work(self):
         a=self.approve();r=self.st.room(self.pid,self.rid);r['anchor_id']=a['id'];before=r['revision']
         body={'revision':before,'mode':'region','source_id':a['id'],'region':[.5,.5,.3,.3],'instruction':'Replace selected chair','denoise':.75}
-        self.call(self.route+'/scene-control',body);self.assertEqual(r['revision'],before+1);self.assertIsNone(r['approved_image_id'])
+        self.call(self.route+'/scene-control',body);self.assertEqual(r['revision'],before);self.assertEqual(r['approved_image_id'],a['id'])
         self.call(self.route+'/scene-control',body,status=400)
-        j=self.call(self.route+'/generate-image',{});self.assertEqual(j['scene_ticket']['content']['control']['mode'],'region')
+        j=self.call(self.route+'/generate-image',{});self.assertEqual(j['edit_ticket']['mode'],'region');self.assertEqual(j['source_image_id'],a['id'])
         self.call(self.route+'/scene-control',{**body,'revision':r['revision']},status=400)
     def test_prompt_preparation_does_not_change_source_or_approval(self):
         a=self.approve();before=self.st.snapshot()
         result=self.call(self.route+'/prepare-edit',{'instruction':'replace this chair with the refrence, dont change the table','mode':'region'})
         self.assertIn('do not change the table',result['prompt']);self.assertEqual(self.st.snapshot(),before)
+    def test_keep_child_is_saved_without_approving_or_replacing_parent(self):
+        from store import Store
+        parent=self.asset();r=self.st.room(self.pid,self.rid);r['images'].append(parent['id'])
+        child=self.asset(source_image_id=parent['id']);r['images'].append(child['id'])
+        self.call(self.route+'/keep-image',{'asset_id':child['id']})
+        reopened=Store(self.root);saved=reopened.room(self.pid,self.rid)
+        self.assertEqual(saved['images'],[parent['id'],child['id']])
+        self.assertIsNone(saved['approved_image_id']);self.assertEqual(reopened.asset(child['id'])['status'],'review')
+        self.assertEqual(saved['preferred_images']['room'],child['id'])
+        self.assertEqual(reopened.asset(child['id'])['source_image_id'],parent['id'])
     def test_locked_video_anchors_end_and_crops_guides(self):
         a=self.approve();room=self.st.room(self.pid,self.rid);engine=Engine(self.st,ROOT);engine.upload=lambda path:Path(path).name
         job=self.st.new_job(self.pid,'video',self.rid,input_revision=room['revision'],source_image_id=a['id'],duration=5,motion='still')

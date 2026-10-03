@@ -1,0 +1,10 @@
+{
+  "private_dir": "",
+  "lan_ip": "192.0.2.17",
+  "subnet": "192.0.2.0/24",
+  "port": 8792,
+  "certificate": "",
+  "private_key": "",
+  "token_file": "",
+  "comfy_url": "http://127.0.0.1:8191"
+}

@@ -27,7 +27,7 @@ def floor_bounds(store, room):
 def applies(store,room):
     if not room.get('plan_id'):return False
     plan=store.asset(room['plan_id'])
-    return bool(plan.get('raster_geometry') or plan.get('cad_redraw_id') or plan.get('vector_preview_id') or len(sections(store,room))>1 or room.get('block_layout',{}).get('items'))
+    return bool(plan.get('drawing',{}).get('surface_design') or plan.get('raster_geometry') or plan.get('cad_redraw_id') or plan.get('vector_preview_id') or len(sections(store,room))>1 or room.get('block_layout',{}).get('items'))
 
 
 def unresolved_curves(plan,architecture,floor=None):
@@ -127,23 +127,30 @@ def build(store,room,preview_items=None,camera_override=None):
         # Entire source segments must belong to this floor; never reinterpret another floor.
         if not selection and not all(b[0]-.003<=v[0]<=b[2]+.003 and b[1]-.003<=v[1]<=b[3]+.003 for v in pts):continue
         a,z=map(xy,pts);kind=f['kind'];lines.append({'id':f.get('id'),'source_id':f.get('source_id',f.get('id')),'kind':kind,'points':pts,'thickness':f.get('thickness',1.5)})
-        bands=[(0,H,[232,227,217])]
-        if kind=='window':bands=[(0,.9,[232,227,217]),(.9,2.4,[182,212,218]),(2.4,H,[232,227,217])]
-        elif kind=='sliding_door':bands=[(0,2.4,[171,207,216]),(2.4,H,[232,227,217])]
-        elif kind=='door':bands=[(2.2,H,[232,227,217])]
+        wallH=f.get('height_m',H);head=f.get('head_m',2.4 if kind in ('window','sliding_door') else 2.2);sill=f.get('sill_m',.9);base=f.get('base_m',0) if (plan.get('draft_only') or plan.get('manual_geometry')) else 0
+        bands=[(0,wallH,[232,227,217])]
+        if kind=='window':bands=[(0,sill,[232,227,217]),(sill,head,[182,212,218]),(head,wallH,[232,227,217])]
+        elif kind=='sliding_door':bands=[(0,head,[171,207,216]),(head,wallH,[232,227,217])]
+        elif kind=='door':bands=[(0,base,[232,227,217]),(head,wallH,[232,227,217])]
         # Drawing thickness is in source pixels. Use an explicit illustrative
         # default only for older features without a recorded thickness.
         thickness=float(f.get('thickness',0) or 0)*W/(span[0]*plan['width']) or .12
-        for low,high,col in bands:prism(a,z,thickness,max(0,min(H,low)),max(0,min(H,high)),col,kind)
+        for low,high,col in bands:prism(a,z,thickness,max(0,min(wallH,low)),max(0,min(wallH,high)),col,kind)
+        if kind=='window' and (plan.get('draft_only') or plan.get('manual_geometry')):
+            # Draft-only frame follows the same saved span and vertical opening.
+            L=math.dist(a,z);u=[(z[i]-a[i])/L for i in range(2)];jamb=min(.04,L/4,(head-sill)/4)
+            for p,q in [(a,[a[i]+u[i]*jamb for i in range(2)]),([z[i]-u[i]*jamb for i in range(2)],z)]:
+                prism(p,q,thickness,sill,head,[112,136,146],'window_frame')
+            for low,high in [(sill,sill+jamb),(head-jamb,head)]:prism(a,z,thickness,low,high,[112,136,146],'window_frame')
         if kind=='door':
             dx,dy=z[0]-a[0],z[1]-a[1];length=math.hypot(dx,dy)
             if length>0:
                 unit=[dx/length,dy/length];jamb=min(.07,length*.08)
-                prism(a,[a[0]+unit[0]*jamb,a[1]+unit[1]*jamb],thickness,0,min(2.2,H),[172,135,93],'door_frame')
-                prism([z[0]-unit[0]*jamb,z[1]-unit[1]*jamb],z,thickness,0,min(2.2,H),[172,135,93],'door_frame')
+                prism(a,[a[0]+unit[0]*jamb,a[1]+unit[1]*jamb],thickness,base,min(head,wallH),[172,135,93],'door_frame')
+                prism([z[0]-unit[0]*jamb,z[1]-unit[1]*jamb],z,thickness,base,min(head,wallH),[172,135,93],'door_frame')
                 sign=-1 if f.get('flip') else 1
                 leaf=[xy([v[0]/plan['width'],v[1]/plan['height']]) for v in f['leaf_points']] if f.get('leaf_points') else [a,[a[0]-sign*dy,a[1]+sign*dx]]
-                prism(*leaf,min(.045,thickness),0,min(2.15,H),[190,160,121],'door_leaf')
+                prism(*leaf,min(.045,thickness),base,min(head-.05,wallH),[190,160,121],'door_leaf')
     architecture_id=None
     products=[]
     for r in rs:
@@ -178,6 +185,14 @@ def build(store,room,preview_items=None,camera_override=None):
              'unresolved_architecture':unresolved,'architecture_counts':{k:sum(f['kind']==k for f in lines) for k in ('wall','window','door','sliding_door')},
              'camera':world_camera,'saved_camera':camera,'room_id':room['id'],'room_name':room['name'],
              'limits':['3D uses visible classified source architecture and typed drawing segments, including saved edits; room/section rectangles are not walls.',f'Wall height {H:g} m; opening heights and door leaf poses are defaults unless measured. Wall thickness follows the drawing.','Low-poly furniture shows saved placement, size and seat counts. Models are library proxies; exact product appearance depends on reference conditioning.']+([] if dims else ['Scale is estimated from furniture or manually entered; calibrate a known plan dimension for measured accuracy.'])}
+    if (plan.get('draft_only') or plan.get('manual_geometry')):
+        import wall_junctions
+        features=plan['drawing']['features']
+        content['wall_footprints']=wall_junctions.resolve(features,H)
+        content['surfaces']=[f for f in content['surfaces'] if f['kind'] not in ('wall','door','window','sliding_door') or f['color'] in ([182,212,218],[171,207,216])]
+        content['surfaces']+=wall_junctions.mesh(features,model['metres_per_pixel'],[b[0]*plan['width'],b[1]*plan['height']],H)
+    from surface_inputs import augment
+    augment(content,plan,room)
     from scene_document import from_plan
     content['construction_selection']=copy.deepcopy(selection)
     content['scene_document']=from_plan(plan,rs,architecture)
@@ -197,6 +212,7 @@ def create_guide(store,room,refs,folder):
     issues=readiness(store,room)
     if issues:raise ValueError('Shared floor: '+' '.join(issues))
     scene=build(store,room);camera=scene['camera']
+    if scene.get('surface_design_issues'):raise ValueError(' '.join(scene['surface_design_issues']))
     from perspective_layout import render_faces
     faces=[(np.array(f['points']),tuple(f['color'])) for f in scene['surfaces']]
     products=[p for p in scene['products'] if p.get('object_key')]
@@ -207,14 +223,16 @@ def create_guide(store,room,refs,folder):
     projected=save_projection(products,owners,depth,folder)
     issues=visible_block_issues(store,room,projected)
     if issues:raise ValueError('Shared floor: '+' '.join(issues))
-    invisible=[p['label'] for p in projected if p['room_id']==room['id'] and not p['visible_pixels']]
+    invisible=[p['label'] for p in projected if p['room_id']==room['id'] and not p.get('surface_design') and not p['visible_pixels']]
     if invisible:raise ValueError('The selected camera cannot see these furniture blocks: '+', '.join(invisible)+'. Adjust the camera or placement before generating.')
+    from surface_inputs import prepare
+    design_inputs,_=prepare(store.asset(room['plan_id']),room,folder)
     from geometry_guidance import save as save_guidance
     guidance=save_guidance(scene,face_ids,depth,folder)
     info={'version':3,'method':'Shared full-floor geometry; all section views use the same wall/opening and furniture coordinates','geometry_hash':scene['geometry_hash'],
           'plan_id':scene['plan_id'],'floor':scene['floor'],'camera':camera,'objects':scene['products'],'output_size':[1920,1088],
           'labels_in_image':False,'assumptions':scene['limits'],'shared_floor':True,'projected_objects':projected,
-          'geometry_guidance':guidance,'scene_revision':scene['scene_document']['scene_revision'],
+          'geometry_guidance':guidance,**({'surface_design_inputs':design_inputs} if design_inputs else {}),'scene_revision':scene['scene_document']['scene_revision'],
           'placement_enforcement':'Projected coordinates and reference conditioning; masks are QA targets, not a model-enforced constraint.'}
     (Path(folder)/'shared-floor-scene.json').write_text(json.dumps(scene,indent=2),encoding='utf-8')
     return path,info

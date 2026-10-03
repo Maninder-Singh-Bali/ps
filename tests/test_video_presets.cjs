@@ -1,0 +1,17 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const elements={},events={};
+const context={window:{},esc:x=>String(x),document:{addEventListener:(n,f)=>events[n]=f,getElementById:id=>elements[id]}};
+vm.runInNewContext(fs.readFileSync(require.resolve('../static/video-presets.js'),'utf8'),context);
+const p=context.window.VideoPresets,key='view-fixture';
+assert.match(p.controls(key),/Native 1080p · 5 seconds/);assert.match(p.controls(key),/Native 1080p · 8 seconds/);assert.match(p.controls(key),/Preview · 768 × 432 · 2 seconds/);
+assert.equal(p.read(key).video_preset,'ltx-native-1080p-v1');assert.equal(p.read(key).duration,5);
+elements['video-preset-'+key]={value:'preview-2'};elements['video-motion-'+key]={value:'slide'};elements['video-preset-note-'+key]={};
+events.change({target:{dataset:{videoChoice:key},value:'preview-2'}});
+assert.equal(p.read(key).duration,2);assert.equal(p.read(key).motion,'still');assert.equal(elements['video-motion-'+key].disabled,true);assert.match(elements['video-preset-note-'+key].textContent,/endpoint frame 48 is excluded/);
+assert.doesNotMatch(p.describe({video_preset:p.read(key).video_preset}),/Native/);
+elements['video-preset-'+key].value='native-8';events.change({target:{dataset:{videoChoice:key},value:'native-8'}});
+assert.equal(p.read(key).duration,8);assert.equal(elements['video-motion-'+key].disabled,false);
+assert.match(p.describe({video_preset:'ltx-native-1080p-v1',duration:8}),/Native 1080p/);
+const {generationProgressModel:model}=require('../static/generation-progress.js');
+assert.match(model({kind:'video',status:'completed',video_preset:'ltx-preview-768x432-2s-v1',scene_manifest:{approved_image:{}}},{url:'/fixture'}).hint,/downsampled/);
+console.log('Preset selection, fixed preview motion, output labels and progress wording verified without submission.');

@@ -75,11 +75,16 @@ class Engine:
         p=self.store.project(job['project_id']);room=view_context(self.store.room(p['id'],job['room_id']),job.get('view_id'));assert_image_gate(p,room,self.store)
         if room['revision']!=job['input_revision']:raise ValueError('Room inputs changed while this image was queued. Generate again with the updated references.')
         scene=scene_control.assert_scene(self.store,p,room,job.get('scene_ticket'))
+        scene_control.assert_edit(room,job)
         control=scene_control.clean_control(self.store,p,room,room.get('scene_control',{}))
+        if control.get('source_id'):job['source_image_id']=control['source_id']
         from placement_map import active_references
         object_refs=active_references(self.store,room)
         from interior_style import surface_references
-        refs=object_refs+surface_references(self.store,room)
+        from surface_inputs import prepare as prepare_design, instruction as design_instruction
+        plan=self.store.asset(room['plan_id']) if room.get('plan_id') else {}
+        design_inputs,design_refs=prepare_design(plan,room,folder)
+        refs=object_refs+surface_references(self.store,room)+design_refs
         if control.get('reference_id'):
             refs=[a for a in refs if a['id']==control['reference_id']]
             if not refs:raise ValueError('The selected edit reference is no longer assigned to this scene.')
@@ -90,7 +95,7 @@ class Engine:
         if control['mode']!='reference':anchor=self.store.asset(control['source_id'])
         # A saved block layout is the spatial authority for a new room view.
         # Explicit region/full-image edits retain their selected master instead.
-        if control['mode']=='reference' and room.get('block_layout',{}).get('items'):anchor=None
+        if control['mode']=='reference' and (room.get('block_layout',{}).get('items') or design_inputs):anchor=None
         primary=Path(anchor['path']) if anchor else self.plan_crop(room,folder)
         from perspective_layout import create as create_perspective_layout
         perspective=create_perspective_layout(self.store,room,object_refs,folder) if not anchor else None
@@ -111,7 +116,14 @@ class Engine:
         for i,a in enumerate(refs):
             if packed and i>0:continue
             key=100+i*5
-            g[str(key)]={'class_type':'LoadImage','inputs':{'image':self.upload(board if packed else a['path'])}}
+            reference_path=board if packed else a['path']
+            if control.get('reference_crop') and control.get('reference_id')==a['id']:
+                with Image.open(a['path']) as reference:
+                    rw,rh=reference.size;x,y,w,h=control['reference_crop']
+                    box=(round(x*rw),round(y*rh),round((x+w)*rw),round((y+h)*rh))
+                    reference_path=folder/'isolated-reference.png';reference.crop(box).save(reference_path)
+                    job['reference_crop']={'asset_id':a['id'],'source_box':list(box),'size':[box[2]-box[0],box[3]-box[1]],'aspect_preserved':True}
+            g[str(key)]={'class_type':'LoadImage','inputs':{'image':self.upload(reference_path)}}
             g[str(key+1)]={'class_type':'ImageScaleToTotalPixels','inputs':{'image':[str(key),0],'upscale_method':'lanczos','megapixels':1.0,'resolution_steps':16}}
             g[str(key+2)]={'class_type':'VAEEncode','inputs':{'pixels':[str(key+1),0],'vae':['3',0]}}
             g[str(key+3)]={'class_type':'ReferenceLatent','inputs':{'conditioning':pos,'latent':[str(key+2),0]}}
@@ -168,36 +180,37 @@ class Engine:
         if surface_cleanup:
             prompt='Edit image 1. '+control['instruction']+' The edited patch is a continuous clean unmarked surface matching the surrounding material and illumination. Preserve the rest of this photograph exactly.'
             job['surface_cleanup']={'reference_count':1,**scene_control.focus_surface_graph(g,control)}
+        elif control['mode']=='region' and control.get('masked_context'):
+            mask=folder/'object-mask.png';scene_control.object_mask(control).convert('RGB').save(mask)
+            job['context_edit']=scene_control.mask_context_graph(g,control,self.upload(mask))
         elif control['mode']=='region' and control.get('context_crop'):
             job['context_edit']=scene_control.focus_surface_graph(g,control)
+        if design_inputs and not surface_cleanup:prompt+=design_instruction(design_inputs)
         g['6']['inputs']['text']=prompt;g['16']['inputs'].update(positive=pos,negative=neg)
         g['17']['inputs']['noise_seed']=p['seed'];g['24']['inputs']['filename_prefix']='Pixeloid_Studio/'+job['id']+'/Image';g['25']['inputs']['filename_prefix']='Pixeloid_Studio/'+job['id']+'/Raw1920x1088'
-        job['seed']=p['seed'];job['source_assets']=[a['id'] for a in refs]+([anchor['id']] if anchor else [room['plan_id']])+([room['plan_id']] if guide else []);job['prompt']=prompt
+        job['seed']=p['seed'];job['source_assets']=[a['id'] for a in refs if not a.get('design_target')]+([anchor['id']] if anchor else [room['plan_id']])+([room['plan_id']] if guide else []);job['prompt']=prompt
         scene_control.save_manifest(job,folder,scene_control.assert_scene(self.store,p,room,job.get('scene_ticket')),
             model='FLUX.2 Klein 4B',master_image=scene_control.file_identity(self.store,anchor['id']) if anchor else None,
-            preservation=control,workflow_sha256=scene_control.digest(g))
+            preservation=control,workflow_sha256=scene_control.digest(g),
+            **({'surface_design_inputs':design_inputs,'surface_reference_conditioning':[a['id'] for a in refs if a.get('design_target')]} if design_inputs else {}))
         return g,'24'
-    def build_video(self,job,folder):
+    def assert_video_source(self,job):
         p=self.store.project(job['project_id']);room=view_context(self.store.room(p['id'],job['room_id']),job.get('view_id'));a=approved_image(self.store,p,room,job.get('view_id'))
         if room['revision']!=job['input_revision'] or a['id']!=job['source_image_id']:raise ValueError('Image approval changed while the video was queued. Review and queue it again.')
         scene=scene_control.assert_scene(self.store,p,room,job.get('scene_ticket'))
         source_identity=scene_control.file_identity(self.store,a['id'])
         if job.get('source_image_identity') and source_identity!=job['source_image_identity']:raise ValueError('The approved image changed after the video was queued.')
-        g=json.loads((self.app_root/'templates/ltx.json').read_text())
-        seconds=job.get('duration',5);frames=int(seconds*24);latent_frames=frames+1
-        g['8']['inputs']['image']=self.upload(a['path']);g['11']['inputs']['length']=latent_frames;g['13']['inputs']['frames_number']=latent_frames;g['34']['inputs']['length']=frames;g['15']['inputs']['noise_seed']=p['seed']
+        return p,room,a,scene,source_identity
+    def build_video(self,job,folder):
+        p,room,a,scene,source_identity=self.assert_video_source(job)
+        from video_workflow import settings,provenance,NATIVE
+        config=settings(job.get('video_preset',NATIVE),job.get('duration'),job.get('motion','still'))
+        from video_capture import check,instrument,capability
+        capture=job.get('video_capture');check(capture,config['preset'])
+        seconds=config['duration'];seed=config['fixed_seed'] if config['fixed_seed'] is not None else p['seed']
+        job.update(video_preset=config['preset'],duration=seconds,video_provenance=provenance(config['preset'],seconds,config['motion']))
         with Image.open(a['path']) as source:
-            if source.size!=(1920,1080):raise ValueError('Video needs an approved native 1920 Ã— 1080 image. No source enlargement is performed.')
-        g['9']={'class_type':'ImagePadForOutpaint','inputs':{'image':['8',0],'left':0,'right':0,'top':4,'bottom':4,'feathering':0}}
-        g['12']['inputs']['strength']=1.0
-        if job.get('motion','still')=='still':
-            # Anchor the end to the same approved view, then remove appended
-            # guide tokens before decoding. Moving-camera shots do not use this.
-            g['35']={'class_type':'LTXVAddGuide','inputs':{'positive':['7',0],'negative':['7',1],'vae':['3',0],'latent':['12',0],'image':['10',0],'frame_idx':frames,'strength':1.0}}
-            g['14']['inputs']['video_latent']=['35',2]
-            g['16']['inputs'].update(positive=['35',0],negative=['35',1])
-            g['36']={'class_type':'LTXVCropGuides','inputs':{'positive':['35',0],'negative':['35',1],'latent':['20',0]}}
-            g['29']['inputs']['samples']=['36',2]
+            if source.size!=(1920,1080):raise ValueError('Video needs an approved native 1920 × 1080 image. No source enlargement is performed.')
         motion={'still':'The camera is locked on a tripod. Only subtle natural foliage movement.','push':'A very slow, straight five-centimetre camera push toward the subject. Fixed focal length, level horizon.','slide':'A tiny five-centimetre lateral camera slide, fixed focal length and level horizon.'}.get(job.get('motion'),'The camera is locked on a tripod.')
         source_job=self.store.db['jobs'].get(a.get('job_id'),{})
         saved_camera=copy.deepcopy(source_job.get('scene_manifest',{}).get('content',{}).get('floor_camera'))
@@ -205,16 +218,21 @@ class Engine:
             motion+=' Begin at the exact approved camera composition. Keep its lens and viewing direction; do not reframe or cut to a different viewpoint.'
         job['camera_guidance']={'source_image_id':a['id'],'camera':saved_camera,'motion':job.get('motion','still'),'mode':'approved-image conditioning and motion prompt','path_enforced':False}
         prompt=f"{seconds}-second natural architectural film of this exact approved {room['name']} image. {motion} Preserve every object, furniture silhouette, background, wall and door frame. Exposure and daylight direction stay constant. No extra glass panels or new openings. All furniture and stone geometry remain rigid. Keep reflections physically plausible and restrained; no texture crawling, jitter, morphing or lighting transitions. No people, speech, music, text or watermark."
-        g['5']['inputs']['text']=prompt;g['32']['inputs']['filename_prefix']='Pixeloid_Studio/'+job['id']+'/Video'
+        from video_workflow import build
+        g=build(self.app_root,'pending-approved-input',seconds,job.get('motion','still'),seed,prompt,'Pixeloid_Studio/'+job['id']+'/Video',config['preset'])
+        if capture:
+            g=instrument(self.app_root,g,job['id'],capture)
+            job['video_provenance']['capture']=capability(self.app_root)
         source_job=self.store.db['jobs'].get(a.get('job_id'),{})
         if source_job.get('scene_manifest'):scene_control.assert_scene(self.store,p,room,source_job['scene_manifest'])
         if source_job.get('scene_lighting'):job['scene_lighting']=copy.deepcopy(source_job['scene_lighting'])
-        job['seed']=p['seed'];job['source_assets']=[a['id']];job['prompt']=prompt
+        job['seed']=seed;job['source_assets']=[a['id']];job['prompt']=prompt
+        g['8']['inputs']['image']=self.upload(a['path'])
         scene_control.save_manifest(job,folder,scene,model='LTX 2.5',approved_image=source_identity,
-            camera_guidance=copy.deepcopy(job['camera_guidance']),
+            camera_guidance=copy.deepcopy(job['camera_guidance']),video_provenance=copy.deepcopy(job['video_provenance']),
             parent_image_scene=copy.deepcopy(source_job.get('scene_manifest')),workflow_sha256=scene_control.digest(g),
-            preservation={'first_frame_strength':1.0,'end_frame_guidance':job.get('motion','still')=='still','source_resize':False,'motion':job.get('motion','still'),
-                          'scope':'Exact approved input; subsequent generated frames require full motion review.'})
+            preservation={'first_frame_strength':1.0,'end_frame_guidance':job.get('motion','still')=='still','source_resize':config['conditioning']!=[1920,1080],'motion':job.get('motion','still'),
+                          'scope':'Approved source bytes retained; conditioning dimensions and retained frames are recorded in video provenance. Full motion review required.'})
         return g,'32'
     def build_reference(self,job,folder):
         p=self.store.project(job['project_id']);room=self.store.room(p['id'],job['room_id'])
@@ -244,6 +262,8 @@ class Engine:
             for req in spec['input'].get('required',{}):
                 if req not in n['inputs']:raise RuntimeError(f'Missing workflow input {key}.{req}')
     def run_render(self,job):
+        from generation_phase import assert_dispatch
+        assert_dispatch(self.store,job)
         jid=job['id'];folder=project_storage.job_folder(self.store,job);folder.mkdir(parents=True,exist_ok=True)
         graph_path=folder/'workflow.api.json'
         if not self.ensure_renderer(job):return
@@ -265,7 +285,7 @@ class Engine:
             ws=self.connect_events(jid)
             response=self.post('/prompt',{'prompt':g,'client_id':jid,'extra_data':{'pixeloid_job_id':jid}})
             if response.get('node_errors'):raise RuntimeError('Workflow validation failed: '+str(response['node_errors'])[:600])
-            self.store.update_job(jid,prompt_id=response['prompt_id'],stage='Loading models')
+            self.store.update_job(jid,prompt_id=response['prompt_id'],stage='Submitted to renderer')
         else:
             g=json.loads(graph_path.read_text());node=job['output_node'];ws=self.connect_events(jid)
         pid=job['prompt_id'];start=time.time();last_poll=0
@@ -293,6 +313,7 @@ class Engine:
                 try:ws.close()
                 except Exception:pass
     def ensure_renderer(self,job):
+        if getattr(self,'services',None) and not self.services.prepared:raise ValueError('Click Prepare Studio before generation.')
         """Start an installed service once; keep readiness and cancellation in the job."""
         if self.health(force=True).get('connected'):return True
         from standalone import start_renderer,config
@@ -322,19 +343,35 @@ class Engine:
         if not entries:raise RuntimeError('Renderer finished but returned no media output.')
         is_image=job['kind'] in ('image','reference')
         entry=entries[0];ext='.png' if is_image else '.mp4';path=project_storage.output_folder(self.store,job,folder)/('result'+ext)
-        response=self.session.get(self.url+'/view',params=entry,timeout=180);response.raise_for_status();path.write_bytes(response.content)
+        path.write_bytes(self.download_output(entry))
         p=self.store.project(job['project_id']);room=self.store.room(p['id'],job['room_id'])
         if job['kind']!='reference' and room['revision']!=job['input_revision']:raise RuntimeError('Output was preserved, but room references changed during rendering. It cannot be approved as current.')
         if job['kind']=='video':
             current=approved_image(self.store,p,room,job.get('view_id'))
             if current['id']!=job['source_image_id']:raise RuntimeError('Output preserved; its source approval changed during rendering.')
+            self.assert_video_source(job)
             from video_checks import inspect
-            job['video_check']=inspect(path,current['path'],job['duration'])
+            from video_workflow import NATIVE,settings,provenance
+            config=settings(job.get('video_preset',NATIVE),job['duration'],job.get('motion','still'))
+            vp=provenance(config['preset'],config['duration'],config['motion'])
+            # Existing accepted v1 native requests keep their historical revision.
+            vp['video_workflow_revision']=job.get('video_provenance',{}).get('video_workflow_revision',1)
+            if job.get('video_capture'):
+                from video_capture import evidence
+                from worker_protocol import digest
+                capture=job.get('video_provenance',{}).get('capture')
+                manifest=evidence(history,job['id'])
+                if not capture or capture.get('profile')!=job['video_capture'] or digest(manifest.get('extension_sha256'))!=capture.get('fingerprint'):
+                    raise ValueError('Saved capture provenance differs from the executed extension; output preserved.')
+                if manifest.get('mp4',{}).get('sha256')!=hashlib.sha256(path.read_bytes()).hexdigest():raise ValueError('Capture MP4 identity differs; output preserved.')
+                vp['capture']=copy.deepcopy(capture)
+            if job.get('video_provenance') and job['video_provenance']!=vp:raise ValueError('Saved video provenance differs from the preset; output preserved.')
+            job['video_check']=inspect(path,current['path'],job['duration'],config['preset'])
             (folder/'video-check.json').write_text(json.dumps(job['video_check'],indent=2),encoding='utf8')
             import av
             with av.open(str(path)) as container:
                 stream=container.streams.video[0]
-                if (stream.width,stream.height)!=(1920,1080):raise RuntimeError('Video output is not 1920x1080; preserved for inspection.')
+                if [stream.width,stream.height]!=config['output']:raise RuntimeError('Video output differs from its preset resolution; preserved for inspection.')
                 if stream.average_rate and abs(float(stream.average_rate)-24)>.01:raise RuntimeError('Video frame rate does not match 24 fps.')
                 duration=float(stream.duration*stream.time_base) if stream.duration else float(container.duration/1000000)
                 if abs(duration-job['duration'])>.1:raise RuntimeError('Video duration does not match the requested length.')
@@ -343,8 +380,9 @@ class Engine:
                 if im.size!=(1920,1080):raise RuntimeError('Output is not 1920x1080; it was preserved for inspection.')
             raw=history['outputs'].get('25',{}).get('images',[])
             if raw:
-                response=self.session.get(self.url+'/view',params=raw[0],timeout=180);response.raise_for_status();(folder/'raw_1920x1088.png').write_bytes(response.content)
+                (folder/'raw_1920x1088.png').write_bytes(self.download_output(raw[0]))
         if job.get('scene_manifest'):
+            if job['kind']=='image':scene_control.assert_edit(room,job)
             scene_control.assert_scene(self.store,p,room,job['scene_manifest'])
             control=job['scene_manifest'].get('preservation',{})
             if is_image and control.get('mode')=='region':
@@ -353,11 +391,21 @@ class Engine:
                 (folder/'consistency-check.json').write_text(json.dumps(qa,indent=2),encoding='utf8')
                 if not qa['outside_exact_match']:raise RuntimeError('The protected background pixel check failed. Output preserved for inspection; it cannot be approved.')
         sampling=(job.get('context_edit') or job.get('surface_cleanup') or {}).get('context',[0,0,1920,1088])[2:]
-        (folder/'resolution-provenance.json').write_text(json.dumps({'sampling_width':sampling[0],'sampling_height':sampling[1],'protected_composite':sampling!=[1920,1088],'output_width':1920,'output_height':1080,'crop_top':4,'crop_bottom':4,'output_upscaler':False,'source_conditioning_may_be_resized':True,'workflow':'workflow.api.json','seed':job['seed']},indent=2),encoding='utf8')
-        a=register_asset(self.store,p['id'],path,'reference_candidate' if job['kind']=='reference' else job['kind'],room['id'],input_revision=job['input_revision'],job_id=job['id'],seed=job['seed'],status='review',view_id=job.get('view_id'),view_revision=job.get('view_revision'),source_image_id=job.get('source_image_id'),native_sampling=sampling,output_upscaled=False,duration=job.get('duration'),reference_purpose=job.get('reference_purpose'),reference_prompt=job.get('reference_prompt'),reference_anchor_id=job.get('reference_anchor_id'),category=job.get('category','Furniture'))
+        resolution={'sampling_width':sampling[0],'sampling_height':sampling[1],'protected_composite':sampling!=[1920,1088],'output_width':1920,'output_height':1080,'crop_top':4,'crop_bottom':4,'output_upscaler':False,'source_conditioning_may_be_resized':True,'workflow':'workflow.api.json','seed':job['seed']}
+        video_metadata={}
+        if job['kind']=='video':
+            sampling=config['sampling'];resolution={**vp,'seed':job['seed']}
+            video_metadata={'video_preset':config['preset'],'video_provenance':resolution,'width':config['output'][0],'height':config['output'][1],'fps':24,'frames':config['frames']}
+        (folder/'resolution-provenance.json').write_text(json.dumps(resolution,indent=2),encoding='utf8')
+        prior=next((a for a in self.store.db['assets'].values() if a.get('job_id')==job['id'] and a.get('kind')==('reference_candidate' if job['kind']=='reference' else job['kind']) and a.get('sha256')==hashlib.sha256(path.read_bytes()).hexdigest()),None)
+        a=prior or register_asset(self.store,p['id'],path,'reference_candidate' if job['kind']=='reference' else job['kind'],room['id'],input_revision=job['input_revision'],job_id=job['id'],seed=job['seed'],status='review',view_id=job.get('view_id'),view_revision=job.get('view_revision'),source_image_id=job.get('source_image_id'),native_sampling=sampling,output_upscaled=False,duration=job.get('duration'),reference_purpose=job.get('reference_purpose'),reference_prompt=job.get('reference_prompt'),reference_anchor_id=job.get('reference_anchor_id'),category=job.get('category','Furniture'),**video_metadata)
         with self.store.lock:
-            room.setdefault('reference_candidates' if job['kind']=='reference' else 'images' if job['kind']=='image' else 'videos',[]).append(a['id']);self.store.save()
+            versions=room.setdefault('reference_candidates' if job['kind']=='reference' else 'images' if job['kind']=='image' else 'videos',[])
+            if a['id'] not in versions:versions.append(a['id'])
+            self.store.save()
         self.store.update_job(job['id'],status='completed',stage='Ready for review',progress=100,eta=None,result_asset_id=a['id'],finished=now())
+    def download_output(self,entry):
+        response=self.session.get(self.url+'/view',params=entry,timeout=180);response.raise_for_status();return response.content
     def run_analysis(self,job):
         from analysis import analyze_local,analyze_vision
         import source_scope
@@ -400,6 +448,7 @@ class Engine:
             with self.store.lock:
                 candidates=sorted([j for j in self.store.db['jobs'].values() if j['status'] in ('queued','waiting','running') and (j['kind'] in ('raster_reconstruction','plan_setup'))==cpu],key=lambda j:j['created'])
             if not candidates:self.stop.wait(1);continue
+            if not cpu and getattr(self,'services',None) and not self.services.prepared:self.stop.wait(1);continue
             if cpu and memory_headroom()[0]<2:self.stop.wait(1);continue
             job=candidates[0]
             with self.store.lock:
@@ -408,6 +457,9 @@ class Engine:
                 first=job.get('first_dispatch_at',time.time())
                 self.store.update_job(job['id'],status='running',lane='cpu' if cpu else 'model',first_dispatch_at=first,queue_wait_seconds=round(first-job['created'],3))
             try:
+                from generation_phase import assert_dispatch, GenerationPaused
+                assert_dispatch(self.store,job)
+                if not cpu and getattr(self,'services',None):self.services.before_model(job)
                 if job['kind']=='plan_setup':
                     import plan_setup
                     plan_setup.run(self,job)
@@ -422,8 +474,10 @@ class Engine:
                     component_setup.run(self,job)
                 elif job['kind']=='analysis':self.run_analysis(job)
                 else:self.run_render(job)
+            except GenerationPaused as exc:
+                self.store.update_job(job['id'],status='failed',stage='Generation paused',error=str(exc));continue
             except Exception as exc:self.store.update_job(job['id'],status='failed',stage='Needs attention',error=str(exc)[:900],eta=None,finished=now())
-            if self.store.db['settings'].get('auto_release') and job['kind'] in ('image','video','reference'):
+            if self.store.db['settings'].get('auto_release') and (not getattr(self,'services',None) or self.services.process is not None) and job['kind'] in ('image','video','reference'):
                 try:
                     q=self.get('/queue')
                     if not q['queue_running'] and not q['queue_pending']:self.post('/free',{'unload_models':True,'free_memory':True})

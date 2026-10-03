@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict'),G=require('../static/trace-geometry'),O=require('../static/opening-editor');
+for(const end of [[600,0],[0,600],[360,480]])for(const kind of ['window','door']){
+ const w={id:'w',kind:'wall',points:[[0,0],end],thickness:15,height_m:3},o={id:'o',kind,host_wall_id:'w',offset:100,width:100,points:[[0,0],[1,0]],thickness:15,head_m:2.2,...(kind==='window'?{sill_m:.8}:{base_m:0}),flip:true,hinge_end:true,review_note:'keep'},fs=G.hosted([w,o]);
+ for(const [anchor,offset] of [['left',100],['centre',75],['right',50]]){const result=O.edit(fs,'o',{width:150,height:1.3},anchor,3);assert.equal(result[1].offset,offset);assert.equal(O.levels(result[1]).base,O.levels(o).base);assert.equal(O.levels(result[1]).height,1.3);for(const k of ['flip','hinge_end','review_note'])assert.equal(result[1][k],o[k]);assert.deepEqual(result[0],w);assert.deepEqual(G.hosted(JSON.parse(JSON.stringify(result))),result);}
+ const moved=O.edit(fs,'o',{base:.4},'left',3);assert.ok(Math.abs(O.levels(moved[1]).height-O.levels(o).height)<1e-12);assert.equal(moved[1].host_wall_id,'w');
+ assert.throws(()=>O.edit(fs,'o',{width:700}),/ends/);assert.throws(()=>O.edit(fs,'o',{height:0}),/positive/);assert.throws(()=>O.edit(fs,'o',{height:4}),/wall height/);
+ const legacy={...fs[1]};delete legacy.host_wall_id;delete legacy.width;delete legacy.offset;const attached=O.attach([w,legacy],'o','w',3);assert.deepEqual(attached[1].points,fs[1].points);assert.equal(attached[1].hinge_end,true);
+ assert.throws(()=>O.attach([{...w,points:w.points.map(p=>[p[0]+50,p[1]+50])},legacy],'o','w',3),/outside this wall thickness/);
+}
+const w={id:'w',kind:'wall',points:[[0,0],[600,0]],thickness:15},o={id:'o',kind:'window',host_wall_id:'w',offset:50,width:100,points:[[50,0],[150,0]],thickness:15,sill_m:.8,head_m:2.1},q={...o,id:'q',offset:300};const fs=[w,o,q];assert.deepEqual(O.clearances(fs,o),{a:50,b:450,left:null,right:150});assert.throws(()=>O.edit(fs,'o',{width:300}),/overlap/);assert.equal(O.verticalSnap(fs,o,2.09,'top',.02,true).value,2.1);assert.equal(O.verticalSnap(fs,o,2.09,'top',.02,false).value,2.09);
+console.log('Opening editing: horizontal, vertical, angled; anchors, fixed base, sill, explicit attachment, overlap/bounds, levels, clearances and roundtrip passed.');

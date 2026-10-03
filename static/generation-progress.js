@@ -23,7 +23,7 @@ function generationProgressModel(job, asset, nowSeconds = Date.now()/1000) {
   }else if(busy&&finishedSteps)remaining='Remaining time: finishing estimate not yet available';
   const stage=ready&&asset?.status==='rejected'?(job.kind==='video'?'Video needs revision':'Image needs revision'):ready?(job.kind==='video'?'Video ready for review':['analysis','plan_setup','vision_study'].includes(job.kind)?job.stage:'Image ready for review'):job.status==='completed'?'Loading finished image…':job.stage||'Queued';
   const checked=job.consistency_check;
-  const verifiedHint=checked?.outside_exact_match?`Protected background: ${checked.outside_pixels.toLocaleString()} pixels checked; no changes outside the edit area. Review the edited object.`:job.kind==='video'&&job.scene_manifest?.approved_image?'Exact approved image supplied. Review the full clip for motion and detail changes.':null;
+  const verifiedHint=checked?.outside_exact_match?`Protected background: ${checked.outside_pixels.toLocaleString()} pixels checked; no changes outside the edit area. Review the edited object.`:job.kind==='video'&&job.scene_manifest?.approved_image?job.video_preset==='ltx-preview-768x432-2s-v1'?'Approved image downsampled for a 768 × 432 preview; no output upscaling. Review the full clip.':'Exact approved image supplied. Review the full clip for motion and detail changes.':null;
   return {busy,ready,percent,elapsed,renderElapsed,stage,remaining,
     hint:ready?(asset?.status==='rejected'?'Rejected in review. Correct the result before approving video.':verifiedHint||'Saved and ready for review.'):busy?(finishedSteps?'Rendering steps complete. Decoding and saving must finish before the image is ready.':sampling?'Bar advances only when the renderer completes a step.':'Waiting for measured progress; the bar will hold.'):job.error||'Generation stopped.',
     percentLabel:ready?'100% · complete':sampling&&percent!==null?(steps?.[1]?`${steps[0]} / ${steps[1]} steps · `:'')+Math.round(percent)+'% rendered':percent!==null?Math.round(percent)+'%':busy?'Waiting for progress':job.status==='completed'?'Loading preview':job.status==='failed'?'Needs attention':'Cancelled'};
@@ -39,7 +39,7 @@ if(typeof document!=='undefined'){
   function latestRoomJob(){return Object.values(state?.jobs||{}).filter(j=>j.project_id===pid&&j.room_id===rid&&['reference','image'].includes(j.kind)).sort((a,b)=>b.created-a.created)[0]}
   window.openGenerationProgress=function(job){
     monitoredJob=job.id;
-    showModal(job.kind==='reference'?'Reference image generation':'Room image generation',`<p class="generation-room">${esc(P()?.rooms.find(r=>r.id===job.room_id)?.name||'Room')} · Native 1080</p><div id="generation-modal-status" role="status" aria-live="polite"></div><div id="generation-preview" class="generation-preview"><div class="generation-placeholder"><span class="generation-orbit" aria-hidden="true"></span><strong>Your image will appear here</strong><p>You can close this window and keep working.</p></div></div>`,btn('Close','close-modal','','ghost'),'generation');
+    showModal(job.kind==='video'?'Video generation':job.kind==='reference'?'Reference image generation':'Room image generation',`<p class="generation-room">${esc(P()?.rooms.find(r=>r.id===job.room_id)?.name||'Room')} · ${job.kind==='video'?esc(VideoPresets.describe(job)):'Native 1080'}</p><div id="generation-modal-status" role="status" aria-live="polite"></div><div id="generation-preview" class="generation-preview"><div class="generation-placeholder"><span class="generation-orbit" aria-hidden="true"></span><strong>${job.kind==='video'?'Your clip':'Your image'} will appear here</strong><p>You can close this window and keep working.</p></div></div>`,btn('Close','close-modal','','ghost'),'generation');
     $('#modal').classList.add('generation-dialog');
     updateGenerationProgress(job);
   };
@@ -63,10 +63,10 @@ if(typeof document!=='undefined'){
     const preview=$('#generation-preview');
     if(m.ready&&preview.dataset.asset!==asset.id){
       preview.dataset.asset=asset.id;
-      preview.innerHTML=`<img src="${url(asset.id)}" alt="${esc(job.category||P()?.rooms.find(r=>r.id===job.room_id)?.name||'Generated image')} · generated preview" data-action="view" data-id="${asset.id}"><span>Click image for full-size review</span>`;
+      preview.innerHTML=job.kind==='video'?`<video src="${url(asset.id)}" controls preload="metadata"></video><span>${esc(VideoPresets.describe(asset))} · Review the complete clip</span>`:`<img src="${url(asset.id)}" alt="${esc(job.category||P()?.rooms.find(r=>r.id===job.room_id)?.name||'Generated image')} · generated preview" data-action="view" data-id="${asset.id}"><span>Click image for full-size review</span>`;
     }else if(!m.ready){
       const message=preview.querySelector('strong');
-      if(message)message.textContent=job.status==='failed'?'The image could not be generated':job.status==='cancelled'?'Generation cancelled':'Your image will appear here';
+      if(message)message.textContent=job.status==='failed'?'Generation could not finish':job.status==='cancelled'?'Generation cancelled':job.kind==='video'?'Your clip will appear here':'Your image will appear here';
       preview.classList.toggle('generation-stopped',!m.busy&&job.status!=='completed');
     }
   };

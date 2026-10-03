@@ -21,6 +21,11 @@ def installations(root):
 
 
 def status(engine):
+    if hasattr(engine,'remote'):
+        s=engine.services.snapshot()
+        return {'remote':True,'worker':s,'components':[{'name':c['name'],'state':'info','detail':c['detail']} for c in s.get('checks',[])],
+                'downloads':[],'installations':[],'configuration':{},
+                'download_policy':'Models stay on the PC. No model downloads or installations on this dashboard computer.'}
     from raster_reconstruction import runtime
     from engine import memory_headroom
     c=config(engine.app_root);components=[]

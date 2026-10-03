@@ -1,0 +1,5 @@
+{
+  "url": "https://192.0.2.17:8792",
+  "certificate": "worker.pem",
+  "token_file": "worker.token"
+}

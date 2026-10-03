@@ -4,7 +4,7 @@ import copy
 import hashlib
 import json
 import math
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFilter
 
 
 def digest(value):
@@ -51,6 +51,7 @@ def clean_control(store, project, room, data):
     out['denoise'] = strength
     if mode == 'region':
         out['context_crop'] = data.get('context_crop') is True
+        out['masked_context'] = data.get('masked_context') is True
         box = data.get('region')
         if not isinstance(box, list) or len(box) != 4 or not all(isinstance(v, (float, int)) and math.isfinite(v) for v in box):
             raise ValueError('Draw an edit area on the room image.')
@@ -59,6 +60,18 @@ def clean_control(store, project, room, data):
             raise ValueError('Keep the edit area inside the room image.')
         out['region'] = [float(v) for v in box]
         out['feather'] = 16
+        points=data.get('mask_polygon')
+        if points:
+            if not isinstance(points,list) or not 3<=len(points)<=100 or any(not isinstance(p,list) or len(p)!=2 or any(not isinstance(v,(int,float)) or not math.isfinite(v) for v in p) or not (x<=p[0]<=x+w and y<=p[1]<=y+h) for p in points):
+                raise ValueError('Draw an object outline inside the edit area, with at least three points.')
+            area=abs(sum(p[0]*q[1]-q[0]*p[1] for p,q in zip(points,points[1:]+points[:1])))/2
+            if area<.00001:raise ValueError('The object outline has no usable area.')
+            out['mask_polygon']=copy.deepcopy(points)
+        crop=data.get('reference_crop')
+        if crop:
+            if not reference_id or not isinstance(crop,list) or len(crop)!=4 or any(not isinstance(v,(int,float)) or not math.isfinite(v) for v in crop) or min(crop[:2])<0 or min(crop[2:])<=0 or crop[0]+crop[2]>1 or crop[1]+crop[3]>1:
+                raise ValueError('Keep the product crop inside its selected reference.')
+            out['reference_crop']=list(crop)
         if not out['instruction']:
             raise ValueError('Describe the change to make inside the selected area.')
     return out
@@ -75,7 +88,6 @@ def scene_snapshot(store, project, room):
         'seed': project['seed'], 'style': project['style'],
         'room': {k: copy.deepcopy(room.get(k)) for k in ('name', 'floor', 'kind', 'bbox', 'area_polygon', 'notes', 'furniture_layout', 'block_layout')},
         'anchor': file_identity(store, room.get('anchor_id')),
-        'master': file_identity(store, control.get('source_id')),
         'plan': file_identity(store, room.get('plan_id')),
         'drawing': {k: copy.deepcopy(drawing.get(k)) for k in ('edits', 'features', 'site')},
         'construction_selection': copy.deepcopy(plan.get('construction_selection')),
@@ -86,14 +98,63 @@ def scene_snapshot(store, project, room):
         'floor_products': [{**file_identity(store,aid),'enabled':store.asset(aid).get('enabled',True),'category':store.asset(aid).get('category')} for r in project['rooms'] if r.get('plan_id')==room.get('plan_id') and r.get('floor')==room.get('floor') for aid in r.get('references',[])],
         'measurements': [{k: copy.deepcopy(v) for k,v in m.items() if k!='updated'} for m in project.get('measurements',[]) if m.get('plan_id')==room.get('plan_id') and m.get('floor')==room.get('floor')],
         'products': [{**file_identity(store, a['id']), 'category': a.get('category'), 'placement': a.get('placement')} for a in refs],
-        'control': copy.deepcopy(control),
     }
+    from surface_inputs import identity
+    design=identity(plan,room.get('floor'))
+    if design:content['surface_design']=design
     if plan.get('raster_geometry'):
         content['raster_geometry']={k:copy.deepcopy(plan['raster_geometry'].get(k)) for k in ('source_sha256','pipeline_key','walls','uncertain_spans','openings','regions')}
         content['raster_corrections']=copy.deepcopy(plan.get('raster_corrections',{}))
     if room.get('surfaces'):content['surfaces']=copy.deepcopy(room['surfaces'])
     if room.get('_view_id'):content['view_id']=room['_view_id']
-    return {'version': 1, 'fingerprint': digest(content), 'content': content}
+    return {'version': 2, 'fingerprint': digest(content), 'content': content}
+
+
+def revision_matches(room, revision):
+    return revision == room['revision'] or revision in room.get('edit_revision_equivalents',[])
+
+
+def semantic_content(content):
+    return {k:v for k,v in content.items() if k not in ('master','control','room_revision')}
+
+
+def restore_edit_lineage(store):
+    """Conservative legacy repair: every intervening revision must be a recorded
+    control-only step, with identical scene evidence. Gaps/scene changes stop it.
+    No output status, approval, scene record or historical manifest is changed.
+    """
+    from interior_style import view_context
+    for project in store.db['projects'].values():
+        for room in project['rooms']:
+            records={}
+            for job in store.db['jobs'].values():
+                snap=job.get('scene_manifest',{})
+                c=snap.get('content',{})
+                if job.get('room_id')==room['id'] and job.get('kind')=='image' and snap.get('version')==1 and c.get('control'):
+                    records.setdefault(c['room_revision'],[]).append(c)
+            current=room['revision']; aliases=[];proof=[]
+            # Do not bridge unrecorded revisions or multiple inconsistent snapshots.
+            while current in records and current-1 in records:
+                after,before=records[current],records[current-1]
+                if len(after)!=1 or len(before)!=1:break
+                a,b=after[0],before[0]
+                if a['control']==b['control'] or semantic_content(a)!=semantic_content(b):break
+                try:
+                    live=scene_snapshot(store,project,view_context(room,a.get('view_id')))
+                    if semantic_content(live['content'])!=semantic_content(a):break
+                    for c in (a,b):
+                        if c.get('master')!=file_identity(store,c['control'].get('source_id')):raise ValueError('Master changed')
+                except (ValueError,OSError,KeyError):break
+                aliases.append(current-1);proof.append({'from':current-1,'to':current,'scene':digest(semantic_content(a))});current-=1
+            if aliases:
+                room['edit_revision_equivalents']=aliases
+                room['edit_revision_audit']={'method':'contiguous recorded control-only revisions','steps':proof}
+
+
+def assert_edit(room, job):
+    expected=job.get('edit_ticket')
+    if expected is not None and expected!=room.get('scene_control',{'mode':'reference'}):
+        raise ValueError('Edit settings changed during generation. The output cannot replace the requested edit.')
 
 
 def assert_scene(store, project, room, expected):
@@ -101,7 +162,7 @@ def assert_scene(store, project, room, expected):
         from interior_style import view_context
         room=view_context(room,expected['content']['view_id'])
     current = scene_snapshot(store, project, room)
-    if expected and expected['fingerprint'] != current['fingerprint']:
+    if expected and (not revision_matches(room,expected['content']['room_revision']) or semantic_content(expected['content']) != semantic_content(current['content'])):
         raise ValueError('The master scene or references changed. Generate a new version from the current room before continuing.')
     return current
 
@@ -124,6 +185,38 @@ def region_pixels(control):
     left, top = int(x*1920), int(y*1080)
     right, bottom = min(1920, math.ceil((x+w)*1920)), min(1080, math.ceil((y+h)*1080))
     return left, top, right-left, bottom-top
+
+
+def object_mask(control):
+    """Full-resolution mask; blur remains strictly inside the selected bounds."""
+    x,y,w,h=region_pixels(control)
+    local=Image.new('L',(w,h))
+    if control.get('mask_polygon'):
+        ImageDraw.Draw(local).polygon([(round(px*1920)-x,round(py*1080)-y) for px,py in control['mask_polygon']],fill=255)
+        local=local.filter(ImageFilter.GaussianBlur(3))
+    else:
+        # Feather inward so no pixel beyond the confirmed region can change.
+        import numpy as np
+        yy,xx=np.mgrid[:h,:w];edge=max(1,min(control.get('feather',16),w//4,h//4))
+        local=Image.fromarray((255*np.clip(np.minimum.reduce([xx,yy,w-1-xx,h-1-yy])/edge,0,1)).astype('uint8'))
+    result=Image.new('L',(1920,1088));result.paste(local,(x,y+4));return result
+
+
+def mask_context_graph(graph,control,mask_name):
+    """Same object mask feeds noise masking and compositing; references stay global.
+    This is latent masking on the installed model, not a trained inpaint model.
+    """
+    meta=focus_surface_graph(graph,control);left,top,cw,ch=meta['context']
+    graph['340']={'class_type':'LoadImage','inputs':{'image':mask_name}}
+    graph['341']={'class_type':'ImageToMask','inputs':{'image':['340',0],'channel':'red'}}
+    graph['342']={'class_type':'CropMask','inputs':{'mask':['341',0],'x':left,'y':top,'width':cw,'height':ch}}
+    graph['343']={'class_type':'VAEEncode','inputs':{'pixels':['320',0],'vae':['3',0]}}
+    graph['344']={'class_type':'SetLatentNoiseMask','inputs':{'samples':['343',0],'mask':['342',0]}}
+    graph['345']={'class_type':'SplitSigmasDenoise','inputs':{'sigmas':['19',0],'denoise':control['denoise']}}
+    graph['21']['inputs'].update(latent_image=['344',0],sigmas=['345',1])
+    graph['330']['inputs']['mask']=['342',0]
+    meta.update(method='native context with object-shaped latent noise mask and protected composite',sampler_mask=True,reference_spatial_binding=False)
+    return meta
 
 
 def protect_graph(graph, control):
@@ -176,6 +269,8 @@ def check_protected_output(source, result, control):
     x, y, w, h = region_pixels(control)
     outside = np.ones(a.shape[:2], dtype=bool)
     outside[y:y+h, x:x+w] = False
+    if control.get('masked_context'):
+        outside=np.array(object_mask(control))[4:1084,:]==0
     diff = np.abs(a-b)
     changed = int(np.count_nonzero(np.any(diff[outside] != 0, axis=1)))
     return {'outside_pixels': int(outside.sum()), 'changed_outside_pixels': changed,

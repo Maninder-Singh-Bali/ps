@@ -4,7 +4,7 @@ import sys
 ROOT=Path(__file__).resolve().parent
 sys.path.insert(0,str(ROOT))
 sys.path.insert(0,str(ROOT/'vendor'))
-import argparse, json, mimetypes, os, re, threading, time, traceback, io
+import argparse, json, mimetypes, os, re, threading, time, traceback, io, socket
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse,parse_qs,unquote
 from PIL import Image, ImageOps
@@ -25,6 +25,7 @@ import local_area
 import plan_reading
 import plan_setup
 import plan_import
+import plan_drafts
 import plan_preflight
 import plan_health
 import shared_floor
@@ -53,12 +54,14 @@ def public_state(store,engine):
 class Handler(BaseHTTPRequestHandler):
     server_version='PixeloidStudio/1.0'
     def log_message(self,fmt,*args):
-        if self.path not in ('/api/state','/api/health'):print(time.strftime('%H:%M:%S'),fmt%args,flush=True)
+        if urlparse(self.path).path not in ('/api/state','/api/health','/api/studio/status'):print(time.strftime('%H:%M:%S'),self.command,urlparse(self.path).path,str(args[1]) if len(args)>1 else '',flush=True)
     @property
     def store(self):return self.server.store
     def reply(self,data,status=200):
         raw=json.dumps(data).encode();self.send_response(status);self.send_header('Content-Type','application/json');self.send_header('Cache-Control','no-store');self.send_header('Content-Length',str(len(raw)));self.end_headers();self.wfile.write(raw)
     def origin_check(self):
+        if self.server.access:
+            return self.server.access.origin(self.headers,self.client_address[0])
         expected={'127.0.0.1:'+str(self.server.server_port),'localhost:'+str(self.server.server_port)}
         if self.headers.get('Host') not in expected:raise PermissionError('Open the dashboard from its local address.')
         origin=self.headers.get('Origin')
@@ -67,13 +70,35 @@ class Handler(BaseHTTPRequestHandler):
     def body(self):
         if not self.headers.get('Content-Type','').startswith('application/json'):raise ValueError('Expected JSON request.')
         n=int(self.headers.get('Content-Length','0'))
-        if n>1000000:raise ValueError('Request is too large.')
+        if n<0 or n>1000000:raise ValueError('Invalid request size.')
         d=json.loads(self.rfile.read(n) or b'{}')
         if not isinstance(d,dict):raise ValueError('Expected a JSON object.')
         return d
     def do_GET(self):
         try:
             self.origin_check();path=urlparse(self.path).path
+            access=self.server.access
+            if path=='/api/access/session':
+                row=access.session(self.headers) if access else None
+                return self.reply({'enabled':bool(access),'configured':access.configured if access else True,'authenticated':bool(row) if access else True,'csrf':row['csrf'] if row else None,'setup_allowed':self.client_address[0]=='127.0.0.1','lan_url':f'http://{access.lan_ip}:{access.port}' if access and access.lan_ip else None})
+            if path in ('/login','/login.js','/login.css'):
+                return self.send_file(ROOT/'static'/('login.html' if path=='/login' else path[1:]))
+            if access and not access.check(self.headers):
+                if path=='/':
+                    self.send_response(303);self.send_header('Location','/login');self.send_header('Content-Length','0');self.end_headers();return
+                return self.reply({'error':'Sign in to Studio.','signin':True},401)
+            if path=='/api/studio/status':return self.reply(self.server.services.snapshot() if self.server.services else {'state':'Not prepared','managed':False,'message':'Background controls are available in the managed launcher.'})
+            if path=='/api/plan-drafts':
+                import manual_project
+                return self.reply(manual_project.listing(self.store))
+            draft_match=re.fullmatch(r'/api/plan-drafts/([a-zA-Z0-9_-]+)(?:/files/([a-zA-Z0-9_.-]+))?',path)
+            if draft_match:
+                key,name=draft_match.groups()
+                if name:
+                    if name not in ('original.pdf','original.png','original.jpg','original.jpeg','original.webp') and not re.fullmatch(r'page-\d+\.png',name):raise ValueError('Unknown draft file.')
+                    return self.send_file(plan_drafts.folder(key)/name)
+                import manual_project
+                return self.reply(manual_project.get(self.store,key))
             if path=='/api/state':return self.reply(public_state(self.store,self.server.engine))
             if path=='/api/health':return self.reply(self.server.engine.health())
             if path=='/api/identity':return self.reply({'app':'Pixeloid Studio','root':str(ROOT),'pid':os.getpid(),'standalone':True})
@@ -130,6 +155,14 @@ class Handler(BaseHTTPRequestHandler):
             match=re.fullmatch(r'/api/projects/([a-zA-Z0-9]+)/rooms/([a-zA-Z0-9]+)/preflight',path)
             if match:
                 with self.store.lock:return self.reply(plan_preflight.report(self.store,self.store.project(match[1]),self.store.room(match[1],match[2])))
+            comparison=re.fullmatch(r'/api/assets/([a-zA-Z0-9]+)/revision-comparison',path)
+            if comparison:
+                import revision_comparison
+                return self.reply(revision_comparison.review(self.store.review_snapshot(),comparison[1]))
+            review=re.fullmatch(r'/api/assets/([a-zA-Z0-9]+)/product-review',path)
+            if review:
+                import product_review
+                return self.reply(product_review.review(self.store.review_snapshot(),review[1]))
             if path.startswith('/media/'):
                 a=self.store.asset(path.split('/')[-1]);return self.send_file(Path(a['path']))
             if path.startswith('/api/'):return self.reply({'error':'Not found'},404)
@@ -166,9 +199,42 @@ class Handler(BaseHTTPRequestHandler):
     def mutate(self,method):
         try:
             self.origin_check();u=urlparse(self.path);parts=u.path.strip('/').split('/')
+            access=self.server.access
+            if access and u.path in ('/api/access/setup','/api/access/login') and method=='POST':
+                if self.headers.get('X-Pixeloid-Client')!='1' or self.headers.get('Origin')!='http://'+self.headers.get('Host',''):raise PermissionError('Use the Studio sign-in page.')
+                d=self.body()
+                if u.path.endswith('/setup'):access.setup(d.get('user'),d.get('password'),self.client_address[0])
+                token=access.login(d.get('user'),d.get('password'),self.client_address[0])
+                self.send_response(200);self.send_header('Set-Cookie','pixeloid_session='+token+'; HttpOnly; SameSite=Strict; Path=/; Max-Age=43200');self.send_header('Cache-Control','no-store');self.send_header('Content-Length','2');self.end_headers();self.wfile.write(b'{}');return
+            if access and not access.check(self.headers,write=True):return self.reply({'error':'Sign in to Studio.','signin':True},401)
+            if access and u.path=='/api/access/logout' and method=='POST':
+                access.logout(self.headers);self.send_response(200);self.send_header('Set-Cookie','pixeloid_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');self.send_header('Content-Length','2');self.end_headers();self.wfile.write(b'{}');return
+            if access and u.path=='/api/choose-folder':raise ValueError('Enter a desktop storage path in Settings. The remote browser cannot open a Windows folder dialog.')
             if len(parts)==4 and parts[:2]==['api','projects'] and parts[3]=='upload' and method=='POST':
                 with self.store.lock:return self.reply(self.upload(parts[2],parse_qs(u.query)))
+            if parts==['api','plan-drafts','import'] and method=='POST':
+                n=int(self.headers.get('Content-Length','0'))
+                if not 0<n<=MAX_UPLOAD:raise ValueError('Choose a PDF or image up to 32 MB.')
+                return self.reply(plan_drafts.upload(self.rfile.read(n),unquote(self.headers.get('X-Filename','plan.pdf'))))
             d=self.body()
+            if parts[:2]==['api','plan-drafts'] and method=='POST':
+                if len(parts)==3 and parts[2]=='resolve':return self.reply(plan_drafts.footprint(d))
+                if len(parts)==3 and parts[2]=='preview':
+                    import manual_project
+                    return self.reply(manual_project.preview(self.store,d))
+                if len(parts)==4 and parts[3]=='create':return self.reply(plan_drafts.create(parts[2],d.get('page')))
+                if len(parts)==3:
+                    import manual_project
+                    return self.reply(manual_project.save(self.store,parts[2],d))
+                raise ValueError('No apply or generation operation is available for correction drafts.')
+            if parts[:2]==['api','studio'] and method=='POST':
+                manager=self.server.services
+                if not manager:raise ValueError('Use the managed background launcher.')
+                actions={'prepare':manager.prepare,'release':manager.release,'stop':manager.stop_services}
+                if hasattr(manager,'pause'):actions.update(pause=manager.pause,resume=manager.resume)
+                if len(parts)!=3 or parts[2] not in actions:raise ValueError('Unknown studio control.')
+                return self.reply(actions[parts[2]]())
+            if self.server.services and parts==['api','renderer','start']:return self.reply(self.server.services.prepare())
             if parts==['api','renderer','start'] and method=='POST':return self.reply(standalone.start_renderer(self.server.engine))
             if parts==['api','products','search'] and method=='POST':
                 with self.store.lock:
@@ -196,10 +262,13 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:traceback.print_exc();self.reply({'error':'Could not complete this activity: '+str(e)},500)
     def route(self,method,s,d):
         st=self.store
+        if hasattr(self.server.engine,'remote') and s in (['api','local-setup','connect'],['api','local-setup','download'],['api','local-setup','start-reader'],['api','settings']):
+            raise ValueError('Remote-worker mode: models and renderer configuration stay on the PC. Use Prepare Studio; no local model installation is supported here.')
         if s==['api','projects'] and method=='POST':return st.create_project(str(d.get('name','New project')),d.get('save_parent'))
         if s==['api','local-setup','connect']:
             import local_setup
             return local_setup.connect(self.server.engine,d)
+        if s==['api','local-setup','start-reader'] and self.server.services:return self.server.services.prepare()
         if s==['api','local-setup','start-reader']:
             import local_setup
             return local_setup.start_vision(self.server.engine)
@@ -344,9 +413,10 @@ class Handler(BaseHTTPRequestHandler):
         if action=='scene-control' and method=='POST':
             if any(j.get('room_id')==r['id'] and j['status'] in ACTIVE for j in st.db['jobs'].values()):raise ValueError('Finish this room’s current generation before changing consistency controls.')
             if d.get('revision')!=r['revision']:raise ValueError('This room changed. Reopen consistency controls before saving.')
+            if d.get('edit_revision',0)!=r.get('edit_revision',0):raise ValueError('Edit settings changed. Reopen this revision before saving.')
             control=scene_control.clean_control(st,p,r,d)
             if control!=r.get('scene_control',{'mode':'reference'}):
-                r['scene_control']=control;st.invalidate(pid,r);st.save()
+                r['scene_control']=control;r['edit_revision']=r.get('edit_revision',0)+1;st.save()
             return r
         if action=='placement-map' and method=='POST':
             if any(j.get('room_id')==r['id'] and j['status'] in ACTIVE for j in st.db['jobs'].values()):raise ValueError('Finish this room’s generation before changing its furniture map.')
@@ -355,6 +425,9 @@ class Handler(BaseHTTPRequestHandler):
             if layout!=r.get('furniture_layout'):
                 r['furniture_layout']=layout;st.invalidate(pid,r);st.save()
             return r
+        if action in ('generate-image','generate-video','generate-reference'):
+            from generation_phase import assert_submission
+            assert_submission(st,pid,action.removeprefix('generate-'))
         if action=='generate-reference':
             prompt=str(d.get('prompt','')).strip();purpose=d.get('purpose','product')
             if not 8<=len(prompt)<=6000:raise ValueError('Describe the reference in at least eight characters (up to 6,000).')
@@ -384,6 +457,13 @@ class Handler(BaseHTTPRequestHandler):
         if action in ('generate-image','generate-video'):
             from interior_style import view_context
             r=view_context(r,d.get('view_id'))
+        if action=='keep-image' and method=='POST':
+            aid=d.get('asset_id')
+            if aid not in r['images']:raise ValueError('Choose an image belonging to this room.')
+            a=st.asset(aid)
+            # Keeping a comparison candidate is deliberately separate from approval.
+            a['review_decision']='kept';r.setdefault('preferred_images',{})[a.get('view_id') or 'room']=aid
+            st.save();return a
         if action=='generate-image':
             if r.get('plan_id'):
                 health=plan_health.inspect(st,pid,r['plan_id'])
@@ -393,20 +473,25 @@ class Handler(BaseHTTPRequestHandler):
             if r.get('furniture_layout',{}).get('items') and not current_layout(r):raise ValueError('The room boundary changed. Reopen and save its furniture placement map before generating.')
             assert_image_gate(p,r,st);scene_control.clean_control(st,p,r,r.get('scene_control',{}))
             check=plan_preflight.assert_ready(st,p,r)
-            return st.new_job(pid,'image',r['id'],input_revision=r['revision'],view_id=r.get('_view_id'),view_revision=r.get('camera_views',{}).get(r.get('_view_id'),{}).get('revision'),scene_ticket=scene_control.scene_snapshot(st,p,r),plan_check=check)
+            return st.new_job(pid,'image',r['id'],input_revision=r['revision'],view_id=r.get('_view_id'),view_revision=r.get('camera_views',{}).get(r.get('_view_id'),{}).get('revision'),source_image_id=r.get('scene_control',{}).get('source_id'),edit_ticket=json.loads(json.dumps(r.get('scene_control',{'mode':'reference'}))),scene_ticket=scene_control.scene_snapshot(st,p,r),plan_check=check)
         if action=='generate-video':
             from interior_style import map_ready
             if not map_ready(st,p,r):raise ValueError('Confirm the selected room map first.')
-            a=approved_image(st,p,r,r.get('_view_id'));duration=int(d.get('duration',5));motion=d.get('motion','still')
-            if duration not in (5,8) or motion not in ('still','push','slide'):raise ValueError('Choose a supported duration and camera movement.')
-            return st.new_job(pid,'video',r['id'],input_revision=r['revision'],source_image_id=a['id'],duration=duration,motion=motion,view_id=r.get('_view_id'),view_revision=a.get('view_revision'),
-                scene_ticket=scene_control.scene_snapshot(st,p,r),source_image_identity=scene_control.file_identity(st,a['id']))
+            a=approved_image(st,p,r,r.get('_view_id'))
+            from video_workflow import settings,NATIVE
+            config=settings(d.get('video_preset',NATIVE),d.get('duration'),d.get('motion','still'))
+            from video_capture import check
+            capture=d.get('video_capture');check(capture,config['preset'])
+            capture_fields={'video_capture':capture} if capture else {}
+            duration=config['duration'];motion=config['motion']
+            return st.new_job(pid,'video',r['id'],input_revision=r['revision'],source_image_id=a['id'],duration=duration,motion=motion,video_preset=config['preset'],view_id=r.get('_view_id'),view_revision=a.get('view_revision'),
+                scene_ticket=scene_control.scene_snapshot(st,p,r),source_image_identity=scene_control.file_identity(st,a['id']),**capture_fields)
         if action in ['approve-image','reject-image','approve-video','reject-video']:
             kind=action.split('-')[1];aid=d['asset_id']
             if aid not in r['images' if kind=='image' else 'videos']:raise ValueError('This output does not belong to the room.')
             a=st.asset(aid)
             approval=r.setdefault('view_approvals',{}).setdefault(a['view_id'],{}) if a.get('view_id') else r
-            if a.get('input_revision')!=r['revision']:raise ValueError('References changed since this version. Generate an updated image before approving.')
+            if action.startswith('approve') and not scene_control.revision_matches(r,a.get('input_revision')):raise ValueError('References changed since this version. Generate an updated image before approving.')
             if action.startswith('approve'):
                 source_job=st.db['jobs'].get(a.get('job_id'),{})
                 if source_job.get('scene_manifest'):scene_control.assert_scene(st,p,r,source_job['scene_manifest'])
@@ -490,14 +575,39 @@ class Handler(BaseHTTPRequestHandler):
                     st.new_job(pid,'plan_setup',plan_id=a['id'])
         return {'assets':[{'id':a['id'],'url':'/media/'+a['id']} for a in assets]}
 
-def make_server(data,port=8777,start_worker=True):
-    st=Store(data);engine=Engine(st,ROOT);http=ThreadingHTTPServer(('127.0.0.1',port),Handler);http.store=st;http.engine=engine
+class StudioHTTPServer(ThreadingHTTPServer):
+    daemon_threads=True
+    def server_bind(self):
+        if hasattr(socket,'SO_EXCLUSIVEADDRUSE'):
+            self.allow_reuse_address=False
+            self.socket.setsockopt(socket.SOL_SOCKET,socket.SO_EXCLUSIVEADDRUSE,1)
+        super().server_bind()
+    def get_request(self):
+        connection,address=super().get_request();connection.settimeout(30);return connection,address
+
+def make_server(data,port=8777,start_worker=True,access_config=None,remote_config=None):
+    # Bind before opening/mutating the database: an occupied port cannot disturb saved work.
+    bind='0.0.0.0' if access_config and access_config.get('lan_ip') else '127.0.0.1'
+    http=StudioHTTPServer((bind,port),Handler);http.access=None;http.services=None
+    st=Store(data);scene_control.restore_edit_lineage(st)
+    if remote_config:
+        from remote_processing import RemoteEngine
+        engine=RemoteEngine(st,ROOT,remote_config);http.services=engine.services
+    else:engine=Engine(st,ROOT)
+    http.store=st;http.engine=engine
+    if access_config:
+        from dashboard_access import Access,interrupted
+        from processing_services import Services
+        from background_runtime import prevent_sleep
+        http.access=Access(access_config['private_dir'],http.server_port,access_config.get('lan_ip'),access_config.get('subnet'))
+        if not remote_config:http.services=Services(engine,Path(access_config['private_dir'])/'logs');engine.services=http.services
+        interrupted(st);prevent_sleep(engine)
     if start_worker:threading.Thread(target=engine.worker,daemon=True,name='Pixeloid render queue').start()
     return http
 
 if __name__=='__main__':
-    ap=argparse.ArgumentParser();ap.add_argument('--port',type=int,default=8777);ap.add_argument('--data',default=str(ROOT/'data'));args=ap.parse_args()
-    http=make_server(args.data,args.port)
+    ap=argparse.ArgumentParser();ap.add_argument('--port',type=int,default=8777);ap.add_argument('--data',default=str(ROOT/'data'));ap.add_argument('--remote-config');args=ap.parse_args()
+    http=make_server(args.data,args.port,remote_config=args.remote_config)
     (ROOT/'server.pid').write_text(str(os.getpid()))
     print(f'Pixeloid Studio is ready at http://127.0.0.1:{http.server_port}',flush=True)
     try:http.serve_forever()

@@ -55,6 +55,7 @@ class Store:
             p['rooms'].append(r);p['map_confirmed']=False;p['map_revision']+=1;p['updated']=now();self.save();return r
     def invalidate(self,pid,room):
         room['revision']+=1;room['approved_image_id']=None;room['approved_video_id']=None
+        room.pop('edit_revision_equivalents',None);room.pop('edit_revision_audit',None)
         if room.get('view_approvals'):room['view_approvals']={}
         self.project(pid)['updated']=now()
     def asset(self,aid):
@@ -63,6 +64,8 @@ class Store:
     def new_job(self,pid,kind,room_id=None,**extra):
         with self.lock:
             p=self.project(pid)
+            from generation_phase import assert_submission
+            assert_submission(self,pid,kind)
             scoped=kind in ('plan_setup','vision_study','raster_reconstruction') and extra.get('plan_id') in self.db['assets']
             if scoped:
                 from source_scope import capture
@@ -78,6 +81,8 @@ class Store:
                     if kind=='component_download' and job.get('component_id')!=extra.get('component_id'):continue
                     return job
             j={'id':uid(),'project_id':pid,'room_id':room_id,'kind':kind,'status':'queued','stage':'Queued','progress':None,'created':now(),'updated':now(),'error':None,'prompt_id':None,'events':[],**extra}
+            from generation_phase import admit
+            admit(self,j)
             self.db['jobs'][j['id']]=j;p['updated']=now();self.save();return j
     def update_job(self,jid,**fields):
         with self.lock:
@@ -92,6 +97,12 @@ def approved_image(store,project,room,view_id=None):
     aid=room.get('view_approvals',{}).get(view_id,{}).get('approved_image_id') if view_id else room.get('approved_image_id')
     if not aid:raise ValueError('Approve a room image before generating video.')
     a=store.asset(aid)
+    if a.get('status')!='approved' or a.get('kind')!='image':raise ValueError('Explicitly approve a current room image before generating video.')
+    scope=a.get('approval_scope',{})
+    if scope.get('purpose')=='technical_preview_only' and scope.get('phase_id')!=project.get('generation_phase',{}).get('id'):
+        raise ValueError('This image approval is limited to its recorded technical preview phase.')
+    if a.get('view_id')!=view_id:raise ValueError('The approved image belongs to another camera view.')
+    if view_id and a.get('view_revision')!=room.get('camera_views',{}).get(view_id,{}).get('revision'):raise ValueError('The camera changed after image approval.')
     if a.get('approved_revision')!=room['revision'] or a.get('room_id')!=room['id']:
         raise ValueError('The room changed after approval. Review and approve an updated image first.')
     if a.get('project_id')!=project['id']:raise ValueError('Approved image belongs to another project.')

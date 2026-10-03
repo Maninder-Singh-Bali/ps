@@ -48,3 +48,27 @@ __pycache__/
 *.onnx
 *.gguf
 *.pixeloid-part
+
+# Private LAN deployment and authentication
+/private-runtime/
+lan.local.json
+worker.local.json
+remote.local.json
+*.token
+/private-pairing/
+/verification/
+
+# Drafts and private handoff artifacts
+working-drafts/
+output/
+project/
+evidence/
+configuration/
+handoff/
+verification/
+publish/
+*.pid
+.DS_Store
+SOURCE_REVISION.json
+WORKTREE_STATUS.txt
+UNCOMMITTED.patch

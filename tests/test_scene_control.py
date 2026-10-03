@@ -45,6 +45,47 @@ class SceneControlTests(unittest.TestCase):
   self.assertEqual(g['21']['inputs']['latent_image'],['20',0]);self.assertNotIn('307',g)
   self.assertEqual(g['330']['class_type'],'ImageCompositeMasked');self.assertEqual(g['23']['inputs']['image'],['330',0])
   self.assertEqual(g['10']['inputs']['pixels'],['320',0]);self.assertFalse(j['context_edit']['resized'])
+ def test_object_mask_is_connected_to_sampler_and_composite(self):
+  self.r['scene_control']=self.control(masked_context=True,mask_polygon=[[.55,.55],[.7,.55],[.65,.8]])
+  j=self.st.new_job(self.p['id'],'image',self.r['id'],input_revision=self.r['revision'],edit_ticket=copy.deepcopy(self.r['scene_control']))
+  g,_=self.engine.build_image(j,self.root)
+  self.assertEqual(g['21']['inputs']['latent_image'],['344',0])
+  self.assertEqual(g['344']['inputs']['mask'],g['330']['inputs']['mask'])
+  self.assertEqual(g['343']['inputs']['pixels'],['320',0])
+  self.assertEqual(j['source_image_id'],self.a['id'])
+  self.assertFalse(j['context_edit']['reference_spatial_binding'])
+  import numpy as np
+  mask=np.array(Image.open(self.root/'object-mask.png'))[:,:,0]
+  self.assertEqual(mask[650,990],0);self.assertGreater(mask[650,1200],0)
+  self.assertEqual(j['context_edit']['context'][2:],[704,560])
+  self.r['scene_control']['instruction']='Something different'
+  with self.assertRaises(ValueError):self.engine.build_image(j,self.root)
+ def test_reference_crop_preserves_ratio_and_original_file(self):
+  path=self.root/'poster.png';Image.new('RGB',(1400,1400),'white').save(path)
+  a=register_asset(self.st,self.p['id'],path,'reference',self.r['id']);self.r['references']=[a['id']]
+  self.r['scene_control']=self.control(reference_id=a['id'],reference_crop=[.14,.02,.72,.96])
+  j=self.st.new_job(self.p['id'],'image',self.r['id'],input_revision=self.r['revision']);g,_=self.engine.build_image(j,self.root)
+  self.assertEqual(Image.open(self.root/'isolated-reference.png').size,(1008,1344))
+  self.assertEqual(Image.open(path).size,(1400,1400))
+  self.assertEqual(g['100']['inputs']['image'],'isolated-reference.png')
+ def test_edit_settings_do_not_change_scene_but_real_edits_do(self):
+  snap=scene_snapshot(self.st,self.p,self.r);self.r['scene_control']=self.control()
+  self.assertEqual(assert_scene(self.st,self.p,self.r,snap)['fingerprint'],snap['fingerprint'])
+  self.st.invalidate(self.p['id'],self.r)
+  with self.assertRaises(ValueError):assert_scene(self.st,self.p,self.r,snap)
+ def test_legacy_repair_requires_contiguous_control_only_evidence(self):
+  from scene_control import restore_edit_lineage,revision_matches,file_identity
+  def record(rev,control):
+   self.r['revision']=rev
+   snap=scene_snapshot(self.st,self.p,self.r);snap['version']=1
+   snap['content'].update(control=control,master=file_identity(self.st,control.get('source_id')))
+   self.st.db['jobs'][str(rev)]={'room_id':self.r['id'],'kind':'image','scene_manifest':snap}
+   return snap
+  old=record(4,{'mode':'reference'});record(5,self.control())
+  restore_edit_lineage(self.st);self.assertTrue(revision_matches(self.r,4));assert_scene(self.st,self.p,self.r,old)
+  self.st.invalidate(self.p['id'],self.r);self.assertFalse(revision_matches(self.r,4))
+  self.r['revision']=7;record(7,{'mode':'structure','source_id':self.a['id']})
+  restore_edit_lineage(self.st);self.assertFalse(revision_matches(self.r,4))
  def test_changed_file_and_scene_rejected(self):
   original=scene_snapshot(self.st,self.p,self.r);self.r['notes']='Move the chair'
   with self.assertRaises(ValueError):assert_scene(self.st,self.p,self.r,original)

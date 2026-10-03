@@ -42,6 +42,11 @@ def from_plan(plan,rooms=(),architecture=()):
                 'review_state':'user_reviewed' if room.get('block_layout',{}).get('reviewed') else 'draft',
                 'lighting_origin':('user_design' if item.get('preset_id') in LIGHT_ASSETS else None),
                 'proxy':copy.deepcopy(item),'manual_history':copy.deepcopy(item.get('history',[]))})
+    from surface_inputs import identity
+    design=identity(plan)
+    if design:
+        for category in ('surfaces','items'):
+            elements.extend({'id':'design:'+category+':'+v['id'],'origin':'surface_design','category':v['kind'],'design':v,'floor':plan.get('drawing',{}).get('surface_design_floor')} for v in design[category])
     lighting=[f for f in report.get('features',[]) if f.get('suggested_asset_id','') in
               ('pendant-light','wall-light','ceiling-light','floor-lamp','table-lamp','lamp-floor','lamp-table','light-pendant','light-ceiling','light-wall','chandelier','spotlight')
               or f.get('object_type','').lower() in ('lamp','pendant','chandelier','light','wall light','ceiling light')]

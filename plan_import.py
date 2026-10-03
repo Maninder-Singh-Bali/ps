@@ -95,7 +95,8 @@ def pdf(source,folder):
             png=Path(folder)/f'plan_page_{i+1}.png';pix.save(png);w,h=pix.width,pix.height
             paths=page.get_drawings();parts=[];rotation=page.rotation_matrix
             def pt(p):
-                q=p*rotation;return [q.x/page.rect.width*w,q.y/page.rect.height*h]
+                from plan_structure import page_point
+                return page_point(page,p,w,h)
             def xy(p):return ' '.join(f'{v:.4f}' for v in pt(p))
             for draw_index,draw in enumerate(paths):
                 commands=[];end=None
@@ -108,11 +109,26 @@ def pdf(source,folder):
                     elif item[0]=='qu':
                         q=item[1];commands.append('M'+xy(q.ul)+' L'+xy(q.ur)+' L'+xy(q.lr)+' L'+xy(q.ll)+' Z');end=None
                 if draw.get('closePath'):commands.append('Z')
-                if commands:parts.append(f'<path id="pdfpage{i+1}path{draw_index}" class="detail" stroke-width="{float(draw.get("width") or .8)*scale}" d="'+ ' '.join(commands)+'"/>')
-            for b in page.get_text('dict')['blocks']:
+                if commands:
+                    def colour(value):
+                        return 'none' if value is None else '#'+''.join(f'{max(0,min(255,round(c*255))):02x}' for c in value)
+                    # Inline paint survives generic editor CSS. It is source evidence,
+                    # never a declaration that coloured lines or fills are walls.
+                    paint={'stroke':colour(draw.get('color')), 'fill':colour(draw.get('fill')),
+                           'stroke-width':str(float(draw.get('width') or .8)*scale),
+                           'stroke-opacity':str(draw.get('stroke_opacity',1)),
+                           'fill-opacity':str(draw.get('fill_opacity',1)),
+                           'fill-rule':'evenodd' if draw.get('even_odd') else 'nonzero'}
+                    dash=re.fullmatch(r'\[([^\]]*)\]\s*([-+.\d]+)',draw.get('dashes') or '')
+                    if dash and dash[1].strip():
+                        paint['stroke-dasharray']=' '.join(str(float(v)*scale) for v in dash[1].split())
+                        paint['stroke-dashoffset']=str(float(dash[2])*scale)
+                    style=';'.join(f'{k}:{v}' for k,v in paint.items())
+                    parts.append(f'<path id="pdfpage{i+1}path{draw_index}" class="detail" style="{style}" stroke-width="{float(draw.get("width") or .8)*scale}" d="'+ ' '.join(commands)+'"/>')
+            for b in page.get_text('dict',flags=0)['blocks']:
                 for line in b.get('lines',[]):
                     for span in line['spans']:
-                        pos=pt(pymupdf.Point(span['origin']));parts.append(f'<text x="{pos[0]}" y="{pos[1]}" font-size="{span["size"]*scale}">{escape(span["text"])}</text>')
+                        pos=pt(pymupdf.Point(span['origin']));dx,dy=line.get('dir',(1,0));m=page.rotation_matrix;angle=math.degrees(math.atan2(dx*m.b+dy*m.d,dx*m.a+dy*m.c));parts.append(f'<text x="{pos[0]}" y="{pos[1]}" transform="rotate({angle} {pos[0]} {pos[1]})" font-size="{span["size"]*scale}">{escape(span["text"])}</text>')
             svg=None
             if paths:
                 svg=Path(folder)/f'plan_page_{i+1}_lines.svg';svg.write_text(svg_document(w,h,parts),encoding='utf8')

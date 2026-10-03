@@ -24,6 +24,9 @@ def compile_prompt(project,room,refs,plan,lighting='',packed=False,projection=No
     items={v['asset_id']:v for v in layout.get('items',[])}
     subjects=[];roles=[{'image':1,'role':'Layout authority: camera view, wall openings, furniture centres, facing and depth ordering.'}]
     for index,ref in enumerate(refs,2):
+        if ref.get('design_target'):
+            roles.append({'image':2 if packed else index,'role':ref['placement'],**({'product_board_tile':index-1} if packed else {})})
+            continue
         if ref.get('surface_target'):
             roles.append({'image':2 if packed else index,'role':f"Finish reference for {ref['surface_target']} only; preserve the layout and all geometry.",**({'product_board_tile':index-1} if packed else {})})
             continue
