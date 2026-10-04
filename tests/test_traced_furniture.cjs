@@ -15,3 +15,9 @@ const unmapped=convert(probes,[],plan);assert.equal(unmapped.hide_ids.length,0);
 const other=convert([p('left',[5,5,10,10]),p('right',[60,5,10,10])],[{id:'left',bbox:[0,0,.5,1]},{id:'right',bbox:[.5,0,.5,1]}],plan);
 assert.deepEqual(other.replacements.map(r=>r.room_id),['left','right']);
 console.log('Whole-plan conversion: grouping, section routing, architecture and saved layout preservation passed');
+// New chairs face the table, using physical pixels on a non-square plan.
+const dining=convert([p('dining',[400,800,200,400]),p('west',[320,975,60,50],true,{atomic:true}),p('east',[620,975,60,50],true,{atomic:true})],[room],{width:1000,height:2000});
+assert.deepEqual(dining.replacements.filter(r=>r.item.kind==='chair').map(r=>r.item.angle),[270,90]);
+const isolated=convert([p('dining',[400,800,200,400]),p('west',[320,975,60,50],true,{atomic:true})],[{id:'chair-room',bbox:[0,0,.39,1]},{id:'table-room',bbox:[.39,0,.61,1]}],{width:1000,height:2000});
+assert.equal(isolated.replacements.find(r=>r.item.kind==='chair').item.angle,0);
+console.log('Chair facing: table relation, non-square plan and room isolation passed');

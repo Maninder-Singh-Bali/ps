@@ -1,5 +1,24 @@
 'use strict';
 (() => {
+ // Only new trace proposals; saved layouts and explicit rotations are retained.
+ function orientProposals(items,plan){
+  const W=plan.width,H=plan.height,tables=items.filter(v=>v.kind==='table'&&!(v.angle%180));
+  for(const c of items){
+   if(c.kind!=='chair'||c.angle!==0)continue;
+   const cw=c.width*W,cd=c.depth*H,candidates=[];
+   for(const t of tables){
+    const dx=(t.x-c.x)*W,dy=(t.y-c.y)*H,hw=t.width*W/2,hd=t.depth*H/2,gx=Math.abs(dx)-hw,gy=Math.abs(dy)-hd;
+    let gap,angle;
+    if(gx>=0&&Math.abs(dy)<=hd){gap=gx-cw/2;angle=dx>0?270:90}
+    else if(gy>=0&&Math.abs(dx)<=hw){gap=gy-cd/2;angle=dy>0?0:180}else continue;
+    if(gap>=-.15*Math.max(cw,cd)&&gap<=1.5*Math.max(cw,cd))candidates.push({gap:Math.max(0,gap),angle});
+   }
+   candidates.sort((a,b)=>a.gap-b.gap);
+   if(!candidates.length||(candidates.length>1&&candidates[1].gap-candidates[0].gap<.5*Math.max(cw,cd)))continue;
+   c.angle=candidates[0].angle;if(c.angle===90||c.angle===270){c.width=cd/W;c.depth=cw/H}
+   c.prompt='Facing inferred toward nearby table; verify against source.';
+  }return items;
+ }
  // Group inner cushion/pillow strokes into their outer symbol, never architecture.
  function convert(probes,rooms,plan){
   const furniture=probes.filter(p=>p.kind==='furniture'&&p.box.every(Number.isFinite));
@@ -27,6 +46,7 @@
    const item={id:'library-'+p.id,preset_id:preset,kind,label,x:cx,y:cy,width:Math.max(.005,width/plan.width),depth:Math.max(.005,depth/plan.height),angle,height_m:height,shape:'box',return_side:'left',seat_count:seats,asset_id:null,source:'traced-furniture-library',prompt:''};
    replacements.push({room_id:room.id,item,source_ids:members.map(q=>q.id)});
   }
+  for(const room of rooms)orientProposals(replacements.filter(r=>r.room_id===room.id).map(r=>r.item),plan);
   // Loose cushion/divider strokes can survive a separately moved outer symbol.
   // Remove them only where a saved library arrangement already replaces the traces.
   for(const p of furniture.filter(p=>!p.closed)){
@@ -35,5 +55,5 @@
   }
   return {replacements,hide_ids:[...hide],unassigned};
  }
- if(typeof module!=='undefined')module.exports={convert};else window.TracedFurniture={convert};
+ if(typeof module!=='undefined')module.exports={convert,orientProposals};else window.TracedFurniture={convert};
 })();

@@ -200,7 +200,8 @@ def proposals(store,room,include_unknown=True):
         for item in scan(plan,room):
             if any(abs(v['x']-item['x'])<(v['width']+item['width'])*.4 and abs(v['y']-item['y'])<(v['depth']+item['depth'])*.4 for v in out):continue
             out.append(item)
-    return clean(out[:40])
+    from chair_orientation import orient_proposals
+    return clean(orient_proposals(out[:40], plan))
 
 def suggest(store,room,items,key):
     selected=next((i for i,v in enumerate(items) if v['id']==key),None)
