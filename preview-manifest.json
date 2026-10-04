@@ -1,10 +1,10 @@
 {
-  "source_commit": "b6f53bc553d062f38a3b4664ea3b01d75245a077",
+  "source_commit": "fe0b2a57c6a5dc4845b3be34a4fe2d41e6b33ada",
   "type": "production components + staging-only adapter",
   "backend": "none",
   "inference": false,
   "files": {
-    "index.html": "3c477c82a0d42ae1b708a42e046e7c67295ca1efac394fc44d97b2189243dc3b",
+    "index.html": "c94c049843d36cc3b12d8e7c2d256770e831d7751cc6e5ca08200a1c2daefd23",
     "404.html": "abfa87f16362265fac6fb0fc0eda3848c3a9bc1ee827b3c31076fbf6660b454b",
     "README.md": "5c3305b8b8ac8b633b1b07d3ad1985de77c5f1179bd4eb4f42a66285570fc572",
     "VERIFICATION.md": "89ae2a99c54c51a42785b20f1c8ec176e436df0ebb285bbeedcc23135bdf2135",
@@ -32,7 +32,7 @@
     "app/plan-area.js": "e8cb532abaa608cb97231c1f0778dd3f3017bd18dd9c1ec812f27260f3329457",
     "app/scene-control.css": "924e9f21b562c034ec30a0cde760c384bd3553e59290c90ca51d8ff963786240",
     "app/draft-shell.css": "2a5c8717ddd08d90f9af882932d713c9b1852e5ddf24f1dbede56d5d0868b10a",
-    "app/floor-plan.html": "3a86673e64a35051fe238ddadf570132df013fe021d41cdd23865edc39d9ddc9",
+    "app/floor-plan.html": "c34e5087ffad87c89e5f3cb7dffbc479406bfdebd097e8a5f156fe9709e1c7e8",
     "app/synthetic-paper.svg": "06ddb59f4d2e2c8afd16989e28803180b120a5f1ba2061a9b4b9c6aac97e361b",
     "app/model-viewer.js": "e716a0981acf5f6ec75ac06c0c53f22a58813ddfa9c6e6f3eaaa9d664a9126d7",
     "app/drawing-editor.css": "f5773c128c4fd737f9e2ae0ce64af9b794acd8833f226fca5359da03d93fff1a",
@@ -80,13 +80,14 @@
     "app/references.css": "1f4a9ee2cdb4008127aa09af2f04d7867303dba57f258de7684e8ac1c1f029f1",
     "app/drawing-geometry.js": "2f6ec25869edea3f6fb5c5c510d10753975a76db48e33fd1812980b553046b81",
     "app/furniture-meshes.json": "0fdc9aba7445308e8bfc12d8084d04972199c7ba00a0295e9fdbec02d5328ba9",
-    "app/ui-adapter.js": "e491af3e6ba5852bf96cd1f5ecd9bd4313ac74844bda7cf653dedd0e353b3103",
+    "app/ui-adapter.js": "8e24fc0089640eb3eea129202518ad3c367713f159a276c3dc716c847a65d10b",
     "app/plan-area.css": "9bf1270e0e5a8c4f076a59bf89476d12226bac3101d834abaf690268dc9de211",
     "app/room-results.js": "893f0e24da773d80dd46dbc21fd0b4c159a042894acd45681cfcda628fa69fe4",
     "app/plan-check.js": "8d4334241d56e97392e4e6e4f7e25ab37f00d072aa8e1b0088aac46fd6a2d247",
     "app/workspace-chrome.css": "cf365eb967c6969a7192af7bc770e88c7f6f00490cd99430dfd7cb10b8fbb13e",
     "app/workspace-selection.js": "f4efdcd4c4cbb84cf0acaaa1ccfcb3375d6982ed451906c79f6c99ccdbe9dd72",
     "app/app.js": "156329e8c1337bb1a8aa4a5bd29693fb332d2ccdd5f025358e03d7e7256a2de9",
+    "app/joined-footprints.js": "ceee43c06332e30a8f708357f206bde854bdb988741fbb514c6ea6e78c8e5272",
     "app/system-status.css": "2615c9476740af3ac33b9b377cabed9ddc11f00cd0b07f8e02878a2fa448551f",
     "app/reference-upload.js": "3653db4da98778c35f2b7d39d866f3ada930cf342d3a84e8cdf45aa48c189f95",
     "app/reference-upload.css": "a0e131cbe1a6f85ca1d5782f98358dc68453da39ac2575bae26b8e2fe738a5e7",
@@ -123,6 +124,11 @@
     "app/icons/mouse-pointer-2.svg": "a87128b1d33024c22ab598d1ce313081ce8942efd1a70274215bcc53421b7c7e",
     "app/icons/arrow-left.svg": "c5f4b88076108eb1a0d95336e1aa7e7bb1419a3a92af96f6247d88cd3456f933",
     "app/icons/upload.svg": "04b9443355c959b3477b7856ee40dffa79438e5bfdb4e9dbf5159341ace26408",
-    "app/icons/layers-2.svg": "2fb9f11b92b06fedd9190c16d9781d4a34bb2151050ff1e0a484a411b4e18c03"
+    "app/icons/layers-2.svg": "2fb9f11b92b06fedd9190c16d9781d4a34bb2151050ff1e0a484a411b4e18c03",
+    "app/vendor/polygon-clipping.js": "7f8619e84a86ce8dd400c9b50430e9c8cf8f26027b19eeb479f109f5c1a9d688",
+    "app/vendor/robust-predicates.LICENSE.txt": "88d9b4eb60579c191ec391ca04c16130572d7eedc4a86daa58bf28c6e14c9bcd",
+    "app/vendor/polygon-clipping.LICENSE.md": "864ae9e4ed75e1571a3bcf5dc9070264213445b32e7e2af5bf60eba46fb656d0",
+    "app/vendor/README.md": "f4b1fd5b51f3cb1e08176206bfbd6bdc4d4df68e2f22485dacc7303ea9bcf150",
+    "app/vendor/splaytree.LICENSE.txt": "01f997518b3e065c05cb372d4cd7f919bf1ff40b29b571ca4436be5436f7bc31"
   }
 }
