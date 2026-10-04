@@ -10,6 +10,30 @@ function corners(o){if(o.run){const r=o.rotation*Math.PI/180,h=o.height/2;return
 function inside(p,poly){let yes=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const a=poly[i],b=poly[j],v=[b[0]-a[0],b[1]-a[1]],q=[p[0]-a[0],p[1]-a[1]];if(Math.abs(v[0]*q[1]-v[1]*q[0])<1e-7&&q[0]*v[0]+q[1]*v[1]>=-1e-7&&q[0]*v[0]+q[1]*v[1]<=v[0]*v[0]+v[1]*v[1]+1e-7)return true;if((a[1]>p[1])!==(b[1]>p[1])&&p[0]<(b[0]-a[0])*(p[1]-a[1])/(b[1]-a[1])+a[0])yes=!yes;}return yes;}
 function overlaps(a,b){for(const p of [a,b])for(let i=0;i<p.length;i++){const q=p[(i+1)%p.length],n=[q[1]-p[i][1],p[i][0]-q[0]],A=a.map(v=>v[0]*n[0]+v[1]*n[1]),B=b.map(v=>v[0]*n[0]+v[1]*n[1]);if(Math.max(...A)<=Math.min(...B)+1e-8||Math.max(...B)<=Math.min(...A)+1e-8)return false;}return true;}
 function openingRects(d,s){const c=context(d,s);if(c.missing||s.kind!=='wall')return [];return d.features.filter(o=>o.host_wall_id===s.wall_id).map(o=>({id:o.id,x:(o.offset+o.width/2)*c.m,y:((o.kind==='window'?(o.sill_m??.9):(o.base_m??0))+(o.head_m??(o.kind==='window'?2.4:2.2)))/2,width:o.width*c.m,height:(o.head_m??(o.kind==='window'?2.4:2.2))-(o.kind==='window'?(o.sill_m??.9):(o.base_m??0)),rotation:0}));}
+// View-only context. Never split host walls or change surface/item coordinates.
+function roomPolygon(d,r){const b=r.bbox;return (r.area_polygon||[[b[0],b[1]],[b[0]+b[2],b[1]],[b[0]+b[2],b[1]+b[3]],[b[0],b[1]+b[3]]]).map(p=>[p[0]*d.width,p[1]*d.height]);}
+function roomWallSpans(d,s,r){
+ const c=context(d,s);if(c.missing||!r)return [];
+ const poly=roomPolygon(d,r).map(p=>p.map(v=>v*c.m)),offset=c.wall.thickness*c.m/2+.001;
+ const origin=c.origin.map((v,i)=>v+c.n[i]*offset),cross=(a,b)=>a[0]*b[1]-a[1]*b[0],cuts=[0,c.L];
+ for(let i=0;i<poly.length;i++){const a=poly[i],b=poly[(i+1)%poly.length],v=b.map((x,j)=>x-a[j]),q=a.map((x,j)=>x-origin[j]),den=cross(c.u,v);if(Math.abs(den)<1e-9)continue;const x=cross(q,v)/den,t=cross(q,c.u)/den;if(x>0&&x<c.L&&t>=0&&t<=1)cuts.push(x);}
+ cuts.sort((a,b)=>a-b);const spans=[];
+ for(let i=1;i<cuts.length;i++){const a=cuts[i-1],b=cuts[i];if(b-a>1e-6&&inside(origin.map((v,j)=>v+c.u[j]*(a+b)/2),poly))spans.push([a,b]);}
+ return spans;
+}
+function roomWallSide(d,w,r){if(!r)return null;const sides=[-1,1].filter(side=>roomWallSpans(d,{kind:'wall',wall_id:w.id,side},r).length);return sides.length===1?sides[0]:null;}
+function wallPartitions(d,s){
+ const c=context(d,s);if(c.missing)return [];const result=[],eps=1e-6;
+ for(const w of d.features){if(w.kind!=='wall'||w.id===s.wall_id)continue;
+  const ps=w.points.map(p=>{const q=p.map((v,i)=>v*c.m-c.origin[i]);return [q[0]*c.u[0]+q[1]*c.u[1],q[0]*c.n[0]+q[1]*c.n[1]];}),[a,b]=ps,dy=b[1]-a[1];
+  if(Math.abs(dy)<eps)continue;const t=-a[1]/dy;
+  // Actual segment intersections only: do not bridge a gap to another wall.
+  if(t< -eps||t>1+eps)continue;const x=a[0]+t*(b[0]-a[0]);if(x<=eps||x>=c.L-eps)continue;
+  const length=dist(a,b),width=(w.thickness||0)*c.m*length/Math.abs(dy);
+  result.push({id:w.id,x,width:Math.min(c.L,width),height:Math.min(c.H,w.height_m??d.wall_height_m),facing:Math.max(a[1],b[1])>eps});
+ }
+ return result.sort((a,b)=>a.x-b.x);
+}
 function conflicts(d,s,o){const c=context(d,s);if(c.missing)return ['Host wall missing — item retained; select a new host explicitly.'];const ps=corners(o),issues=[];if(s.kind==='wall'){if(ps.some(p=>p[0]<-1e-6||p[1]<-1e-6||p[0]>c.L+1e-6||p[1]>c.H+1e-6))issues.push('Outside wall face');for(const q of openingRects(d,s))if(overlaps(ps,corners(q)))issues.push('Opening conflict: '+q.id);}else{const world=ps.map(p=>p.map((v,i)=>(v+c.origin[i])/c.m));if(world.some(p=>!inside(p,s.boundary))||(s.holes||[]).some(h=>world.some(p=>inside(p,h))||h.some(p=>inside(p,world))))issues.push('Outside surface or over a void');}for(const q of d.surface_design?.items||[])if(q.surface_id===s.id&&q.id!==o.id&&overlaps(ps,corners(q)))issues.push('Overlaps '+q.kind);return issues;}
 function world(d,s,o,p=[0,0],depth=0){const c=context(d,s);if(c.missing)return null;const r=o.rotation*Math.PI/180,x=o.x+p[0]*Math.cos(r)-p[1]*Math.sin(r),y=o.y+p[0]*Math.sin(r)+p[1]*Math.cos(r);if(s.kind==='wall'){const offset=c.wall.thickness*c.m/2+.003+depth;return [c.origin[0]+c.u[0]*x+c.n[0]*offset,c.origin[1]+c.u[1]*x+c.n[1]*offset,y];}return [c.origin[0]+x,c.origin[1]+y,s.kind==='ceiling'?(s.elevation_m??2.5)-(o.drop||0)-depth:(s.elevation_m||0)+.005+depth];}
 function snap(d,s,o,tol){const c=context(d,s),xs=[0,c.L/2,c.L],ys=[0,c.H/2,c.H],others=[...openingRects(d,s),...(d.surface_design?.items||[]).filter(q=>q.surface_id===s.id&&q.id!==o.id)];for(const q of others){const ps=corners(q);xs.push(Math.min(...ps.map(p=>p[0])),q.x,Math.max(...ps.map(p=>p[0])));ys.push(Math.min(...ps.map(p=>p[1])),q.y,Math.max(...ps.map(p=>p[1])));}const out=copy(o),guides=[];for(const [axis,refs] of [[0,xs],[1,ys]]){const ps=corners(out),positions=[Math.min(...ps.map(p=>p[axis])),out[axis?'y':'x'],Math.max(...ps.map(p=>p[axis]))];let best=null;for(const ref of refs)for(const pos of positions){const delta=ref-pos;if(Math.abs(delta)<=tol&&(!best||Math.abs(delta)<Math.abs(best.delta)))best={delta,ref};}if(best){out[axis?'y':'x']+=best.delta;guides.push({axis,value:best.ref});}}return {item:out,guides};}
@@ -22,5 +46,5 @@ function resize(o,delta){
  const x=(out.width-o.width)/2,y=(out.height-o.height)/2;out.x+=x*c-y*s;out.y+=x*s+y*c;return out;
 }
 function translate(items,dx,dy){return items.map(o=>({...copy(o),x:o.x+dx,y:o.y+dy}));}
-const api={copy,kinds,context,corners,inside,overlaps,openingRects,conflicts,world,snap,align,resize,translate};if(typeof module!=='undefined')module.exports=api;else window.SurfaceDesignGeometry=api;
+const api={roomPolygon,roomWallSpans,roomWallSide,wallPartitions,copy,kinds,context,corners,inside,overlaps,openingRects,conflicts,world,snap,align,resize,translate};if(typeof module!=='undefined')module.exports=api;else window.SurfaceDesignGeometry=api;
 })();
