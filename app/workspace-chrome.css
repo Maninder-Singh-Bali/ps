@@ -233,3 +233,5 @@ body.surface-editing .tools{display:none}
 .surface-item-grid button{font-size:11px;padding:7px 5px;cursor:grab}
 #surface-gizmo .direct-move{display:block}
 #surface-gizmo .direct-rotate{position:absolute;left:calc(50% + 42px);top:50%;transform:translate(-50%,-50%);font-size:22px;width:28px;height:28px;line-height:26px;text-align:center;border:1px solid #9ac2ff;border-radius:50%;background:#284569;color:white;text-shadow:none}
+
+[data-design-lock]:focus-visible > circle {stroke:#fff;stroke-width:3}
