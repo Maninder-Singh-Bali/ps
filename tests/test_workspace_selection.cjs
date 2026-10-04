@@ -10,3 +10,13 @@ const other={floor_plans:['q'],rooms:[{id:'other',plan_id:'q',floor:'Other',came
 v=resolve(other,{}, {planId:'p',roomId:'ground',floor:'Ground',cameraId:'b'});assert.equal(v.planId,'q');assert.equal(v.roomId,'other');assert.equal(v.cameraId,'z');
 assert.equal(resolve({floor_plans:[],rooms:[]},{},{}).roomId,null);
 console.log('Workspace selection: 6 cases passed');
+// Browser preference memory is scoped to the owning room and project.
+const vm=require('node:vm'),fs=require('node:fs'),saved=new Map();
+const p={floor_plans:['p1','p2'],rooms:[{id:'r1',plan_id:'p1',floor:'One',camera_views:{v1:{id:'v1'},qa:{id:'qa'}}},{id:'r2',plan_id:'p2',floor:'Two',camera_views:{v2:{id:'v2'}}}]};
+const c={URLSearchParams,location:{search:'?plan=p1&room=r1&camera=qa'},pid:'project',planId:null,rid:null,state:{assets:{p1:{},p2:{}}},P:()=>p,toast:()=>{},localStorage:{getItem:k=>saved.get(k),setItem:(k,v)=>saved.set(k,v)}};c.R=()=>p.rooms.find(r=>r.id===c.rid);c.window=c;
+vm.createContext(c);vm.runInContext(fs.readFileSync(require.resolve('../static/workspace-selection.js'),'utf8'),c);
+c.WorkspaceSelection.restore();assert.equal(c.rid,'r1');assert.equal(c.WorkspaceSelection.cameraId,'qa');c.WorkspaceSelection.remember();
+c.WorkspaceSelection.selectRoom('r2');c.planId='p2';c.WorkspaceSelection.remember();assert.equal(c.WorkspaceSelection.cameraId,'v2');assert.equal(c.WorkspaceSelection.cameraForRoom('r1'),'qa');
+c.WorkspaceSelection.selectRoom('r1');c.planId='p1';c.WorkspaceSelection.remember();assert.equal(c.WorkspaceSelection.cameraId,'qa');
+p.rooms[0].camera_views.newView={id:'newView'};c.WorkspaceSelection.selectCamera('newView');assert.equal(c.WorkspaceSelection.cameraForRoom('r1'),'newView');
+console.log('Direct-link selection, per-floor view memory, and newly saved view preference passed');

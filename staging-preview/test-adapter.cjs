@@ -1,0 +1,16 @@
+const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict');
+const root='verification/https-staging-20261004/site/app/';
+const data=Object.fromEntries(['fixture.json','fixture-scene.json','fixture-footprint.json'].map(n=>[n,JSON.parse(fs.readFileSync(root+n))]));
+const storage=new Map(),network=[];
+const ctx={URL,Response,Event,structuredClone,localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},location:{href:'https://preview.example/ps/app/floor-plan.html',origin:'https://preview.example'},document:{currentScript:{src:'https://preview.example/ps/app/staging-api.js'},addEventListener(){}},alert(){},confirm(){return false},fetch:async input=>{network.push(String(input));const value=data[new URL(input).pathname.split('/').pop()];return new Response(JSON.stringify(value||{}),{status:200})},dispatchEvent(){}};
+ctx.window=ctx;vm.createContext(ctx);vm.runInContext(fs.readFileSync(root+'staging-api.js','utf8'),ctx);
+(async()=>{const S=ctx.Staging;await S.ready;const d=await S.load();assert.equal(d.id,'synthetic-apartment-v1');assert.equal(d.features.length,11);assert((await S.api('/preview',d)).surfaces.length>0);
+const changed=structuredClone(d);changed.features[0].points[0][0]+=1;
+await assert.rejects(S.api('/preview',changed),/Live 3D rebuilding/);
+const saved=await S.api('/'+d.id,changed);assert.equal(saved.revision,1);assert.equal((await S.load()).features[0].points[0][0],71);
+await assert.rejects(S.api('/'+d.id,d),/another tab/);
+const invalid=structuredClone(saved);invalid.features[0].points[0][0]=null;await assert.rejects(S.api('/'+d.id,invalid),/Invalid synthetic/);
+await assert.rejects(S.api('/import',{},true),/Uploads are unavailable/);await assert.rejects(S.api('/generate',{}),/Unavailable/);
+const count=network.length;for(const url of ['https://preview.example/api/generate','https://preview.example/media/private','https://external.example/test'])assert.equal((await ctx.fetch(url)).status,503);assert.equal(network.length,count);
+assert.equal((await ctx.fetch(new URL('https://preview.example/ps/app/fixture.json'))).status,200);
+console.log('PASS: synthetic fixture, local save/reopen, revisions, geometry validation, stale 3D, uploads/generation blocked, no API/external network, static URL fetch');})().catch(e=>{console.error(e);process.exitCode=1});

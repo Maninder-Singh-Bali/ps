@@ -478,7 +478,12 @@ class Handler(BaseHTTPRequestHandler):
             if aid not in r['images']:raise ValueError('Choose an image belonging to this room.')
             a=st.asset(aid)
             # Keeping a comparison candidate is deliberately separate from approval.
-            a['review_decision']='kept';r.setdefault('preferred_images',{})[a.get('view_id') or 'room']=aid
+            from review_state import transition
+            transition(a,'kept')
+            approval=r.setdefault('view_approvals',{}).setdefault(a['view_id'],{}) if a.get('view_id') else r
+            if approval.get('approved_image_id')==aid:approval['approved_image_id']=None;approval['approved_video_id']=None
+            if r.get('approved_image_id')==aid:r['approved_image_id']=None;r['approved_video_id']=None
+            r.setdefault('preferred_images',{})[a.get('view_id') or 'room']=aid
             st.save();return a
         if action=='generate-image':
             if r.get('plan_id'):
@@ -515,10 +520,12 @@ class Handler(BaseHTTPRequestHandler):
                 from interior_style import map_ready
                 if not map_ready(st,p,r):raise ValueError('Confirm the selected room map before approving outputs.')
                 if kind=='video' and a.get('source_image_id')!=approval.get('approved_image_id'):raise ValueError('This video uses an older image approval.')
-                a['status']='approved';a['approved_revision']=r['revision'];a['approved_at']=now();approval['approved_'+kind+'_id']=aid
+                from review_state import transition
+                transition(a,'approved');a['approved_revision']=r['revision'];a['approved_at']=now();approval['approved_'+kind+'_id']=aid
                 if kind=='image':approval['approved_video_id']=None
             else:
-                a['status']='rejected';a['review_note']=str(d.get('reason','Needs revision'))[:2000]
+                from review_state import transition
+                transition(a,'rejected',str(d.get('reason','Needs revision'))[:2000])
                 if approval.get('approved_'+kind+'_id')==aid:approval['approved_'+kind+'_id']=None
                 if kind=='image':approval['approved_video_id']=None
             st.save();return a

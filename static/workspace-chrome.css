@@ -29,3 +29,40 @@ body :is(#stages,#workflow-stages) button[aria-current=page]:hover:not(:disabled
 /* Keep generation status in the header, without a second workspace banner. */
 body .topbar #generation-phase-notice {flex:0 1 auto;min-width:0;margin:0;padding:0;border:0;border-radius:0;background:transparent;font-size:11px;line-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:help}
 body .topbar #generation-phase-notice:focus-visible {outline:2px solid var(--accent);outline-offset:3px}
+
+/* Shared review controls; media pixels retain their original colours. */
+html[data-theme="dark"] .sidebar .nav-item img,
+html[data-theme="dark"] .sidebar-bottom button img{filter:invert(.85)}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent,#91b7ff);outline-offset:2px}
+button:disabled{opacity:.5;cursor:not-allowed}
+.selected-furniture-inspector{padding:10px 6px;border-bottom:1px solid var(--border,#49515e);margin-bottom:8px}
+.selected-furniture-inspector strong{display:block;margin-bottom:8px}
+.selected-furniture-inspector .block-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.selected-furniture-inspector input{width:100%;min-width:0}
+.selected-furniture-inspector .actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+.selected-furniture-inspector small{font-size:11px;line-height:1.4;color:var(--muted)}
+body[data-view="references"] .block-transform-panel,body[data-view="references"] .block-object-properties{display:block}
+#block-edit-status{font-size:11px;min-height:1.3em;margin:3px 0}
+#main>.cards:has(.video-review-workspace){display:block}
+.video-review-workspace{display:grid!important;grid-template-columns:minmax(0,1.45fr) minmax(285px,1fr);gap:14px;align-items:start;padding:12px}
+.video-preview{min-width:0;position:sticky;top:8px}
+.video-preview video.output-media{width:100%;max-height:min(48vh,430px);aspect-ratio:16/9;object-fit:contain;background:#292d32;display:block;border-radius:6px}
+.video-preview .camera-input-preview img{max-height:42vh;object-fit:contain}
+.video-preview .btn{margin-top:7px}
+.video-review-workspace .output-body{padding:0;min-width:0}
+.video-review-workspace h3{margin:0 0 5px}.video-review-workspace h4{margin:12px 0 6px}
+.video-review-workspace .card-controls{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.video-review-workspace .actions{flex-wrap:wrap;gap:6px}
+.video-review-workspace select{max-width:100%;min-width:0;width:100%}
+.video-review-workspace .help,.review-history{font-size:11px;line-height:1.4;margin:6px 0}
+@media(max-width:850px){.video-review-workspace{grid-template-columns:minmax(0,1fr)}.video-preview{position:static}.video-preview video.output-media{max-height:240px}.video-review-workspace .card-controls{grid-template-columns:1fr 1fr}}
+@media(max-width:480px){.video-review-workspace .card-controls{grid-template-columns:1fr}.camera-fields{grid-template-columns:1fr}}
+#plan-editor-inline .block-left-panel{width:auto;max-width:none;min-width:0}
+#plan-editor-inline .inline-selection-controls{width:100%;min-width:0;box-sizing:border-box}
+#plan-editor-inline .selected-furniture-inspector .field{min-width:0}
+#plan-editor-inline .selected-furniture-inspector input{min-width:0;box-sizing:border-box;padding:6px}
+#plan-editor-inline .selected-furniture-inspector .actions .btn{white-space:normal;max-width:100%}
+#plan-editor-inline .block-workspace.with-library{grid-template-columns:190px minmax(0,1fr) minmax(0,1fr)}
+@media(max-width:1100px){#plan-editor-inline .selected-furniture-inspector .block-fields{grid-template-columns:1fr}}
+
+.video-large-player{display:block;width:100%;max-height:72vh;object-fit:contain;background:#292d32}#modal.video-large{width:min(1100px,94vw)}

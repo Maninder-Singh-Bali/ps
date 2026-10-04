@@ -62,4 +62,4 @@ def review(store, aid):
     elif not crop:reason='No saved mask bounds. Showing full room; no edit region inferred.'
     def image_row(v):
         return {'id':v['id'],'url':'/media/'+v['id'],'width':v['width'],'height':v['height'],'version':r['images'].index(v['id'])+1 if v['id'] in r['images'] else None}
-    return {'result':image_row(a),'parent':image_row(parent) if parent else None,'parent_note':parent_note,'reference':ref,'reference_note':ref_note,'crop':crop,'outline':outline,'fallback_reason':reason,'status':a.get('status'),'review_decision':a.get('review_decision'),'phase':p.get('generation_phase')}
+    return {'result':image_row(a),'parent':image_row(parent) if parent else None,'parent_note':parent_note,'reference':ref,'reference_note':ref_note,'crop':crop,'outline':outline,'fallback_reason':reason,'status':a.get('status'),'review_decision':a.get('review_decision'),'review_history':a.get('review_history',[]),'phase':p.get('generation_phase')}

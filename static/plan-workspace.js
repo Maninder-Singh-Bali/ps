@@ -25,8 +25,8 @@
  function mount(){mountReady=mountEditor();return mountReady;}
  async function mountEditor(){
   if(!canRender()||!$('#plan-editor-inline'))return;
-  mountedKey=key();document.body.classList.add('inline-plan-active');mode='blocks';const ticket=++opening;
-  try{await openFurnitureBlocks(pid,rid,{inline:true,view:planView(R()?.floor)})}catch(err){if(ticket===opening){$('#plan-editor-inline').innerHTML=`<div class="empty">${esc(err.message)} ${btn('Retry','furniture-blocks','','small')}</div>`;toast(err.message)}}
+  mountedKey=key();document.body.classList.add('inline-plan-active');mode=currentWorkspaceStage()==='cameras'?'camera':'blocks';const ticket=++opening;
+  try{await (mode==='camera'?openCameraView:openFurnitureBlocks)(pid,rid,{inline:true,view:planView(R()?.floor)})}catch(err){if(ticket===opening){$('#plan-editor-inline').innerHTML=`<div class="empty">${esc(err.message)} ${btn('Retry','furniture-blocks','','small')}</div>`;toast(err.message)}}
  }
  function show(title,body,footer,type){
   const host=$('#plan-editor-inline');if(!host||!['plan','references'].includes(tab)||!['blocks','camera'].includes(type))return false;
@@ -48,11 +48,12 @@
    const review=inspector.querySelector('.block-review');if(review){review.lastChild.textContent=' Placement checked';top.insertBefore(review,save||null)}
    const dock=host.querySelector('.block-left-panel'),props=inspector.querySelector('.block-object-properties'),transform=inspector.querySelector('.block-transform-panel'),wall=inspector.querySelector('#block-wall-properties');
    const controls=document.createElement('div');controls.className='inline-selection-controls';
+   const selected=inspector.querySelector('.selected-furniture-inspector');if(selected)controls.append(selected);
    if(wall)controls.append(wall);
    const stair=props?.querySelector('#block-kind')?.value==='stair';
    if(transform&&!stair)controls.append(transform);else transform?.remove();
    if(props?.querySelector('input')&&!stair)controls.append(props);else props?.remove();
-   dock.append(controls);
+   dock.prepend(controls);
    for(const el of [...inspector.children])if(!el.matches('.block-model-panel'))el.hidden=true;
   }
   const map=host.querySelector('.block-map-wrap');if(map){const label=document.createElement('span');label.className='plan-location';label.textContent=R()?.name||'';map.append(label)}
@@ -60,10 +61,10 @@
  }
  async function select(id){
   const r=P().rooms.find(x=>x.id===id);if(r)hiddenFloors.delete(r.floor);if(!r?.bbox){toast('Mark this section’s area first.');return}
-  if(r.plan_id!==planId){if(pending())return toast('Save your plan before changing pages.');planId=r.plan_id;rid=id;reset();renderMain();return}
-  if(mode==='camera'){if(window.CameraEditor?.pending())return toast('Save the camera before changing sections.');rid=id;await openCameraView(pid,id,{view:planView(r.floor)})}
+  if(r.plan_id!==planId){if(pending())return toast('Save your plan before changing pages.');const stage=mode==='camera'?'cameras':'furnish';window.WorkspaceSelection?.selectRoom(id);planId=r.plan_id;rid=id;pendingWorkspaceStage=stage;reset();renderMain();await mountReady;pendingWorkspaceStage=null;window.recordWorkspaceRoute?.(stage);return}
+  if(mode==='camera'){if(window.CameraEditor?.pending())return toast('Save the camera before changing sections.');window.WorkspaceSelection?.selectRoom(id);rid=id;await openCameraView(pid,id,{view:planView(r.floor)})}
   else{await FurnitureEditor.switchSection(id);rid=FurnitureEditor.roomId()}
-  syncSections();
+  syncSections();window.recordWorkspaceRoute?.(mode==='camera'?'cameras':'furnish');
  }
  async function toggleFloor(floor){
   if(hiddenFloors.has(floor))hiddenFloors.delete(floor);
@@ -94,6 +95,7 @@
  document.addEventListener('change',e=>{
   if(e.target.id==='workspace-floor'){selectFloor(e.target.value).catch(err=>toast(err.message));return}
   if(!$('#plan-editor-inline')||!['project-select','plan-select'].includes(e.target.id))return;
+  if(e.target.id==='plan-select'&&!pending()){e.stopImmediatePropagation();const next=P().rooms.find(r=>r.plan_id===e.target.value&&r.bbox);if(next)select(next.id).catch(err=>toast(err.message));return}
   if(pending()){e.stopImmediatePropagation();e.target.value=e.target.id==='project-select'?pid:planId;toast('Save your edits before changing plans.')}else reset();
  },true);
  window.addEventListener('beforeunload',e=>{if($('#plan-editor-inline')&&pending()){e.preventDefault();e.returnValue=''}});

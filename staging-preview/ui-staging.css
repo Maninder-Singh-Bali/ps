@@ -1,0 +1,29 @@
+#staging-tools{position:fixed;right:10px;bottom:48px;z-index:10000;font:12px system-ui;max-width:360px;color:var(--text,#edf0f4)}#staging-toggle{cursor:pointer;padding:6px 10px;border:1px solid #a48b55;border-radius:6px;background:#343129;color:#f1d497;list-style:none}#staging-tools[data-open]{background:var(--panel,#272b30);padding:12px;border:1px solid var(--border,#49515e);border-radius:8px;box-shadow:0 6px 22px #0004}#staging-tools label{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:10px}#staging-tools select{max-width:195px;padding:5px}#staging-tools p{font-size:11px;line-height:1.45;margin:10px 0}#staging-tools .actions{margin-top:10px}#staging-badge{font:11px system-ui;color:#dfc085;white-space:nowrap;margin-left:8px}#staging-status{font:11px system-ui;color:#dfc085;margin:5px 0}button:disabled{cursor:not-allowed}button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #9cbdff;outline-offset:2px}.staging-preview-note{font-size:11px;color:#e8bd78;margin:4px 0}.staging-ref-picker{display:flex;gap:6px;align-items:center}.staging-ref-picker select{max-width:160px}.workspace-footer-note{font-size:10px}#modal::backdrop{background:#0007}#modal .staging-preview-note{position:sticky;top:0;background:var(--panel,#272b30);z-index:2;padding:6px}#staging-status[data-error=true]{color:#ffafaf}#staging-tools button{padding:5px 8px}.generation-progress-copy:before{content:'SIMULATED';font-size:10px;color:#dfc085}.camera-settings #camera-preview{object-fit:contain}body.studio-plan{grid-template-rows:44px 34px minmax(0,1fr) 44px}body.studio-dashboard #main{min-width:0}.block-map-wrap{min-width:0}@media(max-width:1100px){.inline-plan-grid{grid-template-columns:minmax(0,1fr) 130px}.block-workspace.with-library{grid-template-columns:125px minmax(220px,1fr) minmax(230px,.9fr)}.block-left-panel{min-width:0}.inline-editor-top{flex-wrap:wrap}.topbar{padding:4px 10px}#staging-badge{font-size:10px}.scene-controls{grid-template-columns:minmax(260px,1fr) 280px}}@media(max-width:850px){.inline-plan-grid{grid-template-columns:minmax(0,1fr)}.inline-sections{max-height:160px;overflow:auto}.block-workspace.with-library{grid-template-columns:110px minmax(0,1fr)}.block-model-panel{grid-column:2}.camera-workspace{grid-template-columns:1fr}.scene-controls{grid-template-columns:1fr}#staging-badge{display:none}.page-heading{flex-wrap:wrap}.cards{grid-template-columns:minmax(0,1fr)}#staging-tools{max-width:300px}}
+
+#staging-controls-body[hidden]{display:none!important}#staging-tools[data-open]{max-height:calc(100vh - 90px);overflow:auto}
+@media(min-width:851px) and (max-width:1100px){
+ #plan-editor-inline .block-workspace.with-library{grid-template-columns:125px minmax(190px,1fr) minmax(190px,1fr);grid-template-rows:minmax(0,1fr)}
+ #plan-editor-inline .block-inspector{grid-column:auto;height:auto;min-height:0}
+ #plan-editor-inline .block-map-wrap{min-height:0}
+ #plan-editor-inline .inline-editor-body{min-height:460px}
+ .inline-plan-grid{height:auto;min-height:560px}
+}
+@media(max-width:850px){
+ #plan-editor-inline .block-workspace.with-library{grid-template-columns:115px minmax(0,1fr);grid-template-rows:440px 360px;height:auto;overflow:visible}
+ #plan-editor-inline .block-inspector{grid-column:1/-1;height:360px;min-height:0}
+ #plan-editor-inline .block-model-panel{grid-column:auto}
+ #plan-editor-inline .block-map-wrap{min-height:300px}
+ #plan-editor-inline .inline-editor-body{overflow:visible;height:auto;flex:none}
+ #plan-editor-inline{height:auto;overflow:visible}
+ .inline-plan-grid{height:auto;display:block}.inline-sections{margin-top:10px}
+ .inline-editor-top{min-height:60px}.block-toolbar{flex-wrap:wrap}
+}
+@media(min-width:851px) and (max-width:1100px){
+ .inline-plan-grid>#plan-editor-inline{grid-column:1;grid-row:1}
+ .inline-plan-grid>.inline-sections{grid-column:2;grid-row:1;max-height:none}
+ .inline-sections .room-list{display:block}.inline-sections .room-row{min-width:0}
+ #plan-editor-inline .camera-workspace{grid-template-columns:minmax(0,1fr) minmax(240px,.8fr);gap:10px}
+}
+@media(max-width:850px){#plan-editor-inline .camera-workspace{display:block}#plan-editor-inline #camera-plan{height:360px;flex:none}#plan-editor-inline .camera-settings{overflow:visible}}
+.sidebar .nav-item{color:var(--text,#dce1e8)}
+html[data-theme="dark"] .sidebar .nav-item img,html[data-theme="dark"] .sidebar-bottom button img{filter:invert(.85)}

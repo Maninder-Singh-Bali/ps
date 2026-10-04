@@ -13,6 +13,14 @@
 
  const number=(id,label,value,step=1)=>`<label class="field"><span>${label}</span><input id="${id}" type="number" step="${step}" value="${value}"></label>`;
 
+ const displayUnit=()=>plan()?.manual_document?.units||ctx?.drawing?.units||'m';
+ const unitFactor=()=>displayUnit()==='ft'?.3048:displayUnit()==='in'?.0254:1;
+ function selectedInspector(v){
+  if(!v)return '';const d=ctx.dimensions,b=room().bbox,known=Number(d?.width_m)>0&&Number(d?.depth_m)>0,factor=unitFactor(),unit=displayUnit();
+  const field=(key,label,value)=>`<label class="field">${label} (${unit})<input id="selected-${key}" type="number" min="0.001" step="0.01" ${value==null?'disabled placeholder="Unknown"':`value="${(value/factor).toFixed(3)}"`}></label>`;
+  return `<section class="selected-furniture-inspector" aria-label="Selected furniture"><strong>${esc(v.label)}</strong><div class="block-fields">${field('width','Width',known?v.width/b[2]*d.width_m:null)}${field('depth','Depth',known?v.depth/b[3]*d.depth_m:null)}${field('height','Height',v.height_m??null)}${number('selected-angle','Rotation (°)',v.angle,1)}</div><small>${known?'Plan-scaled dimensions · '+esc(v.dimension_status||'estimated'):'Width/depth unavailable until plan scale is known.'}</small><div class="actions">${btn('Apply size / rotation','precise-size')}${btn('Duplicate','duplicate')}${btn('Delete','remove')}${btn('Assign reference','reference')}</div></section>`;
+ }
+ function saveStatus(message){const el=$('#block-edit-status');if(el)el.textContent=message;}
  window.openFurnitureBlocks=async function(projectId,roomId,options={}){
 
   if(!options.reload&&window.InlinePlan?.active()&&ctx?.pid===projectId&&$('#block-plan'))return switchSection(roomId);
@@ -117,6 +125,7 @@
    const payload={action,revision:ctx.revision,items,selected,...extra};
    if(walls?.dirty)payload.drawing=walls.payload();
    if(action==='save'){
+    saveStatus('Saving…');
     if(walls.first)throw Error('Finish the wall or opening, or press Escape.');
     if(!walls.doc.manual_draft_id&&!walls.doc.site?.model?.metres_per_pixel&&ctx.scene?.model_scale){const s=ctx.scene.model_scale;walls.doc.site={...walls.doc.site,model:{...walls.doc.site?.model,metres_per_pixel:s.metres_per_pixel,scale_source:s.scale_source}};walls.dirty=true;payload.drawing=walls.payload()}
     stashDraft();payload.action='save-plan';
@@ -129,7 +138,7 @@
    if(action==='suggest'||action==='propose')dirty=dirty||JSON.stringify(items)!==JSON.stringify(room().block_layout?.items||[]);
    if(selected&&!items.some(v=>v.id===selected))selected=items[0]?.id;
    render();if(ctx.resumeWalk){ctx.resumeWalk=false;startWalk()}return result;
-  }finally{busy=false;const busyHost=$('#plan-editor-inline');if(busyHost){busyHost.setAttribute('aria-busy','false');busyHost.inert=false}}
+  }catch(err){if(action==='save')saveStatus('Not saved · '+err.message);throw err;}finally{busy=false;const busyHost=$('#plan-editor-inline');if(busyHost){busyHost.setAttribute('aria-busy','false');busyHost.inert=false}}
  }
 
  function libraryCards(){const list=FurnitureLibrary.presets.filter(p=>(libraryCategory==='All'||p.category===libraryCategory)&&p.label.toLowerCase().includes(libraryQuery.toLowerCase()));return list.map(p=>`<button type="button" draggable="true" data-furniture-preset="${p.id}" title="Drag ${p.label} onto the plan, or click to add" aria-label="Add ${p.label}"><svg viewBox="0 0 100 100" aria-hidden="true">${FurnitureLibrary.symbol(p)}</svg><span>${p.label}</span></button>`).join('')||'<span>No matching shapes</span>'}
@@ -169,8 +178,8 @@ ${ctx.architecture?`<details class="block-structure-status"><summary>Structure r
 
 <aside class="block-inspector"><div class="block-model-panel"><div class="block-model-heading"><h3>3D model</h3><select id="model-projection" aria-label="3D projection"><option value="orthographic" ${modelView.projection!=='perspective'?'selected':''}>Orthographic</option><option value="perspective" ${modelView.projection==='perspective'?'selected':''}>Perspective</option></select><button type="button" class="btn small" id="model-walk" ${modelView.projection!=='perspective'?'hidden':''} aria-pressed="${!!modelView.walk}">${modelView.walk?'Exit walk':'Walk'}</button><span>${esc(r.floor)}</span>${scaleControls()}</div><canvas id="block-preview" tabindex="0" aria-label="Interactive 3D floor model"></canvas><div class="block-model-controls"><button type="button" class="btn small" id="model-place" ${!selected||modelView.projection!=='perspective'?'hidden':''}>Move object</button><span id="model-placement-hint" role="status">${placement?'Click a wall, ceiling or floor · Esc to cancel':modelView.walk?'WASD / arrows · Drag to look':''}</span><button type="button" class="btn small" data-model="reset">Fit</button><button type="button" class="btn small" data-model="top">Top</button><button type="button" class="btn small" data-model="out" aria-label="Zoom out 3D model">−</button><button type="button" class="btn small" data-model="in" aria-label="Zoom in 3D model">+</button><label><input id="model-transparent" type="checkbox" ${modelView.transparent?'checked':''}> See through walls</label></div><p class="block-model-hint" id="block-model-geometry"></p><p class="block-model-hint">Drag to rotate · Middle-drag to pan · Scroll to zoom</p>${btn('Set camera','camera')}</div><label class="field"><span>Section</span><select id="block-room">${state.projects[ctx.pid].rooms.filter(x=>x.plan_id===r.plan_id&&x.bbox).map(x=>`<option value="${x.id}" ${x.id===r.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label>
 
-<div id="block-wall-properties"></div>
-${v?`<details class="block-transform-panel" aria-label="Selected object controls"><summary>Transform values<span id="block-seat-status" aria-live="polite">${FurnitureLibrary.quantityLabel(v)?` \u00b7 ${FurnitureLibrary.quantityLabel(v)}`:""}</span></summary><strong>${esc(v.label)}</strong><div class="block-fields">${number('block-angle','Rotation (degrees)',v.angle,10)}${number('block-scale-percent','Scale (%)',100,10)}${number('block-width','Width (% of section)',+(v.width/b[2]*100).toFixed(1),.5)}${number('block-depth','Depth (% of section)',+(v.depth/b[3]*100).toFixed(1),.5)}</div><div class="block-toolbar">${btn('Rotate 90°','rotate')}${btn('Apply scale','scale')}${btn('Duplicate','duplicate')}</div></details>`:''}
+<div id="block-wall-properties"></div>${selectedInspector(v)}
+${v?`<details class="block-transform-panel" aria-label="Selected object controls"><summary>Advanced · percentage scale<span id="block-seat-status" aria-live="polite">${FurnitureLibrary.quantityLabel(v)?` \u00b7 ${FurnitureLibrary.quantityLabel(v)}`:""}</span></summary><strong>${esc(v.label)}</strong><div class="block-fields">${number('block-angle','Rotation (degrees)',v.angle,10)}${number('block-scale-percent','Scale (%)',100,10)}${number('block-width','Width (% of section)',+(v.width/b[2]*100).toFixed(1),.5)}${number('block-depth','Depth (% of section)',+(v.depth/b[3]*100).toFixed(1),.5)}</div><div class="block-toolbar">${btn('Rotate 90°','rotate')}${btn('Apply scale','scale')}${btn('Duplicate','duplicate')}</div></details>`:''}
 
 <details class="block-object-properties"><summary>Object properties</summary>${v?`<label class="field"><span>Object</span><input id="block-label" value="${esc(v.label)}"></label><label class="field"><span>Type</span><select id="block-kind">${['unknown','sofa','chair','table','bed','storage','refrigerator','comforter','pillar','fixture','appliance','desk','plant','rug','stair','light','decor'].map(k=>`<option ${k===v.kind?'selected':''}>${k}</option>`).join('')}</select></label>
 
@@ -189,7 +198,7 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
 
 <label class="block-review"><input id="block-reviewed" type="checkbox" ${r.block_layout?.reviewed&&!dirty&&!walls.dirty&&!issues.length?'checked':''}> I checked these blocks against the original plan.</label><p class="help">Suggestions avoid known obstructions only. They do not identify missing objects or certify an accurate plan.</p></aside></div>`,`${btn('Close','close')}${btn('Save plan','save')}`,'blocks');
 
-  $('#modal').classList.add('blocks-dialog');draw();
+  $('#modal').classList.add('blocks-dialog');draw();saveStatus(pendingChanges()?'Unsaved changes':'Saved');
 
  }
 
@@ -622,6 +631,13 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
 
    if(action==='choose-product')return await chooseProduct(Number(button.dataset.photo));
 
+   if(action==='precise-size'){
+    if(!v)return;const factor=unitFactor(),angle=Number($('#selected-angle').value),d=ctx.dimensions,widthEl=$('#selected-width'),heightEl=$('#selected-height');
+    const width=Number(widthEl.value)*factor,depth=Number($('#selected-depth').value)*factor,height=Number(heightEl.value)*factor;
+    if(!Number.isFinite(angle)||(!widthEl.disabled&&![width,depth].every(x=>Number.isFinite(x)&&x>0))||(!heightEl.disabled&&!(height>0&&height<=5)))throw Error('Enter positive dimensions and a finite rotation. Height must be at most 5 m.');
+    if(!widthEl.disabled){delete v.sofa_modules;delete v.chair_modules;v.width=width/d.width_m*r.bbox[2];v.depth=depth/d.depth_m*r.bbox[3];v.physical_size={width,depth,unit:'m'};}
+    if(!heightEl.disabled)v.height_m=height;v.angle=(angle%360+360)%360;dirty=true;await call('check');return;
+   }
    if(action==='apply-dimensions'){const width=Number($('#product-size-width').value),depth=Number($('#product-size-depth').value);if(!(width>0&&depth>0))return toast('Enter a valid width and depth.');if(!ctx.dimensions)return toast('Set the floor-plan dimensions first.');delete v.sofa_modules;delete v.chair_modules;v.width=width/ctx.dimensions.width_m*r.bbox[2];v.depth=depth/ctx.dimensions.depth_m*r.bbox[3];v.physical_size={width,depth,unit:'m'};v.dimension_status='reviewed';const height=Number($('#product-size-height')?.value);if(height>0&&height<=5)v.height_m=height;dirty=true;await call('check');return}
 
    if(action==='upload'){const input=document.createElement('input');input.type='file';input.accept='image/png,image/jpeg,image/webp';input.onchange=()=>attach(input.files?.[0]).catch(err=>toast(err.message));input.click();return}

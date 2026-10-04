@@ -15,3 +15,9 @@ assert.match(p.describe({video_preset:'ltx-native-1080p-v1',duration:8}),/Native
 const {generationProgressModel:model}=require('../static/generation-progress.js');
 assert.match(model({kind:'video',status:'completed',video_preset:'ltx-preview-768x432-2s-v1',scene_manifest:{approved_image:{}}},{url:'/fixture'}).hint,/downsampled/);
 console.log('Preset selection, fixed preview motion, output labels and progress wording verified without submission.');
+
+assert.match(p.controls(key),/value="native-8" selected/);
+assert.doesNotMatch(p.controls("other-view"),/value="native-8" selected/);
+events.change({target:{dataset:{videoMotion:key},value:"slide"}});
+assert.match(p.controls(key),/value="slide" selected/);
+console.log("Next-job controls survive re-render and remain separate by view.");
