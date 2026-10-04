@@ -2,6 +2,7 @@
 
 (() => {
 
+ let busyDone=Promise.resolve(),releaseBusy=()=>{},roomSelectionSerial=0;
  let history=null,restoringHistory=false,placement=null,multi=new Set(),groupDrag=null;
  let walls=null,ctx=null,items=[],selected=null,issues=[],drag=null,dirty=false,popupOpen=false,popupSurface='plan',modelViewer=null,modelView=null,productLookup=null,panDrag=null,zoomFrame=null,zoomTarget=null,libraryOpen=true,libraryCategory='All',libraryQuery='',busy=false;
 
@@ -16,17 +17,19 @@
  const displayUnit=()=>plan()?.manual_document?.units||ctx?.drawing?.units||'m';
  const unitFactor=()=>displayUnit()==='ft'?.3048:displayUnit()==='in'?.0254:1;
  function dimensionHint(v,owner){const d=ctx?.dimensions,b=owner?.bbox,f=unitFactor();return owner?.id===ctx.rid&&b&&d?.width_m>0&&d?.depth_m>0?`${(v.width/b[2]*d.width_m/f).toFixed(2)} × ${(v.depth/b[3]*d.depth_m/f).toFixed(2)} ${displayUnit()}`:''}
+ function referenceInspector(v){const refs=room().references.map(A).filter(a=>a?.enabled!==false),f=unitFactor(),u=displayUnit();return `<section class="object-reference" aria-label="Object reference"><div class="reference-heading">${v.asset_id?`<img src="${url(v.asset_id)}" alt="Assigned reference">`:'<span class="reference-empty">No image</span>'}<div><strong>Reference</strong><small>${v.asset_id?'Assigned to this object':'No reference assigned'} · ${esc(v.dimension_status||'estimated')} dimensions</small></div></div><select id="block-asset" aria-label="Choose reference"><option value="">Choose an image…</option>${refs.map(a=>`<option value="${a.id}" ${a.id===v.asset_id?'selected':''}>${esc(a.display_name||a.name||'Reference')}</option>`).join('')}</select><div class="actions">${btn(v.asset_id?'Replace / upload':'Upload image','upload')}${v.asset_id?btn('Remove reference','remove-reference'):''}</div><label class="field">Product URL<input id="block-product-url" type="url" value="${esc(v.product_url||'')}" placeholder="https://…"></label><details><summary>Product dimensions & metadata</summary><p class="help">Source dimensions converted to ${u}. Apply explicitly to change the scene proxy.</p><div class="block-fields">${['width','depth','height'].map(k=>number('product-size-'+k,k+' ('+u+')',v.physical_size?.[k]?+(v.physical_size[k]/f).toFixed(3):'',.01)).join('')}</div>${btn('Apply reviewed dimensions','apply-dimensions')}<label class="field">Variant<input id="block-variant" value="${esc(v.variant||'')}"></label>${btn('Fetch product metadata','fetch-product')}<p id="block-product-status" role="status"></p><div id="block-product-result"></div></details><details><summary>Additional design instructions (optional)</summary><textarea id="block-prompt" rows="2" placeholder="Intent that the placed geometry cannot express">${esc(v.prompt||'')}</textarea></details></section>`;}
  function selectedInspector(v){
-  if(!v)return '';const d=ctx.dimensions,b=room().bbox,known=Number(d?.width_m)>0&&Number(d?.depth_m)>0,factor=unitFactor(),unit=displayUnit();
-  const field=(key,label,value)=>`<label class="field">${label} (${unit})<input id="selected-${key}" type="number" min="0.001" step="0.01" ${value==null?'disabled placeholder="Unknown"':`value="${(value/factor).toFixed(3)}"`}></label>`;
-  return `<section class="selected-furniture-inspector" aria-label="Selected furniture"><strong>${esc(v.label)}</strong><div class="block-fields">${field('width','Width',known?v.width/b[2]*d.width_m:null)}${field('depth','Depth',known?v.depth/b[3]*d.depth_m:null)}${field('height','Height',v.height_m??null)}${number('selected-angle','Rotation (°)',v.angle,1)}</div><small>${known?'Plan-scaled dimensions · '+esc(v.dimension_status||'estimated'):'Width/depth unavailable until plan scale is known.'}</small><div class="actions">${btn('Apply size / rotation','precise-size')}${btn('Duplicate','duplicate')}${btn('Delete','remove')}${btn('Assign reference','reference')}</div></section>`;
+  if(!v)return '';const d=ctx.dimensions,b=room().bbox,known=Number(d?.width_m)>0&&Number(d?.depth_m)>0,factor=unitFactor(),unit=displayUnit(),mount=v.host_attachment?.kind||'floor';
+  const field=(key,label,value)=>`<label class="field">${label} (${unit})<input id="selected-${key}" type="number" step="0.01" ${value==null?'disabled placeholder="Unknown"':`value="${(value/factor).toFixed(3)}"`}></label>`;
+  return `<section class="selected-furniture-inspector" aria-label="Selected furniture"><strong>${esc(v.label)}</strong><small>Scene proxy · ${esc(room().name)} · ${mount} mounted</small><div class="block-fields">${field('width','Width',known?v.width/b[2]*d.width_m:null)}${field('depth','Depth',known?v.depth/b[3]*d.depth_m:null)}${field('height','Height',v.height_m??null)}${number('selected-angle','Rotation (°)',v.angle,1)}${field('x','X from room',known?(v.x-b[0])/b[2]*d.width_m:null)}${field('y','Y from room',known?(v.y-b[1])/b[3]*d.depth_m:null)}${mount==='ceiling'?field('drop','Ceiling drop',v.host_attachment.drop||0):mount==='wall'?field('elevation','Base elevation',v.elevation_m||0):''}</div><div class="actions">${btn('Apply transform','precise-size')}${btn('Duplicate','duplicate')}${btn('Delete','remove')}</div>${referenceInspector(v)}</section>`;
  }
+ function focusRoom(){ctx.focus='room';ctx.view=null;delete modelView.walk;modelView.pan=[0,0];modelView.zoom=1;}
  function saveStatus(message){const el=$('#block-edit-status');if(el)el.textContent=message;}
  window.openFurnitureBlocks=async function(projectId,roomId,options={}){
 
   if(!options.reload&&window.InlinePlan?.active()&&ctx?.pid===projectId&&$('#block-plan'))return switchSection(roomId);
 
-  history=null;placement=null;multi.clear();modelView=BlockModelViewer.defaults();ctx={pid:projectId,rid:roomId,showOriginal:false,drafts:{},view:options.view?[...options.view]:null};productLookup=null;const r=room();if(!r?.bbox)return toast('Map a section on the plan first.');
+  history=null;placement=null;multi.clear();modelView=BlockModelViewer.defaults();try{Object.assign(modelView,JSON.parse(localStorage.getItem('pixeloid-ui-staging-model-appearance')||'{}'))}catch{}ctx={pid:projectId,rid:roomId,showOriginal:false,drafts:{},view:options.view?[...options.view]:null};productLookup=null;const r=room();if(!r?.bbox)return toast('Map a section on the plan first.');
 
   const opening=ctx;opening.savedSource=savedSource();
 
@@ -88,7 +91,7 @@
   history.current=snapshot;
  }
  async function travelHistory(redo=false){
-  if(busy||drag||groupDrag||walls.drag)return;
+  if(busy||drag||modelEdit||groupDrag||walls.drag)return;
   syncHistory();const from=redo?history.future:history.past,to=redo?history.past:history.future;
   if(!from.length)return toast(redo?'Nothing to redo.':'Nothing to undo.');
   const snapshot=from.pop();to.push(history.current);restoringHistory=true;
@@ -109,10 +112,10 @@
   return state.projects[ctx.pid].rooms.filter(r=>r.plan_id===room().plan_id&&r.bbox).sort((a,b)=>(a.id===ctx.rid)-(b.id===ctx.rid)).flatMap(r=>(r.id===ctx.rid?items:ctx.drafts[r.id]?.items||r.block_layout?.items||[]).map(v=>({v,owner:r})));
  }
  async function switchSection(id,blockId=null,options={}){
-  if(busy){$('#block-room').value=ctx.rid;toast('Placement check in progress. Select the section again when it finishes.');return}
-  if(id===ctx.rid){if(blockId){selected=blockId;popupOpen=false;libraryOpen=true;render()}return}
+  const selectionTicket=++roomSelectionSerial,selectionContext=ctx;while(busy)await busyDone;if(ctx!==selectionContext||selectionTicket!==roomSelectionSerial)return;
+  if(id===ctx.rid){if(!blockId&&!options.preserveModel){focusRoom();render()}if(blockId){selected=blockId;popupOpen=false;libraryOpen=true;render()}return}
   const next=state.projects[ctx.pid].rooms.find(r=>r.id===id&&r.plan_id===room().plan_id&&r.bbox);if(!next)return;
-  const floorChanged=next.floor!==room().floor;if(floorChanged&&!options.preserveModel)multi.clear();walls.clear();stashDraft();ctx.rid=id;if(floorChanged){ctx.view=window.InlinePlan?.planView(next.floor)||null;if(!options.preserveModel){ctx.resumeWalk=!!modelView.walk;modelView={...BlockModelViewer.defaults(),projection:modelView.projection}}}const draft=ctx.drafts[id];ctx.revision=draft?.revision??next.revision;
+  const floorChanged=next.floor!==room().floor;if(floorChanged&&!options.preserveModel)multi.clear();walls.clear();stashDraft();ctx.rid=id;if(!options.preserveModel)focusRoom();if(floorChanged){ctx.view=ctx.focus==='room'?null:window.InlinePlan?.planView(next.floor)||null;if(!options.preserveModel){ctx.resumeWalk=!!modelView.walk;modelView={...BlockModelViewer.defaults(),projection:modelView.projection,transparent:modelView.transparent,edges:modelView.edges,cutaway:modelView.cutaway}}}const draft=ctx.drafts[id];ctx.revision=draft?.revision??next.revision;
   items=structuredClone(draft?.items||next.block_layout?.items||[]);selected=blockId||draft?.selected||items[0]?.id;
   dirty=draft?.dirty||false;issues=[];productLookup=null;popupOpen=false;libraryOpen=true;ctx.scene=null;ctx.dimensions=null;
   if(window.InlinePlan?.active()){rid=id;window.InlinePlan.syncSections();if(!blockId)selected=null}
@@ -120,7 +123,7 @@
  }
  async function call(action,extra={}){
   if(ctx.ready&&savedSource()!==ctx.savedSource)throw Error('Plan changed. Your edits are kept; reload the saved plan before checking or saving furniture.');
-  if(busy)throw Error('Wait for the current placement check.');busy=true;const busyHost=$('#plan-editor-inline');if(busyHost){busyHost.setAttribute('aria-busy','true');busyHost.inert=true}
+  if(busy)throw Error('Wait for the current placement check.');busy=true;busyDone=new Promise(resolve=>releaseBusy=resolve);const busyHost=$('#plan-editor-inline');if(busyHost){busyHost.setAttribute('aria-busy','true');busyHost.inert=true}
   try{
    items=items.map(v=>{const corrected=FurnitureLibrary.consistentSofa(v,plan());if(corrected!==v)dirty=true;return corrected});
    const payload={action,revision:ctx.revision,items,selected,...extra};
@@ -139,13 +142,13 @@
    if(action==='suggest'||action==='propose')dirty=dirty||JSON.stringify(items)!==JSON.stringify(room().block_layout?.items||[]);
    if(selected&&!items.some(v=>v.id===selected))selected=items[0]?.id;
    render();if(ctx.resumeWalk){ctx.resumeWalk=false;startWalk()}return result;
-  }catch(err){if(action==='save')saveStatus('Not saved · '+err.message);throw err;}finally{busy=false;const busyHost=$('#plan-editor-inline');if(busyHost){busyHost.setAttribute('aria-busy','false');busyHost.inert=false}}
+  }catch(err){if(action==='save')saveStatus('Not saved · '+err.message);throw err;}finally{busy=false;releaseBusy();const busyHost=$('#plan-editor-inline');if(busyHost){busyHost.setAttribute('aria-busy','false');busyHost.inert=false}}
  }
 
- let catalogueReturn=null;
- function closeCatalogue(){const d=document.querySelector('#furniture-catalogue');if(!d)return;d.close();d.remove();(catalogueReturn?.isConnected?catalogueReturn:document.querySelector('[data-block="library"]'))?.focus();}
+ let catalogueOpen=false;
+ function closeCatalogue(){catalogueOpen=false;document.querySelector('#furniture-catalogue')?.remove();document.querySelector('.block-workspace')?.classList.remove('catalogue-open');document.querySelector('[data-block="library"]')?.setAttribute('aria-expanded','false');}
  function openCatalogue(){
-  closeCatalogue();catalogueReturn=document.activeElement;const d=document.createElement('dialog');d.id='furniture-catalogue';d.setAttribute('aria-labelledby','catalogue-title');d.innerHTML=`<header><h2 id="catalogue-title">Add furniture</h2><button class="btn" data-catalogue-close aria-label="Close furniture catalogue">×</button></header>${libraryMarkup()}`;document.body.append(d);d.querySelector('[data-catalogue-close]').onclick=closeCatalogue;d.addEventListener('cancel',e=>{e.preventDefault();closeCatalogue()});d.showModal();d.querySelector('#furniture-search').focus();
+  catalogueOpen=true;const workspace=document.querySelector('.block-workspace');if(!workspace)return;document.querySelector('#furniture-catalogue')?.remove();const d=document.createElement('aside');d.id='furniture-catalogue';d.setAttribute('aria-label','Furniture catalogue');d.innerHTML=`<header><strong>Add furniture</strong><button class="btn" data-catalogue-close aria-label="Close furniture catalogue">×</button></header>${libraryMarkup()}<p class="help">Choose a shape, then click inside the active room. Escape ends placement.</p>`;workspace.prepend(d);workspace.classList.add('catalogue-open');d.querySelector('[data-catalogue-close]').onclick=closeCatalogue;document.querySelector('[data-block="library"]')?.setAttribute('aria-expanded','true');
  }
  function libraryCards(){const list=FurnitureLibrary.presets.filter(p=>(libraryCategory==='All'||p.category===libraryCategory)&&p.label.toLowerCase().includes(libraryQuery.toLowerCase()));return list.map(p=>`<button type="button" draggable="false" data-furniture-preset="${p.id}" title="Add ${p.label} to the plan" aria-label="Add ${p.label}"><svg viewBox="0 0 100 100" aria-hidden="true">${FurnitureLibrary.symbol(p)}</svg><span>${p.label}</span></button>`).join('')||'<span>No matching shapes</span>'}
 
@@ -157,20 +160,16 @@
 
  async function addPreset(id,position){
   if(busy)return toast('Wait for the current placement check.');
-  if(position){
-   const contains=r=>r.bbox&&position[0]>=r.bbox[0]&&position[0]<=r.bbox[0]+r.bbox[2]&&position[1]>=r.bbox[1]&&position[1]<=r.bbox[1]+r.bbox[3];
-   const target=contains(room())?room():state.projects[ctx.pid].rooms.filter(r=>r.plan_id===room().plan_id&&contains(r)).sort((a,b)=>a.bbox[2]*a.bbox[3]-b.bbox[2]*b.bbox[3])[0];
-   if(target&&target.id!==ctx.rid)await switchSection(target.id);
-  }
-  multi.clear();walls.clear();if(items.length>=40)return toast('Use up to 40 objects in a section.');const item=FurnitureLibrary.create(id,room().bbox,plan(),ctx.dimensions,position,crypto.randomUUID());const mount=FurnitureLibrary.snapToWall(item,plan(),walls.geometries(),position?20/Math.abs($('#block-plan').getScreenCTM()?.a||1):Infinity);if(mount)Object.assign(item,mount.item);items.push(item);selected=item.id;dirty=true;popupOpen=false;await call('check')}
+  multi.clear();walls.clear();if(items.length>=40)return toast('Use up to 40 objects in a section.');const item=FurnitureLibrary.create(id,room().bbox,plan(),ctx.dimensions,position,crypto.randomUUID());const mount=FurnitureLibrary.snapToWall(item,plan(),walls.geometries(),position?20/Math.abs($('#block-plan').getScreenCTM()?.a||1):Infinity);if(mount){Object.assign(item,mount.item);const [a,b]=mount.wall.points,L=Math.hypot(b[0]-a[0],b[1]-a[1]),side=Math.sign((b[0]-a[0])*(item.y*plan().height-a[1])-(b[1]-a[1])*(item.x*plan().width-a[0]))||1;item.host_attachment={kind:'wall',floor:room().floor,wall_id:mount.wall.id,normal:[-side*(b[1]-a[1])/L,side*(b[0]-a[0])/L]};}else if(item.kind==='decor'||item.preset_id==='wall-light')return toast('Place this item close to a compatible wall face.');else if(['pendant-light','ceiling-light','chandelier'].includes(item.preset_id)){item.host_attachment={kind:'ceiling',floor:room().floor,drop:0};item.elevation_m=(modelFloor()?.scene.height||2.8)-item.height_m;}else item.host_attachment={kind:'floor',floor:room().floor};const error=validObjectPosition(item);if(error)return toast(error);items.push(item);selected=item.id;dirty=true;popupOpen=false;await call('check')}
 
  document.addEventListener('dragstart',e=>{const tile=e.target.closest('[data-furniture-preset]');if(!tile)return;e.dataTransfer.setData('application/x-pixeloid-ui-staging-furniture',tile.dataset.furniturePreset);e.dataTransfer.effectAllowed='copy'});
 
  document.addEventListener('dragend',()=>$('#block-plan')?.classList.remove('library-drop-active'));
 
+ function previewPlacement(position){if(!placement?.plan)return;const a=plan(),b=room().bbox,v=FurnitureLibrary.create(placement.preset,b,a,ctx.dimensions,position||[b[0]+b[2]/2,b[1]+b[3]/2],'preview'),svg=$('#block-plan');svg?.querySelector('#placement-ghost')?.remove();const error=validObjectPosition(v);svg?.insertAdjacentHTML('beforeend',`<polygon id="placement-ghost" points="${footprint(v).map(p=>p.join(',')).join(' ')}" fill="${error?'#dd5544':'#3684dd'}" fill-opacity=".3" stroke="${error?'#dd5544':'#245dcc'}" stroke-width="2" vector-effect="non-scaling-stroke" pointer-events="none"/>`)}
  function render(){
 
-  syncHistory();
+  if(!modelEdit)syncHistory();
   modelViewer?.dispose();modelViewer=null;
   const r=room(),v=active(),b=r.bbox;
 
@@ -178,11 +177,11 @@
 
 ${ctx.architecture?`<details class="block-structure-status"><summary>Structure review</summary><p class="help">${ctx.architecture.typed_wall_count} mapped wall segments · ${ctx.architecture.typed_opening_count} mapped openings (whole plan). ${ctx.architecture.study_reviewed?'Plan study reviewed.':'Structure review pending; furniture remains a draft.'}</p>${ctx.architecture.notes.map(n=>`<p class="help">${esc(n)}</p>`).join('')}</details>`:''}
 
-<div class="workspace-modes" role="group" aria-label="Workspace mode"><button type="button" class="btn small active" aria-pressed="true">Furniture</button>${btn('Camera','camera')}</div><div class="block-toolbar">${btn('Add furniture','library')}${btn('Full plan','fit-plan')}${btn('This section','fit-section')}${btn('Add block','add')}${btn('Scan section into blocks','propose')}${btn('Suggest clear position','suggest')}${btn('Check placement','check')}<label class="block-map-toggle"><input id="block-object-labels" type="checkbox" ${PlanLabels.objectsVisible?'checked':''}> All object labels</label><label class="block-map-toggle"><input id="block-original-map" type="checkbox" ${ctx.showOriginal?'checked':''}> Original map</label></div>
+<div class="workspace-modes" role="group" aria-label="Workspace mode"><button type="button" class="btn small active" aria-pressed="true">Furniture</button>${btn('Camera','camera')}</div><div class="block-toolbar">${btn('Add furniture','library')}${btn('Whole apartment','fit-plan')}${btn('Selected room','fit-section')}${btn('Add block','add')}${btn('Scan section into blocks','propose')}${btn('Suggest clear position','suggest')}${btn('Check placement','check')}<label class="block-map-toggle"><input id="block-object-labels" type="checkbox" ${PlanLabels.objectsVisible?'checked':''}> All object labels</label><label class="block-map-toggle"><input id="block-original-map" type="checkbox" ${ctx.showOriginal?'checked':''}> Original map</label></div>
 
 <div class="block-workspace with-library"><div class="block-left-panel"><p class="furniture-edit-empty">Select an object to edit.</p><div id="block-popover" class="block-details-panel" aria-label="Selected furniture details"></div></div><section><h3>Full plan · furniture & walls</h3>${walls.toolbar()}<div class="block-map-wrap"><svg id="block-plan" aria-label="Original floor plan with draggable furniture blocks" aria-description="Two-finger swipe to pan. Pinch to zoom."></svg></div><p id="block-edit-status" role="status"></p></section>
 
-<aside class="block-inspector"><div class="block-model-panel"><div class="block-model-heading"><h3>3D model</h3><select id="model-projection" aria-label="3D projection"><option value="orthographic" ${modelView.projection!=='perspective'?'selected':''}>Orthographic</option><option value="perspective" ${modelView.projection==='perspective'?'selected':''}>Perspective</option></select><button type="button" class="btn small" id="model-walk" ${modelView.projection!=='perspective'?'hidden':''} aria-pressed="${!!modelView.walk}">${modelView.walk?'Exit walk':'Walk'}</button><span>${esc(r.floor)}</span>${scaleControls()}</div><canvas id="block-preview" tabindex="0" aria-label="Interactive 3D floor model"></canvas><div class="block-model-controls"><button type="button" class="btn small" id="model-place" ${!selected||modelView.projection!=='perspective'?'hidden':''}>Move object</button><span id="model-placement-hint" role="status">${placement?'Click a wall, ceiling or floor · Esc to cancel':modelView.walk?'WASD / arrows · Drag to look':''}</span><button type="button" class="btn small" data-model="reset">Fit</button><button type="button" class="btn small" data-model="top">Top</button><button type="button" class="btn small" data-model="out" aria-label="Zoom out 3D model">−</button><button type="button" class="btn small" data-model="in" aria-label="Zoom in 3D model">+</button><label><input id="model-transparent" type="checkbox" ${modelView.transparent?'checked':''}> See through walls</label></div><p class="block-model-hint" id="block-model-geometry"></p><p class="block-model-hint">Drag to rotate · Middle-drag to pan · Scroll to zoom</p>${btn('Set camera','camera')}</div><label class="field"><span>Section</span><select id="block-room">${state.projects[ctx.pid].rooms.filter(x=>x.plan_id===r.plan_id&&x.bbox).map(x=>`<option value="${x.id}" ${x.id===r.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label>
+<aside class="block-inspector"><div class="block-model-panel"><div class="block-model-heading"><h3>3D model</h3><select id="model-projection" aria-label="3D projection"><option value="orthographic" ${modelView.projection!=='perspective'?'selected':''}>Orthographic</option><option value="perspective" ${modelView.projection==='perspective'?'selected':''}>Perspective</option></select><button type="button" class="btn small" id="model-walk" ${modelView.projection!=='perspective'?'hidden':''} aria-pressed="${!!modelView.walk}">${modelView.walk?'Exit walk':'Walk'}</button><span>${esc(r.floor)}</span>${scaleControls()}</div><canvas id="block-preview" tabindex="0" aria-label="Interactive 3D floor model"></canvas><div class="block-model-controls"><button type="button" class="btn small" id="model-edit-move" aria-pressed="${modelEditMode==='move'}">Move</button><button type="button" class="btn small" id="model-edit-rotate" aria-pressed="${modelEditMode==='rotate'}">Rotate</button><button type="button" class="btn small" id="model-place" ${!selected||modelView.projection!=='perspective'?'hidden':''}>Move object</button><span id="model-placement-hint" role="status">${placement?'Click a wall, ceiling or floor · Esc to cancel':modelView.walk?'WASD / arrows · Drag to look':''}</span><button type="button" class="btn small" data-model="reset">Fit</button><button type="button" class="btn small" data-model="top">Top</button><button type="button" class="btn small" data-model="out" aria-label="Zoom out 3D model">−</button><button type="button" class="btn small" data-model="in" aria-label="Zoom in 3D model">+</button><button class="btn small" id="model-solid" aria-pressed="${!modelView.transparent}">Solid</button><label><input id="model-transparent" type="checkbox" ${modelView.transparent?'checked':''}> X-ray</label><label><input id="model-edges" type="checkbox" ${modelView.edges?'checked':''}> Edges</label><label><input id="model-cutaway" type="checkbox" ${modelView.cutaway?'checked':''}> Cutaway</label></div><p class="block-model-hint" id="block-model-geometry"></p><p class="block-model-hint">Drag to rotate · Middle-drag to pan · Scroll to zoom</p>${btn('Set camera','camera')}</div><label class="field"><span>Section</span><select id="block-room">${state.projects[ctx.pid].rooms.filter(x=>x.plan_id===r.plan_id&&x.bbox).map(x=>`<option value="${x.id}" ${x.id===r.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label>
 
 <div id="block-wall-properties"></div>${selectedInspector(v)}
 ${v?`<details class="block-transform-panel" aria-label="Selected object controls"><summary>Advanced · percentage scale<span id="block-seat-status" aria-live="polite">${FurnitureLibrary.quantityLabel(v)?` \u00b7 ${FurnitureLibrary.quantityLabel(v)}`:""}</span></summary><strong>${esc(v.label)}</strong><div class="block-fields">${number('block-angle','Rotation (degrees)',v.angle,10)}${number('block-scale-percent','Scale (%)',100,10)}${number('block-width','Width (% of section)',+(v.width/b[2]*100).toFixed(1),.5)}${number('block-depth','Depth (% of section)',+(v.depth/b[3]*100).toFixed(1),.5)}</div><div class="block-toolbar">${btn('Rotate 90°','rotate')}${btn('Apply scale','scale')}${btn('Duplicate','duplicate')}</div></details>`:''}
@@ -204,7 +203,7 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
 
 <label class="block-review"><input id="block-reviewed" type="checkbox" ${r.block_layout?.reviewed&&!dirty&&!walls.dirty&&!issues.length?'checked':''}> I checked these blocks against the original plan.</label><p class="help">Suggestions avoid known obstructions only. They do not identify missing objects or certify an accurate plan.</p></aside></div>`,`${btn('Close','close')}${btn('Save plan','save')}`,'blocks');
 
-  $('#modal').classList.add('blocks-dialog');draw();saveStatus(pendingChanges()?'Unsaved changes':'Saved');
+  $('#modal').classList.add('blocks-dialog');draw();if(catalogueOpen)openCatalogue();saveStatus(pendingChanges()?'Unsaved changes':'Saved');
 
  }
 
@@ -310,7 +309,7 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
 
   const corrected=!!ctx.drawing;
 
-  svg.innerHTML=`<rect width="${a.width}" height="${a.height}" fill="white"/>${corrected?`${ctx.showOriginal?`<image href="${url(a.id)}" width="${a.width}" height="${a.height}" opacity=".4"/>`:''}${DrawingPreview.markup(ctx.drawing,true)}`:background?`<image href="${url(background)}" width="${a.width}" height="${a.height}"/>`:''}<rect x="${b[0]*a.width}" y="${b[1]*a.height}" width="${b[2]*a.width}" height="${b[3]*a.height}" fill="none" stroke="#848e83" stroke-width=".5" vector-effect="non-scaling-stroke" stroke-dasharray="2 2"/>`+state.projects[ctx.pid].rooms.filter(r=>r.plan_id===a.id&&r.bbox).sort((a,b)=>b.bbox[2]*b.bbox[3]-a.bbox[2]*a.bbox[3]).map(r=>`<rect data-block-section="${r.id}" x="${r.bbox[0]*a.width}" y="${r.bbox[1]*a.height}" width="${r.bbox[2]*a.width}" height="${r.bbox[3]*a.height}" fill="transparent"><title>${esc(r.name)}</title></rect>`).join('')+visibleBlocks().map(({v,owner})=>{
+  svg.innerHTML=`<rect width="${a.width}" height="${a.height}" fill="white"/>${corrected?`${ctx.showOriginal?`<image href="${url(a.id)}" width="${a.width}" height="${a.height}" opacity=".4"/>`:''}${DrawingPreview.markup(ctx.drawing,true)}`:background?`<image href="${url(background)}" width="${a.width}" height="${a.height}"/>`:''}<rect x="${b[0]*a.width}" y="${b[1]*a.height}" width="${b[2]*a.width}" height="${b[3]*a.height}" fill="none" data-active-room="${ctx.rid}" stroke="#3b78db" stroke-width="2" vector-effect="non-scaling-stroke" stroke-dasharray="2 2"/>`+state.projects[ctx.pid].rooms.filter(r=>r.plan_id===a.id&&r.bbox).sort((a,b)=>b.bbox[2]*b.bbox[3]-a.bbox[2]*a.bbox[3]).map(r=>`<rect data-block-section="${r.id}" x="${r.bbox[0]*a.width}" y="${r.bbox[1]*a.height}" width="${r.bbox[2]*a.width}" height="${r.bbox[3]*a.height}" fill="transparent"><title>${esc(r.name)}</title></rect>`).join('')+visibleBlocks().map(({v,owner})=>{
 
    const pts=footprint(v),t=v.angle*Math.PI/180,x=v.x*a.width,y=v.y*a.height,L=Math.min(v.width*a.width,v.depth*a.height)*.3;
 
@@ -327,7 +326,7 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
    if(e.button===1){$('#block-popover').hidden=true;panDrag={start:[e.clientX,e.clientY],view:[...ctx.view],scale:svg.getScreenCTM().a};svg.setPointerCapture(e.pointerId);return}
 
    if(groupPointerDown(e))return;
-   if(walls.pointerDown(e))return;
+   if(placement?.plan&&e.button===0){const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(svg.getScreenCTM().inverse()),v=FurnitureLibrary.create(placement.preset,room().bbox,a,ctx.dimensions,[p.x/a.width,p.y/a.height],'preview');const error=validObjectPosition(v);if(error){toast(error);return}addPreset(placement.preset,[p.x/a.width,p.y/a.height]).catch(e=>toast(e.message));return}if(walls.pointerDown(e))return;
    const handle=e.target.closest('[data-block-handle]')?.dataset.blockHandle;
 
    const object=e.target.closest('[data-block-id]');
@@ -348,7 +347,7 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
 
   };
 
-  svg.onpointermove=e=>{if(groupPointerMove(e))return;if(walls.pointerMove(e))return;if(panDrag){ctx.view=[panDrag.view[0]-(e.clientX-panDrag.start[0])/panDrag.scale,panDrag.view[1]-(e.clientY-panDrag.start[1])/panDrag.scale,...panDrag.view.slice(2)];svg.setAttribute('viewBox',ctx.view.join(' '));popover();return}if(drag&&(drag.moved||Math.hypot(e.clientX-drag.start[0],e.clientY-drag.start[1])>3)){drag.moved=true;move(e)}};
+  svg.onpointermove=e=>{if(placement?.plan){const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(svg.getScreenCTM().inverse());previewPlacement([p.x/a.width,p.y/a.height]);return}if(groupPointerMove(e))return;if(walls.pointerMove(e))return;if(panDrag){ctx.view=[panDrag.view[0]-(e.clientX-panDrag.start[0])/panDrag.scale,panDrag.view[1]-(e.clientY-panDrag.start[1])/panDrag.scale,...panDrag.view.slice(2)];svg.setAttribute('viewBox',ctx.view.join(' '));popover();return}if(drag&&(drag.moved||Math.hypot(e.clientX-drag.start[0],e.clientY-drag.start[1])>3)){drag.moved=true;move(e)}};
 
   svg.onpointerup=async e=>{if(groupDrag){try{await groupPointerUp(e)}catch(err){toast(err.message)}return}if(walls.pointerUp(e))return;svg.style.cursor='';if(panDrag){panDrag=null;if(svg.hasPointerCapture(e.pointerId))svg.releasePointerCapture(e.pointerId);popover();return}if(!drag)return;const moved=drag.moved;if(moved)move(e);drag=null;walls.guides=[];if(svg.hasPointerCapture(e.pointerId))svg.releasePointerCapture(e.pointerId);popupOpen=false;libraryOpen=true;if(moved)try{await call('check')}catch(err){toast(err.message);render()}else render()};
 
@@ -428,11 +427,11 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
   const library=$('#block-library-panel');if(library)library.hidden=!libraryOpen;
   document.querySelectorAll('.block-left-tabs [data-block]').forEach(el=>{const pressed=el.dataset.block===(libraryOpen?'library':'reference');el.classList.toggle('selected',pressed);el.setAttribute('aria-pressed',String(pressed))});
   host.hidden=libraryOpen||!v||!popupOpen||!!(drag||panDrag);
-  if(!v||!popupOpen){host.innerHTML='';return}
+  if(!v||!popupOpen||document.querySelector('.selected-furniture-inspector .object-reference')){host.innerHTML='';host.hidden=true;return}
 
   const refs=room().references.map(A).filter(a=>a?.enabled!==false);
 
-  host.innerHTML=`<div class="block-popover-card"><button class="btn small" type="button" data-block="hide-popup" style="float:right" aria-label="Close furniture popup">x</button><strong>${esc(v.label)}</strong>${['light','decor'].includes(v.kind)?`<div class="block-fields">${number('block-elevation_m','Mounting height (m)',v.elevation_m??0,.05)}${number('block-height_m',v.kind==='decor'?'Frame height (m)':'Fixture height (m)',v.height_m??.5,.05)}</div>`:''}${v.kind==='stair'?`<div class="stair-controls">${number('stair-width',v.preset_id==='staircase-spiral'?'Diameter (% of section)':'Width (% of section)',+(v.width/room().bbox[2]*100).toFixed(1),.5)}${v.preset_id!=='staircase-spiral'?number('stair-depth','Length (% of section)',+(v.depth/room().bbox[3]*100).toFixed(1),.5):''}${number('stair-height','Height (m)',v.height_m??3,.1)}${number('stair-angle','Up direction (°)',v.angle,10)}${v.preset_id==='staircase-spiral'?`<label class="field"><span>Climb direction</span><select id="stair-winding"><option value="clockwise" ${!v.flip_x?'selected':''}>Clockwise</option><option value="counterclockwise" ${v.flip_x?'selected':''}>Counterclockwise</option></select></label>`:''}${btn('Apply','apply-stair')}${btn('Turn 90°','rotate')}${btn('Delete','remove')}<span class="help">Arrow points up the stairs.</span></div>`:''}<div class="block-product-link"><label class="field"><span>Product URL</span><input id="block-product-url" type="url" maxlength="4096" value="${esc(v.product_url||'')}" placeholder="https://shop.com/product/…"></label>${btn('Fetch photos & dimensions','fetch-product')}<p id="block-product-status" role="status"></p><div id="block-product-result"></div></div>${v.asset_id?`<img src="${url(v.asset_id)}" alt="Furniture linked to this block">`:'<div class="block-empty-photo">Link a furniture image to this block</div>'}<label class="field"><span>Furniture reference</span><select id="block-asset"><option value="">Choose an image…</option>${refs.map(a=>`<option value="${a.id}" ${a.id===v.asset_id?'selected':''}>${esc(a.category||a.display_name||a.name||'Furniture')}</option>`).join('')}</select></label>${btn('Upload image','upload')}<label class="field"><span>Variant / finish</span><input id="block-variant" value="${esc(v.variant||'')}" placeholder="Unspecified — enter the exact variant"></label><label class="field"><span>Dimension certainty</span><select id="block-dimension_status">${['missing','estimated','extracted','reviewed'].map(t=>`<option ${t===(v.dimension_status||'estimated')?'selected':''}>${t}</option>`).join('')}</select></label><div class="block-manual-dimensions"><p class="help">Dimensions: ${esc(v.dimension_status||'estimated')}. Missing values are not product measurements.</p>${number('product-size-width','Width (m)',v.physical_size?.width??'',.01)}${number('product-size-depth','Depth (m)',v.physical_size?.depth??'',.01)}${number('product-size-height','Height (m)',v.dimension_status==='reviewed'?v.height_m??'':'',.01)}${btn('Apply reviewed dimensions','apply-dimensions')}</div><label class="field"><span>Placement notes</span><textarea id="block-prompt" rows="3" placeholder="For example: use this sofa, facing the table. Keep the doors clear.">${esc(v.prompt||'')}</textarea></label></div>`;
+  host.innerHTML=`<div class="block-popover-card"><button class="btn small" type="button" data-block="hide-popup" style="float:right" aria-label="Close furniture popup">x</button><strong>${esc(v.label)}</strong>${['light','decor'].includes(v.kind)?`<div class="block-fields">${number('block-elevation_m','Mounting height (m)',v.elevation_m??0,.05)}${number('block-height_m',v.kind==='decor'?'Frame height (m)':'Fixture height (m)',v.height_m??.5,.05)}</div>`:''}${v.kind==='stair'?`<div class="stair-controls">${number('stair-width',v.preset_id==='staircase-spiral'?'Diameter (% of section)':'Width (% of section)',+(v.width/room().bbox[2]*100).toFixed(1),.5)}${v.preset_id!=='staircase-spiral'?number('stair-depth','Length (% of section)',+(v.depth/room().bbox[3]*100).toFixed(1),.5):''}${number('stair-height','Height (m)',v.height_m??3,.1)}${number('stair-angle','Up direction (°)',v.angle,10)}${v.preset_id==='staircase-spiral'?`<label class="field"><span>Climb direction</span><select id="stair-winding"><option value="clockwise" ${!v.flip_x?'selected':''}>Clockwise</option><option value="counterclockwise" ${v.flip_x?'selected':''}>Counterclockwise</option></select></label>`:''}${btn('Apply','apply-stair')}${btn('Turn 90°','rotate')}${btn('Delete','remove')}<span class="help">Arrow points up the stairs.</span></div>`:''}<div class="block-product-link"><label class="field"><span>Product URL</span><input id="block-product-url" type="url" maxlength="4096" value="${esc(v.product_url||'')}" placeholder="https://shop.com/product/…"></label>${btn('Fetch photos & dimensions','fetch-product')}<p id="block-product-status" role="status"></p><div id="block-product-result"></div></div>${v.asset_id?`<img src="${url(v.asset_id)}" alt="Furniture linked to this block">`:'<div class="block-empty-photo">Link a furniture image to this block</div>'}<label class="field"><span>Furniture reference</span><select id="block-asset"><option value="">Choose an image…</option>${refs.map(a=>`<option value="${a.id}" ${a.id===v.asset_id?'selected':''}>${esc(a.category||a.display_name||a.name||'Furniture')}</option>`).join('')}</select></label>${btn('Upload image','upload')}<label class="field"><span>Variant / finish</span><input id="block-variant" value="${esc(v.variant||'')}" placeholder="Unspecified — enter the exact variant"></label><label class="field"><span>Dimension certainty</span><select id="block-dimension_status">${['missing','estimated','extracted','reviewed'].map(t=>`<option ${t===(v.dimension_status||'estimated')?'selected':''}>${t}</option>`).join('')}</select></label><div class="block-manual-dimensions"><p class="help">Dimensions: ${esc(v.dimension_status||'estimated')}. Missing values are not product measurements.</p>${number('product-size-width','Width (m)',v.physical_size?.width??'',.01)}${number('product-size-depth','Depth (m)',v.physical_size?.depth??'',.01)}${number('product-size-height','Height (m)',v.dimension_status==='reviewed'?v.height_m??'':'',.01)}${btn('Apply reviewed dimensions','apply-dimensions')}</div><label class="field"><span>Additional design instructions (optional)</span><textarea id="block-prompt" rows="3" placeholder="Intent that the placed geometry cannot express">${esc(v.prompt||'')}</textarea></label></div>`;
 
   const linked=A(v.asset_id)?.source_product;if(productLookup?.block_id!==v.id&&linked&&(!v.product_url||v.product_url===linked.url))productLookup={block_id:v.id,product:linked};
   if(productLookup?.block_id===v.id)showProduct();
@@ -443,7 +442,7 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
 
   const holder=$('#block-product-result'),p=productLookup?.product;if(!holder||!p)return;
 
-  const sizes=p.dimensions_m||{};if(!active()?.physical_size){for(const [key,val] of Object.entries({width:sizes.length?.metres??sizes.width?.metres,depth:sizes.depth?.metres??(sizes.length?sizes.width?.metres:null),height:sizes.height?.metres})){const input=$('#product-size-'+key);if(input&&val!=null)input.value=val}}holder.innerHTML=`<strong>${esc(p.title)}</strong><p><a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">View source product</a></p><div class="block-product-photos">${(p.images||[p.image]).map((image,i)=>`<button type="button" data-block="choose-product" data-photo="${i}" title="Use photo ${i+1}"><img src="/product-photo/${p.id}?image=${i}" alt="Product photo ${i+1}"></button>`).join('')}</div><p>${['length','width','depth','height'].filter(k=>k!=='length'||sizes.length).map(k=>k+': '+(sizes[k]?esc(sizes[k].published):'not published')).join('<br>')}</p>${p.dimension_notes?.length?`<p>${p.dimension_notes.map(esc).join('<br>')}</p>`:''}<p class="help">Click a photo to use it for this block. Check the product variant and measurements.</p><p class="help">Review the dimensions for the block (metres). Width is across the furniture front; depth is front to back. No size is applied until you choose it.</p><p class="help">${ctx.dimensions?'Sizes use the current plan scale; estimated scale stays approximate.':'Set the floor-plan dimensions before applying real product measurements. The source dimensions are retained with the image.'}</p>`;
+  const sizes=p.dimensions_m||{};if(!active()?.physical_size){for(const [key,val] of Object.entries({width:sizes.length?.metres??sizes.width?.metres,depth:sizes.depth?.metres??(sizes.length?sizes.width?.metres:null),height:sizes.height?.metres})){const input=$('#product-size-'+key);if(input&&val!=null)input.value=val/unitFactor()}}holder.innerHTML=`<strong>${esc(p.title)}</strong><p><a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">View source product</a></p><div class="block-product-photos">${(p.images||[p.image]).map((image,i)=>`<button type="button" data-block="choose-product" data-photo="${i}" title="Use photo ${i+1}"><img src="/product-photo/${p.id}?image=${i}" alt="Product photo ${i+1}"></button>`).join('')}</div><p>${['length','width','depth','height'].filter(k=>k!=='length'||sizes.length).map(k=>k+': '+(sizes[k]?esc(sizes[k].published):'not published')).join('<br>')}</p>${p.dimension_notes?.length?`<p>${p.dimension_notes.map(esc).join('<br>')}</p>`:''}<p class="help">Click a photo to use it for this block. Check the product variant and measurements.</p><p class="help">Review converted product dimensions in the selected scene units. Width is across the furniture front; depth is front to back. No size is applied until you choose it.</p><p class="help">${ctx.dimensions?'Sizes use the current plan scale; estimated scale stays approximate.':'Set the floor-plan dimensions before applying real product measurements. The source dimensions are retained with the image.'}</p>`;
 
 
 
@@ -488,7 +487,7 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
 
  function move(e){
 
-  const svg=$('#block-plan'),a=plan(),v=active();const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(svg.getScreenCTM().inverse());
+  const svg=$('#block-plan'),a=plan(),v=active(),last=structuredClone(active());const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(svg.getScreenCTM().inverse());
 
   if(drag.handle)Object.assign(v,FurnitureLibrary.transform(drag.original,a,drag.handle,drag.point,[p.x,p.y]));
 
@@ -501,10 +500,48 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
     const next=[v.x+result.shift[0]/a.width,v.y+result.shift[1]/a.height];
     if(next.every(n=>n>=0&&n<=1)){[v.x,v.y]=next;walls.guides=result.guides}}
    }
-  }dirty=true;
+  }if(v.host_attachment?.kind==='wall'){const n=v.host_attachment.normal,dx=(v.x-last.x)*a.width,dy=(v.y-last.y)*a.height,dot=dx*n[0]+dy*n[1];v.x-=dot*n[0]/a.width;v.y-=dot*n[1]/a.height;v.angle=last.angle;}if(v.host_attachment?.kind==='ceiling')v.elevation_m=(modelFloor()?.scene.height||2.8)-v.height_m-(v.host_attachment.drop||0);const error=validObjectPosition(v);if(error){Object.assign(v,last);saveStatus(error);return;}dirty=true;
 
   $('#block-reviewed').checked=false;draw();
 
+ }
+
+ let modelEditMode='move',modelEdit=null;
+ function beginModelEdit(hit,p){
+  const v=active();if(busy||placement||!v||hit?.id!==v.id||hit.roomId!==ctx.rid||hit.architecture)return null;
+  const f=modelFloor();if(!f)return null;const a=plan(),mount=v.host_attachment?.kind||'floor';
+  if(modelEditMode==='rotate'&&mount==='wall'){toast('Wall orientation follows its host. Move it along the wall face.');return null}
+  const centre=[(v.x-f.scene.bounds[0])*a.width,(v.y-f.scene.bounds[1])*a.height,(f.elevation+(v.elevation_m||0))*f.unit];
+  const n=mount==='wall'?[...v.host_attachment.normal,0]:[0,0,1],ray=BlockModelViewer.rayFor(p,modelView,modelViewer.bounds,modelViewer.canvas.clientWidth,modelViewer.canvas.clientHeight),point=BlockModelViewer.planePoint(ray,centre,n);if(!point)return null;
+  syncHistory();modelEdit={original:structuredClone(v),dirty,point,normal:n,centre,f,mode:modelEditMode,valid:true};return modelEdit;
+ }
+ function retainFloorAttachment(v){if(!v.host_attachment&&['sofa','chair','table','bed','storage','refrigerator','comforter','pillar','appliance','desk','plant','rug','stair'].includes(v.kind)&&!(v.elevation_m||0))v.host_attachment={kind:'floor',floor:room().floor};}
+ function validObjectPosition(v){
+  const a=plan(),b=room().bbox,f=modelFloor();if(!f)return 'Wait for the shared scene.';
+  const pts=footprint(v);if(pts.some(p=>p[0]<b[0]*a.width-.1||p[0]>(b[0]+b[2])*a.width+.1||p[1]<b[1]*a.height-.1||p[1]>(b[1]+b[3])*a.height+.1))return 'Keep the object footprint inside the selected room. Choose the destination room to place there.';
+  if((v.elevation_m||0)<0||(v.elevation_m||0)+(v.height_m||.8)>(f.scene.height||2.8)+.001)return 'The object must fit between the floor and ceiling.';
+  if(v.host_attachment?.kind==='wall'){
+   const host=walls.geometry(v.host_attachment.wall_id);if(!host)return 'The host wall is missing. Reattach this object before moving it.';
+   const [p,q]=host.points,L=Math.hypot(q[0]-p[0],q[1]-p[1]),t=((v.x*a.width-p[0])*(q[0]-p[0])+(v.y*a.height-p[1])*(q[1]-p[1]))/L;
+   const normal=v.host_attachment.normal,offset=((v.x*a.width-p[0])*normal[0]+(v.y*a.height-p[1])*normal[1]),old=active();if(old?.host_attachment&&Math.abs(offset-((old.x*a.width-p[0])*normal[0]+(old.y*a.height-p[1])*normal[1])-(v.depth-old.depth)*a.height/2)>.1)return 'Keep the object on its attached wall face.';if(t<v.width*a.width/2||t>L-v.width*a.width/2)return 'The object extends beyond its host wall.';
+  }return '';
+ }
+ function moveModelEdit(d,ray,delta,event){
+  const v=active(),a=plan();if(!v)return;const next=structuredClone(d.original);retainFloorAttachment(next);
+  if(d.mode==='rotate')next.angle=(d.original.angle+delta[0]*(event.altKey?.3:1)+360)%360;
+  else{const p=BlockModelViewer.planePoint(ray,d.centre,d.normal);if(!p)return;let shift=p.map((v,i)=>v-d.point[i]);if(!event.altKey){const step=.05*d.f.unit;shift=shift.map(v=>Math.round(v/step)*step)}next.x+=shift[0]/a.width;next.y+=shift[1]/a.height;if(next.host_attachment?.kind==='wall')next.elevation_m=(next.elevation_m||0)+shift[2]/d.f.unit;}
+  const error=validObjectPosition(next);d.valid=!error;if(error){saveStatus(error);return}
+  Object.assign(v,next);dirty=true;draw();saveStatus('Moving · '+dimensionHint(v,room())+' · '+Math.round(v.angle)+'°'+(v.host_attachment?.kind==='wall'?' · base '+((v.elevation_m||0)/unitFactor()).toFixed(2)+' '+displayUnit():''));
+ }
+ async function endModelEdit(d,cancel){
+  modelEdit=null;if(cancel){Object.assign(active(),d.original);dirty=d.dirty;draw();saveStatus(d.dirty?'Unsaved changes':'Saved');return}
+  try{await call('check');saveStatus('Unsaved changes')}catch(e){Object.assign(active(),d.original);dirty=d.dirty;render();toast(e.message)}
+ }
+ function drawModelGizmo(viewer){
+  const c=viewer.canvas,v=active(),f=modelFloor();let svg=c.parentElement.querySelector('.model-gizmo');if(!svg){svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('class','model-gizmo');svg.setAttribute('aria-hidden','true');c.after(svg)}
+  svg.style.cssText=`position:absolute;pointer-events:none;left:${c.offsetLeft}px;top:${c.offsetTop}px;width:${c.clientWidth}px;height:${c.clientHeight}px`;svg.setAttribute('viewBox',`0 0 ${c.clientWidth} ${c.clientHeight}`);if(!v||!f||modelView.walk){svg.innerHTML='';return}
+  const p=[(v.x-f.scene.bounds[0])*plan().width,(v.y-f.scene.bounds[1])*plan().height,(f.elevation+(v.elevation_m||0)+(v.height_m||.8)/2)*f.unit],q=BlockModelViewer.project(p,modelView,viewer.bounds,c.clientWidth,c.clientHeight);
+  svg.innerHTML=`<g transform="translate(${q[0]} ${q[1]})"><circle r="18" fill="#245dcc22" stroke="#245dcc" stroke-width="2"/><path d="M-30 0H30M0-30V30" stroke="#245dcc" stroke-width="2"/><path d="M24-4L30 0 24 4M-4-24L0-30 4-24" fill="none" stroke="#245dcc" stroke-width="2"/><text y="-37" text-anchor="middle" fill="#153d87" stroke="#fff" stroke-width="3" paint-order="stroke" font-size="11">${esc(modelEditMode==='rotate'?'Rotate':v.host_attachment?.kind==='wall'?'Move on wall':v.host_attachment?.kind==='ceiling'?'Move on ceiling':'Move on floor')}</text></g>`;
  }
 
  function modelFloor(name=room().floor){
@@ -540,9 +577,9 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
   if(wallAsset&&!mountWall)return toast('Place this object on a wall.');
   if(!ceilingAsset&&!wallAsset&&!mountFloor)return toast('Place this object on the floor.');
   if((mountWall||mountCeiling)&&item.height_m>(f.scene.height||3))return toast('This object is taller than the room. Reduce its height first.');
-  item.x=position[0];item.y=position[1];const localZ=hit.point[2]/f.unit-f.elevation;
+  item.host_attachment={kind:mountWall?'wall':mountCeiling?'ceiling':'floor',floor:hit.floorName,...(mountWall?{wall_id:hit.sourceId,normal:hit.normal.slice(0,2)}:{})};item.x=position[0];item.y=position[1];const localZ=hit.point[2]/f.unit-f.elevation;
   if(mountWall){if(Math.abs(hit.normal[2])>.2)return toast('Choose the face of the wall.');const host=walls.geometry(hit.sourceId);if(host){const [p,q]=host.points,dx=q[0]-p[0],dy=q[1]-p[1],len=Math.hypot(dx,dy);if(Math.abs(dx*hit.normal[0]+dy*hit.normal[1])/len>.3||len<item.width*a.width)return toast('Choose a wider wall face.');const snap=FurnitureLibrary.snapToWall(item,a,[host],Infinity);if(snap){item.x=snap.item.x;item.y=snap.item.y;item.angle=snap.item.angle;}}item.angle=(Math.atan2(-hit.normal[0],hit.normal[1])*180/Math.PI+360)%360;const offset=item.depth*a.height/2+.05;if(!host){item.x+=hit.normal[0]*offset/a.width;item.y+=hit.normal[1]*offset/a.height;}item.elevation_m=Math.max(0,Math.min((f.scene.height||3)-item.height_m,localZ-item.height_m/2));}
-  else item.elevation_m=mountCeiling?Math.max(0,localZ-item.height_m):0;
+  else item.elevation_m=mountCeiling?Math.max(0,localZ-item.height_m):0;if(mountCeiling)item.host_attachment.drop=0;
   if(item.x<0||item.x>1||item.y<0||item.y>1)return toast('Keep the object inside the plan.');
   if(target.id!==ctx.rid)await switchSection(target.id,null,{preserveModel:true});
   if(items.length>=40&&request.roomId!==target.id)return toast('Use up to 40 objects in a section.');
@@ -551,7 +588,7 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
  }
  function scaleControls(){
   const s=ctx.scene?.model_scale||{},h=s.wall_height_m||3;
-  if(walls.doc.manual_draft_id)return `<details class="model-scale"><summary class="btn small">${h.toFixed(2)} m walls</summary><p class="help">Scale and wall heights come from the linked floor plan.</p><a class="btn small" href="/ps/app/floor-plan.html?preview=ui6#${encodeURIComponent(walls.doc.manual_draft_id)}">Edit scale & heights</a></details>`;
+  if(walls.doc.manual_draft_id)return `<details class="model-scale"><summary class="btn small">${h.toFixed(2)} m walls</summary><p class="help">Scale and wall heights come from the linked floor plan.</p><a class="btn small" href="/ps/app/floor-plan.html?preview=ui7#${encodeURIComponent(walls.doc.manual_draft_id)}">Edit scale & heights</a></details>`;
   return `<details class="model-scale"><summary class="btn small" title="Wall height and real-world scale">${h.toFixed(2)} m walls</summary><div class="model-scale-fields"><strong>Scale & height</strong><span class="help">${esc(s.measured?'Measured plan':s.scale_source||'Estimated scale')}</span>${number('model-wall-height','Wall height (m)',h,.1)}${number('model-floor-width','Floor width (m)',+(ctx.scene?.width||10).toFixed(3),.1)}${number('model-human-height','Human height (ft)',+((s.human_height_m||1.6764)/.3048).toFixed(2),.1)}${number('model-fov','Walk field of view (°)',s.vertical_fov||60,5)}<span class="help">Eye level ${((s.human_height_m||1.6764)-.11).toFixed(2)} m · Current floor</span>${btn('Apply','apply-model-scale')}${btn('Balance furniture','balance-furniture')}<span class="help">Standard furniture sizes · Both floors</span></div></details>`;
  }
  function draw3d(){
@@ -567,14 +604,14 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
    if(hit?.architecture){try{if(hit.floorName!==room().floor)await switchSection(hit.roomId,null,{preserveModel:true});selected=null;popupOpen=false;libraryOpen=true;walls.clear();walls.selected=hit.sourceId;render()}catch(err){toast(err.message)}}
    else if(hit){walls.clear();popupSurface='preview';switchSection(hit.roomId,hit.id,{preserveModel:true}).catch(err=>toast(err.message))}
    else{walls.clear();selected=null;popupOpen=false;libraryOpen=true;render()}
-  },{onSurface:hit=>{if(!placement)return false;placeInModel(hit,placement).catch(e=>toast(e.message));return true},onDrop:(preset,hit)=>{if(modelView.projection!=='perspective')return toast('Switch to Perspective to place objects in 3D.');placeInModel(hit,{preset}).catch(e=>toast(e.message))},onModeChange:walkControls});
-   $('#model-walk').onclick=startWalk;$('#model-place').onclick=()=>armPlacement();
+  },{beginEdit:beginModelEdit,moveEdit:moveModelEdit,endEdit:(d,c)=>endModelEdit(d,c),afterDraw:drawModelGizmo,onSurface:hit=>{if(!placement)return false;placeInModel(hit,placement).catch(e=>toast(e.message));return true},onDrop:(preset,hit)=>{if(modelView.projection!=='perspective')return toast('Switch to Perspective to place objects in 3D.');placeInModel(hit,{preset}).catch(e=>toast(e.message))},onModeChange:walkControls});
+   for(const mode of ['move','rotate'])$('#model-edit-'+mode).onclick=()=>{modelEditMode=mode;for(const m of ['move','rotate'])$('#model-edit-'+m).setAttribute('aria-pressed',String(mode===m));modelViewer.draw()};$('#model-walk').onclick=startWalk;$('#model-place').onclick=()=>armPlacement();
    document.querySelectorAll('[data-model]').forEach(el=>el.onclick=()=>{const action=el.dataset.model;if(action==='in'||action==='out')modelViewer.zoom(action==='in'?1.2:1/1.2);else modelViewer.reset(action==='top');walkControls()});
    $('#model-projection').onchange=e=>{modelView.projection=e.target.value;if(e.target.value!=='perspective'){modelViewer.leaveWalk();placement=null}modelViewer.draw();walkControls()};
-   $('#model-transparent').onchange=e=>{modelView.transparent=e.target.checked;modelViewer.draw()};
+   const appearance=()=>{localStorage.setItem('pixeloid-ui-staging-model-appearance',JSON.stringify({transparent:modelView.transparent,edges:modelView.edges,cutaway:modelView.cutaway}));$('#model-solid').setAttribute('aria-pressed',String(!modelView.transparent));modelViewer.draw()};$('#model-transparent').onchange=e=>{modelView.transparent=e.target.checked;appearance()};$('#model-solid').onclick=()=>{modelView.transparent=false;$('#model-transparent').checked=false;appearance()};for(const key of ['edges','cutaway'])$('#model-'+key).onchange=e=>{modelView[key]=e.target.checked;appearance()};
   }
   const info=$('#block-model-geometry');if(info){const counts=scene?.architecture_counts;info.classList.toggle('needs-review',!!scene&&(!counts?.wall||!!scene.unresolved_architecture?.length));info.textContent=counts?.wall?`${counts.wall} wall spans · ${counts.window} windows · ${counts.door+counts.sliding_door} doors${scene.unresolved_architecture?.length?' · '+scene.unresolved_architecture.length+' outlines need review':''}`:scene?'Walls need tracing · use the wall tool on the plan.':'Loading structure…'}
-  modelViewer.update(faces);walkControls();
+  const f=modelFloor(),b=room().bbox,a=plan();const focus=ctx.focus==='room'&&f?{center:[(b[0]+b[2]/2-f.scene.bounds[0])*a.width,(b[1]+b[3]/2-f.scene.bounds[1])*a.height,(f.elevation+(f.scene.height||2.8)/2)*f.unit],radius:Math.max(1,Math.hypot(b[2]*a.width,b[3]*a.height,(f.scene.height||2.8)*f.unit)/2)}:null;canvas.dataset.activeRoom=ctx.rid;canvas.dataset.focusMode=ctx.focus||'whole';canvas.dataset.focusBounds=JSON.stringify(focus);modelViewer.update(faces,focus);walkControls();
  }
 
  document.addEventListener('click',async e=>{
@@ -582,7 +619,7 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
   if(e.target.closest('[data-action="furniture-blocks"]')){const r=R();if(r?.bbox)return openFurnitureBlocks(pid,r.id);return toast('Select a mapped section first.')}
 
   const groupButton=e.target.closest('[data-group-action]');if(groupButton&&ctx){selectionAction(groupButton.dataset.groupAction).catch(err=>toast(err.message));return}
-  const tile=e.target.closest('[data-furniture-preset]');if(tile&&ctx&&modalType==='blocks'){closeCatalogue();try{if(modelView.projection==='perspective')armPlacement(tile.dataset.furniturePreset);else await addPreset(tile.dataset.furniturePreset)}catch(err){toast(err.message)}return}
+  const tile=e.target.closest('[data-furniture-preset]');if(tile&&ctx&&modalType==='blocks'){try{placement={preset:tile.dataset.furniturePreset,plan:true};previewPlacement();toast('Click inside '+room().name+' to place. Escape ends repeated placement.');}catch(err){toast(err.message)}return}
 
   const select=e.target.closest('[data-block-select]');if(select){walls.clear();selected=select.dataset.blockSelect;popupOpen=false;libraryOpen=true;render();return}
 
@@ -609,9 +646,9 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
     walls.doc.site={...walls.doc.site,model:{...old,metres_per_pixel:width/((ctx.scene.bounds[2]-ctx.scene.bounds[0])*plan().width),scale_source:changed?'Manual floor width':s.scale_source,wall_heights:{...old.wall_heights,[r.floor]:height},human_height_m:human,vertical_fov:fov}};
     walls.dirty=true;ctx.resumeWalk=!!modelView.walk;await call('check');toast('Scale updated · Save plan to keep it.');return;
    }
-   if(action==='fit-plan'){ctx.view=window.InlinePlan?.active()?InlinePlan.planView():[0,0,plan().width,plan().height];draw();return}
-   if(action==='fit-section'){ctx.view=null;draw();return}
-   if(action==='library'){openCatalogue();return}
+   if(action==='fit-plan'){ctx.focus='whole';delete modelView.walk;modelView.pan=[0,0];modelView.zoom=1;ctx.view=window.InlinePlan?.active()?InlinePlan.planView():[0,0,plan().width,plan().height];draw();return}
+   if(action==='fit-section'){focusRoom();draw();return}
+   if(action==='library'){catalogueOpen?closeCatalogue():openCatalogue();return}
    if(action==='reference'){if(!active())return toast('Select a furniture object first.');libraryOpen=false;popupOpen=true;render();return}
 
    if(action==='hide-popup'){popupOpen=false;libraryOpen=true;popover();return}
@@ -638,14 +675,21 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
 
    if(action==='choose-product')return await chooseProduct(Number(button.dataset.photo));
 
-   if(action==='precise-size'){
-    if(!v)return;const factor=unitFactor(),angle=Number($('#selected-angle').value),d=ctx.dimensions,widthEl=$('#selected-width'),heightEl=$('#selected-height');
-    const width=Number(widthEl.value)*factor,depth=Number($('#selected-depth').value)*factor,height=Number(heightEl.value)*factor;
-    if(!Number.isFinite(angle)||(!widthEl.disabled&&![width,depth].every(x=>Number.isFinite(x)&&x>0))||(!heightEl.disabled&&!(height>0&&height<=5)))throw Error('Enter positive dimensions and a finite rotation. Height must be at most 5 m.');
-    if(!widthEl.disabled){delete v.sofa_modules;delete v.chair_modules;v.width=width/d.width_m*r.bbox[2];v.depth=depth/d.depth_m*r.bbox[3];v.physical_size={width,depth,unit:'m'};}
-    if(!heightEl.disabled)v.height_m=height;v.angle=(angle%360+360)%360;dirty=true;await call('check');return;
+   if(action==='remove-reference'){v.asset_id=null;dirty=true;await call('check');return;}
+   if(action==='precise-size'||action==='apply-dimensions'){
+    if(!v)return;const next=structuredClone(v),factor=unitFactor(),product=action==='apply-dimensions',prefix=product?'product-size-':'selected-',d=ctx.dimensions;
+    const width=Number($('#'+prefix+'width').value)*factor,depth=Number($('#'+prefix+'depth').value)*factor,height=Number($('#'+prefix+'height').value)*factor;
+    if(!d||![width,depth,height].every(x=>Number.isFinite(x)&&x>0)||height>5)throw Error('Enter positive dimensions using the selected units; height must be at most 5 m.');
+    retainFloorAttachment(next);delete next.sofa_modules;delete next.chair_modules;next.width=width/d.width_m*r.bbox[2];next.depth=depth/d.depth_m*r.bbox[3];next.height_m=height;
+    if(product){next.physical_size={width,depth,height,unit:'m'};next.dimension_status='reviewed';}
+    else {const angle=Number($('#selected-angle').value);if(!Number.isFinite(angle))throw Error('Enter a finite rotation.');if(next.host_attachment?.kind==='wall'&&Math.abs(angle-v.angle)>.01)throw Error('Wall objects keep the host wall orientation.');next.angle=(angle%360+360)%360;
+     const x=Number($('#selected-x').value)*factor,y=Number($('#selected-y').value)*factor;if(![x,y].every(Number.isFinite))throw Error('Enter finite position values.');next.x=r.bbox[0]+x/d.width_m*r.bbox[2];next.y=r.bbox[1]+y/d.depth_m*r.bbox[3];
+     if($('#selected-elevation'))next.elevation_m=Number($('#selected-elevation').value)*factor;
+     if($('#selected-drop')){next.host_attachment.drop=Number($('#selected-drop').value)*factor;if(!Number.isFinite(next.host_attachment.drop)||next.host_attachment.drop<0)throw Error('Ceiling drop must be zero or positive.');}
+    }
+    if(next.host_attachment?.kind==='wall'){const n=next.host_attachment.normal,shift=(next.depth-v.depth)*plan().height/2;next.x+=n[0]*shift/plan().width;next.y+=n[1]*shift/plan().height;}if(next.host_attachment?.kind==='ceiling')next.elevation_m=(modelFloor()?.scene.height||2.8)-next.height_m-next.host_attachment.drop;
+    const error=validObjectPosition(next);if(error)throw Error(error);Object.assign(v,next);dirty=true;await call('check');return;
    }
-   if(action==='apply-dimensions'){const width=Number($('#product-size-width').value),depth=Number($('#product-size-depth').value);if(!(width>0&&depth>0))return toast('Enter a valid width and depth.');if(!ctx.dimensions)return toast('Set the floor-plan dimensions first.');delete v.sofa_modules;delete v.chair_modules;v.width=width/ctx.dimensions.width_m*r.bbox[2];v.depth=depth/ctx.dimensions.depth_m*r.bbox[3];v.physical_size={width,depth,unit:'m'};v.dimension_status='reviewed';const height=Number($('#product-size-height')?.value);if(height>0&&height<=5)v.height_m=height;dirty=true;await call('check');return}
 
    if(action==='upload'){const input=document.createElement('input');input.type='file';input.accept='image/png,image/jpeg,image/webp';input.onchange=()=>attach(input.files?.[0]).catch(err=>toast(err.message));input.click();return}
 
@@ -674,12 +718,12 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
   const tool=e.target.closest('[data-wall-tool]'),action=e.target.closest('[data-wall-action]');
   try{if(tool){walls.tool=tool.dataset.wallTool;walls.first=null;selected=null;popupOpen=false;draw()}if(action){const key=action.dataset.wallAction;if(key==='undo'||key==='redo')travelHistory(key==='redo').catch(err=>toast(err.message));else walls.action(key)}}catch(err){toast(err.message)}
  });
- document.addEventListener('keydown',e=>{if(e.key==='Escape'&&multi.size){multi.clear();render();return}if(e.key==='Escape'&&placement){placement=null;walkControls();return}if(modalType==='blocks'&&walls&&e.key==='Escape'&&(walls.first||walls.tool!=='select')){e.preventDefault();walls.clear();draw()}});
+ document.addEventListener('keydown',e=>{if(e.target.closest('input,textarea,select,[contenteditable=true]'))return;if(e.key==='Escape'&&multi.size){multi.clear();render();return}if(e.key==='Escape'&&placement){placement=null;$('#placement-ghost')?.remove();walkControls();return}if(e.key==='Escape'&&catalogueOpen){closeCatalogue();return}if(modalType==='blocks'&&walls&&e.key==='Escape'&&(walls.first||walls.tool!=='select')){e.preventDefault();walls.clear();draw()}});
  document.addEventListener('input',e=>{
   if(modalType!=='blocks'||e.target.id!=='block-product-url'||!active())return;
   active().product_url=e.target.value;dirty=true;$('#block-reviewed').checked=false;
-  if(productLookup?.block_id===selected){productLookup=null;$('#block-product-result').innerHTML=''}
-  $('#block-product-status').textContent='';
+  if(productLookup?.block_id===selected){productLookup=null;if($('#block-product-result'))$('#block-product-result').innerHTML=''}
+  if($('#block-product-status'))$('#block-product-status').textContent='';
  });
  document.addEventListener('input',e=>{if(e.target.id==='block-variant'&&active()){active().variant=e.target.value;dirty=true}});
  document.addEventListener('input',e=>{if(e.target.id==='block-prompt'&&active()){active().prompt=e.target.value;dirty=true;$('#block-reviewed').checked=false}});
@@ -744,6 +788,6 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
   if(busy||pendingChanges()&&!confirm('Discard unsaved furniture changes in this window?')){e.preventDefault();e.stopImmediatePropagation()}
  },true);
  document.querySelector('#modal').addEventListener('cancel',e=>{if(modalType==='blocks'&&(busy||pendingChanges()&&!confirm('Discard unsaved furniture changes in this window?')))e.preventDefault()});
- window.FurnitureEditor={syncSaved,redraw:()=>draw(),fitFloor:()=>{ctx.view=InlinePlan.planView(room().floor);if(!modelView.walk)modelView={...BlockModelViewer.defaults(),projection:modelView.projection};render()},reload:()=>ctx&&openFurnitureBlocks(ctx.pid,ctx.rid,{reload:true,inline:true,view:ctx.view}),pending:()=>!!ctx&&pendingChanges(),roomId:()=>ctx?.rid,switchSection,dispose(){closeCatalogue();modelViewer?.dispose();modelViewer=null;if(zoomFrame)cancelAnimationFrame(zoomFrame);zoomFrame=null;zoomTarget=null;ctx=null;walls=null;history=null;dirty=false}};
+ window.FurnitureEditor={syncSaved,redraw:()=>draw(),fitFloor:()=>{ctx.focus='whole';ctx.view=InlinePlan.planView(room().floor);if(!modelView.walk)modelView={...BlockModelViewer.defaults(),projection:modelView.projection,transparent:modelView.transparent,edges:modelView.edges,cutaway:modelView.cutaway};render()},reload:()=>ctx&&openFurnitureBlocks(ctx.pid,ctx.rid,{reload:true,inline:true,view:ctx.view}),pending:()=>!!ctx&&pendingChanges(),roomId:()=>ctx?.rid,switchSection,dispose(){closeCatalogue();modelViewer?.dispose();modelViewer=null;if(zoomFrame)cancelAnimationFrame(zoomFrame);zoomFrame=null;zoomTarget=null;ctx=null;walls=null;history=null;dirty=false}};
 })();
 
