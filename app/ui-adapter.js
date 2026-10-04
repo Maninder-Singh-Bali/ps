@@ -2,7 +2,7 @@
 /* Staging-only transport. Production modules never receive a network API. */
 (()=>{
  const nativeFetch=window.fetch.bind(window),base=new URL('.',document.currentScript.src),KEY='pixeloid.synthetic-ui.v2',CONFIG=KEY+'.controls',clone=structuredClone;
- const ready=nativeFetch(new URL('ui-fixtures.json',base)).then(r=>{if(!r.ok)throw Error('Synthetic fixtures unavailable');return r.json()});
+ const ready=nativeFetch(new URL('ui-fixtures.json?v=f649a01d9baf',base)).then(r=>{if(!r.ok)throw Error('Synthetic fixtures unavailable');return r.json()});
  let settings;try{settings=JSON.parse(localStorage.getItem(CONFIG)||'{}')}catch{settings={}}
  settings={mode:'populated',save:'normal',delay:2000,...settings};
  const config=()=>({...settings});const configure=v=>{Object.assign(settings,v);localStorage.setItem(CONFIG,JSON.stringify(settings));window.dispatchEvent(new Event('staging-controls'))};
