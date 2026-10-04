@@ -131,6 +131,12 @@ fixture_hash=hashlib.sha256((APP/'ui-fixtures.json').read_bytes()).hexdigest()[:
 adapter=(APP/'ui-adapter.js').read_text().replace("'ui-fixtures.json'",f"'ui-fixtures.json?v={fixture_hash}'")
 adapter=adapter.replace("'multi-room-fixtures.json'","'multi-room-fixtures.json?v="+hashlib.sha256((APP/'multi-room-fixtures.json').read_bytes()).hexdigest()[:12]+"'")
 (APP/'ui-adapter.js').write_text(adapter)
+# Staging-only live 2D joined footprints; no production endpoint or worker.
+shutil.copytree(ROOT/'staging-preview/vendor',APP/'vendor',dirs_exist_ok=True)
+shutil.copyfile(ROOT/'staging-preview/joined-footprints.js',APP/'joined-footprints.js')
+for page in [OUT/'index.html',APP/'floor-plan.html']:
+ text=page.read_text().replace('</head>','<script src="/ps/app/vendor/polygon-clipping.js" defer></script><script src="/ps/app/joined-footprints.js" defer></script></head>')
+ page.write_text(text)
 for page in [OUT/'index.html',APP/'floor-plan.html']:
  def versioned(m):
   path=OUT/m.group(2).removeprefix('/ps/')
