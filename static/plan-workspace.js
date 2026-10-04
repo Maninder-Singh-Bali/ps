@@ -63,7 +63,7 @@
   const r=P().rooms.find(x=>x.id===id);if(r)hiddenFloors.delete(r.floor);if(!r?.bbox){toast('Mark this section’s area first.');return}
   if(r.plan_id!==planId){if(pending())return toast('Save your plan before changing pages.');const stage=mode==='camera'?'cameras':'furnish';window.WorkspaceSelection?.selectRoom(id);planId=r.plan_id;rid=id;pendingWorkspaceStage=stage;reset();renderMain();await mountReady;pendingWorkspaceStage=null;window.recordWorkspaceRoute?.(stage);return}
   if(mode==='camera'){if(window.CameraEditor?.pending())return toast('Save the camera before changing sections.');window.WorkspaceSelection?.selectRoom(id);rid=id;await openCameraView(pid,id,{view:planView(r.floor)})}
-  else{await FurnitureEditor.switchSection(id);rid=FurnitureEditor.roomId()}
+  else{if(!await FurnitureEditor.switchSection(id))return;rid=FurnitureEditor.roomId()}
   syncSections();window.recordWorkspaceRoute?.(mode==='camera'?'cameras':'furnish');
  }
  async function toggleFloor(floor){

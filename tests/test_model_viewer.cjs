@@ -49,3 +49,21 @@ assert.equal(pick([3,3],[near,far]).id,'cushion','Selection follows depth, not s
 assert.equal(pick([3,3],[far,near]).id,'cushion');assert.equal(pick([30,30],[near,far]),null);
 const many=Array.from({length:40000},()=>near);assert(Number.isFinite(frame(many).radius),'Detailed furniture scenes do not overflow argument limits');
 console.log('Depth-aware picking and large-scene bounds passed.');
+
+// A room-sized orbit can put adjoining architecture behind the camera.
+// Every yaw must clip before division, including faces straddling the eye plane.
+const {orbitProject,rotate}=require('../static/model-viewer.js');
+const focus={center:[0,0,0],radius:2},pv={...defaults(),yaw:0,pitch:0,projection:'perspective'};
+assert.deepEqual(orbitProject([[-1,7,0],[1,7,0],[1,8,1]],pv,focus,500,400),[]);
+const spanning=[[-1,5,0],[1,5,0],[1,7,1],[-1,7,1]];
+const clipped=orbitProject(spanning,pv,focus,500,400);
+assert.equal(clipped.length,4);assert(clipped.flat().every(Number.isFinite));
+assert(clipped.every(p=>p[2]>=2),'Behind-eye vertices must not invert the depth or floor');
+for(let yaw=0;yaw<Math.PI*2;yaw+=Math.PI/24){
+ const view={...pv,yaw},poly=orbitProject(spanning,view,focus,500,400);
+ assert(poly.flat().every(Number.isFinite));
+ if(spanning.every(p=>6-rotate(p,view)[2]<.02))assert.equal(poly.length,0);
+}
+const safe=[[-1,0,0],[1,0,0],[1,0,1]];
+assert.deepEqual(orbitProject(safe,pv,focus,500,400),safe.map(p=>project(p,pv,focus,500,400)));
+console.log('Room-focus perspective near-plane clipping and full orbit passed.');

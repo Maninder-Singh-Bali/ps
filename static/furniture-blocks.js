@@ -40,6 +40,8 @@
 
   try{await FurnitureMeshes.load();opening.drawing=await api(`/api/projects/${projectId}/plans/${r.plan_id}/drawing`,{},'GET')}catch(err){toast('Could not load the editor: '+err.message);return}
 
+  // A just-disposed editor may still be finishing its backend rebuild.
+  while(busy)await busyDone;
   if(ctx!==opening)return;
 
   ctx.savedDrawing=structuredClone({edits:ctx.drawing.edits,features:ctx.drawing.features,site:ctx.drawing.site});
@@ -117,14 +119,14 @@
   return state.projects[ctx.pid].rooms.filter(r=>r.plan_id===room().plan_id&&r.bbox).sort((a,b)=>(a.id===ctx.rid)-(b.id===ctx.rid)).flatMap(r=>(r.id===ctx.rid?items:ctx.drafts[r.id]?.items||r.block_layout?.items||[]).map(v=>({v,owner:r})));
  }
  async function switchSection(id,blockId=null,options={}){
-  const selectionTicket=++roomSelectionSerial,selectionContext=ctx;while(busy)await busyDone;if(ctx!==selectionContext||selectionTicket!==roomSelectionSerial)return;
-  if(id===ctx.rid){if(!blockId&&!options.preserveModel){focusRoom();render()}if(blockId){selected=blockId;popupOpen=false;libraryOpen=true;render()}return}
+  const selectionTicket=++roomSelectionSerial,selectionContext=ctx;while(busy)await busyDone;if(ctx!==selectionContext||selectionTicket!==roomSelectionSerial)return false;
+  if(id===ctx.rid){if(!blockId&&!options.preserveModel){focusRoom();render()}if(blockId){selected=blockId;popupOpen=false;libraryOpen=true;render()}return true}
   const next=state.projects[ctx.pid].rooms.find(r=>r.id===id&&r.plan_id===room().plan_id&&r.bbox);if(!next)return;
   const floorChanged=next.floor!==room().floor;if(floorChanged&&!options.preserveModel)multi.clear();walls.clear();stashDraft();ctx.rid=id;if(!options.preserveModel)focusRoom();if(floorChanged){ctx.view=ctx.focus==='room'?null:window.InlinePlan?.planView(next.floor)||null;if(!options.preserveModel){ctx.resumeWalk=!!modelView.walk;modelView={...BlockModelViewer.defaults(),projection:modelView.projection,transparent:modelView.transparent,edges:modelView.edges,cutaway:modelView.cutaway}}}const draft=ctx.drafts[id];ctx.revision=draft?.revision??next.revision;
   items=structuredClone(draft?.items||next.block_layout?.items||[]);selected=blockId||draft?.selected||(items.some(o=>o.id===readContext().selected)?readContext().selected:null);
   dirty=draft?.dirty||false;issues=[];productLookup=null;popupOpen=false;libraryOpen=true;ctx.scene=null;ctx.dimensions=null;
   if(window.InlinePlan?.active()){rid=id;window.InlinePlan.syncSections();if(!blockId)selected=null}
-  render();await call('check');
+  render();await call('check');return ctx===selectionContext&&selectionTicket===roomSelectionSerial;
  }
  async function call(action,extra={}){
   if(ctx.ready&&savedSource()!==ctx.savedSource)throw Error('Plan changed. Your edits are kept; reload the saved plan before checking or saving furniture.');
@@ -140,13 +142,14 @@
     stashDraft();payload.action='save-plan';
     payload.drafts=Object.entries(ctx.drafts).filter(([id,d])=>id===ctx.rid||d.dirty).map(([id,d])=>({room_id:id,revision:d.revision,items:d.items,reviewed:id===ctx.rid&&extra.reviewed===true}));
    }
-   const requestContext=ctx,result=await api(`/api/projects/${ctx.pid}/rooms/${ctx.rid}/blocks`,payload);
-   if(ctx!==requestContext)return result;
+   const requestContext=ctx,requestRoom=ctx.rid,requestSelection=roomSelectionSerial,result=await api(`/api/projects/${ctx.pid}/rooms/${ctx.rid}/blocks`,payload);
+   if(ctx!==requestContext||ctx.rid!==requestRoom)return result;
    items=result.items;issues=result.issues;ctx.dimensions=result.room_dimensions;ctx.architecture=result.architecture;ctx.scene=result.preview_scene;ctx.floors=result.preview_floors||[{room_id:ctx.rid,scene:result.preview_scene}];ctx.revision=result.revision;
    if(action==='save'){await refresh(true);if(ctx!==requestContext)return result;dirty=false;ctx.drafts={};if(result.drawing){ctx.drawing=result.drawing;walls.saved(ctx.drawing);ctx.savedDrawing=walls.snapshot();ctx.savedSource=savedSource()}}
    if(action==='suggest'||action==='propose')dirty=dirty||JSON.stringify(items)!==JSON.stringify(room().block_layout?.items||[]);
    if(selected&&!items.some(v=>v.id===selected))selected=items[0]?.id;
-   render();if(ctx.resumeWalk){ctx.resumeWalk=false;startWalk()}return result;
+   // Retain checked edits, but let the latest queued selection own the next render.
+   if(requestSelection===roomSelectionSerial){render();if(ctx.resumeWalk){ctx.resumeWalk=false;startWalk()}}return result;
   }catch(err){if(action==='save')saveStatus('Not saved · '+err.message);throw err;}finally{busy=false;releaseBusy();const busyHost=$('#plan-editor-inline');if(busyHost){busyHost.setAttribute('aria-busy','false');busyHost.inert=false}}
  }
 
@@ -608,7 +611,7 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
    const key=hit?.architecture?'w:'+hit.sourceId:hit?'f:'+hit.roomId+':'+hit.id:null;
    if(key&&(modifiers.shiftKey||modifiers.ctrlKey||modifiers.metaKey)){toggleSelection(key);return}
    if(key&&multi.has(key)){render();return}multi.clear();
-   if(hit?.architecture){try{if(hit.floorName!==room().floor)await switchSection(hit.roomId,null,{preserveModel:true});selected=null;popupOpen=false;libraryOpen=true;walls.clear();walls.selected=hit.sourceId;render()}catch(err){toast(err.message)}}
+   if(hit?.architecture){try{if(hit.floorName!==room().floor&&!await switchSection(hit.roomId,null,{preserveModel:true}))return;selected=null;popupOpen=false;libraryOpen=true;walls.clear();walls.selected=hit.sourceId;render()}catch(err){toast(err.message)}}
    else if(hit){walls.clear();popupSurface='preview';switchSection(hit.roomId,hit.id,{preserveModel:true}).catch(err=>toast(err.message))}
    else{walls.clear();selected=null;popupOpen=false;libraryOpen=true;render()}
   },{beginEdit:beginModelEdit,moveEdit:moveModelEdit,endEdit:(d,c)=>endModelEdit(d,c),afterDraw:drawModelGizmo,onSurface:hit=>{if(!placement)return false;placeInModel(hit,placement).catch(e=>toast(e.message));return true},onDrop:(preset,hit)=>{if(modelView.projection!=='perspective')return toast('Switch to Perspective to place objects in 3D.');placeInModel(hit,{preset}).catch(e=>toast(e.message))},onModeChange:walkControls});
@@ -797,4 +800,3 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
  document.querySelector('#modal').addEventListener('cancel',e=>{if(modalType==='blocks'&&(busy||pendingChanges()&&!confirm('Discard unsaved furniture changes in this window?')))e.preventDefault()});
  window.FurnitureEditor={syncSaved,redraw:()=>draw(),fitFloor:()=>{ctx.focus='whole';ctx.view=InlinePlan.planView(room().floor);if(!modelView.walk)modelView={...BlockModelViewer.defaults(),projection:modelView.projection,transparent:modelView.transparent,edges:modelView.edges,cutaway:modelView.cutaway};render()},reload:()=>ctx&&openFurnitureBlocks(ctx.pid,ctx.rid,{reload:true,inline:true,view:ctx.view}),pending:()=>!!ctx&&pendingChanges(),roomId:()=>ctx?.rid,switchSection,dispose(){closeCatalogue();modelViewer?.dispose();modelViewer=null;if(zoomFrame)cancelAnimationFrame(zoomFrame);zoomFrame=null;zoomTarget=null;ctx=null;walls=null;history=null;dirty=false}};
 })();
-
