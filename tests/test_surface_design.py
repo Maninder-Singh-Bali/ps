@@ -37,4 +37,19 @@ class SurfaceDesignTests(unittest.TestCase):
   from shapely.ops import unary_union
   self.assertAlmostEqual(unary_union(polygons).area,15)
   self.assertFalse(unary_union(polygons).contains(Point(1.5,1.5)))
+ def test_explicit_pool_infill_preserves_other_voids(self):
+  opening=[[100,100],[200,100],[200,200],[100,200]]
+  deck={'id':'deck','kind':'floor','boundary':[[0,0],[400,0],[400,400],[0,400]],'holes':[opening,[[250,250],[300,250],[300,300],[250,300]]]}
+  water={'id':'water','kind':'floor','boundary':opening,'void_host_id':'deck','finish':{'kind':'paint','color':'#448899'}}
+  self.d['surface_design']={'version':1,'surfaces':[deck,water],'items':[]}
+  sd.validate(self.d['surface_design'])
+  faces=sd.mesh(self.d,[0,0]);water_faces=[f for f in faces if f['id']=='water']
+  self.assertTrue(water_faces)
+  self.assertAlmostEqual(sum(Polygon([p[:2] for p in f['points']]).area for f in water_faces),1)
+  self.assertAlmostEqual(sum(Polygon([p[:2] for p in f['points']]).area for f in faces),15.75)
+  for edit in [{'void_host_id':'missing'},{'boundary':deck['boundary']},{'elevation_m':1}]:
+   invalid=copy.deepcopy(self.d['surface_design']);invalid['surfaces'][1].update(edit)
+   with self.assertRaises(ValueError):sd.validate(invalid)
+  del water['void_host_id']
+  self.assertFalse(any(f['id']=='water' for f in sd.mesh(self.d,[0,0])))
 if __name__=='__main__':unittest.main()

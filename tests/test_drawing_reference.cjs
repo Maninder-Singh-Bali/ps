@@ -21,3 +21,16 @@ markup=context.window.DrawingPreview.markup(doc,true);
 assert.doesNotMatch(markup,/<image/);
 assert.match(markup,/data-plan-element="0"/);
 console.log('Large unclassified sheet rendering and editable geometry preservation passed');
+
+const floor={id:'deck',kind:'floor',boundary:[[0,0],[100,0],[100,100],[0,100]],holes:[[[20,20],[80,20],[80,80],[20,80]]],finish:{color:'#897353'}};
+doc.surface_design={surfaces:[floor,{...floor,id:'pool',boundary:floor.holes[0],holes:[],finish:{color:'#4a8fa0'}},{...floor,id:'ceiling',kind:'ceiling'},{...floor,id:'tabletop',elevation_m:.7}]};
+markup=context.window.DrawingPreview.markup(doc,true);
+assert.match(markup,/data-ground-surface="deck"[^>]+fill-rule="evenodd"/);
+assert.match(markup,/data-ground-surface="pool"[^>]+fill="#4a8fa0"/);
+assert.doesNotMatch(markup,/data-ground-surface="(?:ceiling|tabletop)"/);
+assert.ok(markup.indexOf('drawing-ground')<markup.indexOf('drawing-art'));
+console.log('Ground finish, pool hole and elevated-surface exclusion checks passed');
+
+assert.doesNotMatch(context.window.DrawingPreview.markup(doc,true,{showGround:false}),/data-ground-surface=/);
+doc.surface_design_floor='Upper';context.window.InlinePlan={floorVisible:()=>false};
+assert.doesNotMatch(context.window.DrawingPreview.markup(doc),/data-ground-surface=/);

@@ -65,6 +65,14 @@ def validate(raw):
             if not p.is_valid or p.area<.01:raise ValueError('Boundary must be simple; voids must lie inside it without crossing.')
             num(s.get('elevation_m',0),0,20,'surface elevation')
         finish(s.get('finish'))
+    by_id={s['id']:s for s in ss}
+    for s in ss:
+        if 'void_host_id' not in s:continue
+        host=by_id.get(s['void_host_id']) if isinstance(s['void_host_id'],str) else None
+        if not host or s['kind']!='floor' or host['kind']!='floor' or host['id']==s['id'] or s.get('elevation_m',0)!=host.get('elevation_m',0):
+            raise ValueError('Pool/infill surface requires a floor opening host at the same elevation.')
+        if not any(Polygon(h).covers(Polygon(s['boundary'])) for h in host.get('holes',[])):
+            raise ValueError('Keep the infill boundary inside its explicitly selected floor opening.')
     itemids=set()
     for o in items:
         if not isinstance(o,dict) or not re.fullmatch(r'[\w:-]{1,100}',o.get('id','')) or o['id'] in itemids:raise ValueError('Invalid design item identity')
@@ -159,14 +167,16 @@ def mesh(d,origin):
         boundary=Polygon([[x*m,y*m] for x,y in s['boundary']],[[[x*m,y*m] for x,y in h] for h in s.get('holes',[])])
         horizontal[s['id']]=(key,boundary)
         for hole in s.get('holes',[]):
-            voids.setdefault(key,[]).append(Polygon([[x*m,y*m] for x,y in hole]))
+            voids.setdefault(key,[]).append((s['id'],Polygon([[x*m,y*m] for x,y in hole])))
     for s in ss.values():
         ctx=context(d,s)
         if not ctx or s['kind'] in hidden:continue
         region,world=ctx
         if s['id'] in horizontal:
             key,coverage=horizontal[s['id']]
-            for hole in voids.get(key,[]):coverage=coverage.difference(hole)
+            for host_id,hole in voids.get(key,[]):
+                # Water/infill is opt-in for one validated opening host only.
+                if host_id!=s.get('void_host_id'):coverage=coverage.difference(hole)
             later=False
             for q in ss.values():
                 if q['id']==s['id']:later=True;continue

@@ -69,7 +69,7 @@ def get_document(st,pid,aid):
     from raster_reconstruction import elements as raster_elements
     elements.extend(raster_elements(a))
     elements=combine_wall_edges(elements,saved.get('edits',{}),a['width'],a['height'])
-    return {'units':a.get('manual_document',{}).get('units','m'),'manual_draft_id':a.get('manual_draft_id'), 'review':copy.deepcopy(a.get('structure_review')), 'revision':saved.get('revision',0),'base_asset_id':base,'elements':elements,'edits':copy.deepcopy(saved.get('edits',{})),'features':copy.deepcopy(saved.get('features',[])),'site':copy.deepcopy(saved.get('site',{})),'width':a['width'],'height':a['height'],'map_revision':p['map_revision']}
+    return {'units':a.get('manual_document',{}).get('units','m'),'manual_draft_id':a.get('manual_draft_id'), 'review':copy.deepcopy(a.get('structure_review')), 'revision':saved.get('revision',0),'base_asset_id':base,'elements':elements,'edits':copy.deepcopy(saved.get('edits',{})),'features':copy.deepcopy(saved.get('features',[])),'surface_design':copy.deepcopy(saved.get('surface_design',{})),'surface_design_floor':saved.get('surface_design_floor'),'site':copy.deepcopy(saved.get('site',{})),'width':a['width'],'height':a['height'],'map_revision':p['map_revision']}
 
 def clean_changes(doc,data):
     edits=data.get('edits',{});features=data.get('features',[])

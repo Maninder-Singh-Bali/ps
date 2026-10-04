@@ -27,6 +27,15 @@ class SolarTests(unittest.TestCase):
         self.assertEqual(lighting_instruction({}),('',None));s={**self.site(),'time':'00:00'};text,meta=lighting_instruction({'drawing':{'site':s}});self.assertIn('No direct sunlight',text);self.assertFalse(meta['solar']['daylight'])
 
 class DrawingTests(unittest.TestCase):
+    def test_document_preserves_ground_surfaces_for_plan_previews(self):
+        design={'surfaces':[{'id':'pool','kind':'floor','boundary':[[0,0],[10,0],[10,10]],'finish':{'color':'#4a8fa0'}}]}
+        self.st.asset('plan')['drawing']={'surface_design':design,'surface_design_floor':'Ground'}
+        doc=get_document(self.st,self.pid,'plan')
+        self.assertEqual(doc['surface_design'],design)
+        self.assertEqual(doc['surface_design_floor'],'Ground')
+        doc['surface_design']['surfaces'].clear()
+        self.assertEqual(len(design['surfaces']),1)
+
     def test_double_boundaries_form_one_wall_without_bridging_openings(self):
         elements=[{'id':'base1','kind':'wall','svg':'<path class="wall" d="M8 22 H212"/>'},{'id':'base2','kind':'wall','svg':'<path class="wall" d="M8 24 H212"/>'},{'id':'base3','kind':'wall','svg':'<path class="wall" d="M220 22 H240"/>'}]
         paired=combine_wall_edges(copy.deepcopy(elements),{},473,355)
