@@ -9,7 +9,7 @@
  // An explicit inspection link opens its own saved dataset; never reset another scenario.
  if(new URL(location.href).searchParams.get('scenario')==='heritage'){settings.scenario='heritage';settings.mode='populated';localStorage.setItem(CONFIG,JSON.stringify(settings));}
  let heritageReady;
- const heritage=()=>heritageReady||=nativeFetch(new URL('heritage-fixtures.json?v=e01a03f36bb7',base)).then(r=>{if(!r.ok)throw Error('Constructed residence unavailable');return r.json()});
+ const heritage=()=>heritageReady||=nativeFetch(new URL('heritage-fixtures.json?v=30a82a23f159',base)).then(r=>{if(!r.ok)throw Error('Constructed residence unavailable');return r.json()});
  const storageKey=()=>KEY+(['multi-room','heritage'].includes(settings.scenario)?'.'+settings.scenario:'');
  const seedFor=()=>settings.scenario==='heritage'?heritage():settings.scenario==='multi-room'?multiReady:ready;
  const config=()=>({...settings});const configure=v=>{Object.assign(settings,v);localStorage.setItem(CONFIG,JSON.stringify(settings));window.dispatchEvent(new Event('staging-controls'))};

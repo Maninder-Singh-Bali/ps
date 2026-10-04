@@ -13,6 +13,15 @@
  function walkBasis(w){const s=Math.sin(w.yaw),c=Math.cos(w.yaw),p=Math.sin(w.pitch),q=Math.cos(w.pitch);return {right:[c,s,0],up:[-s*p,c*p,q],forward:[s*q,-c*q,p]}}
  function cameraPoint(p,w){const b=walkBasis(w),v=sub(p,w.position);return [dot(v,b.right),dot(v,b.up),dot(v,b.forward)]}
  function clipNear(points,near){const out=[];for(let i=0;i<points.length;i++){const a=points[i],b=points[(i+1)%points.length],A=a[2]>=near,B=b[2]>=near;if(A)out.push(a);if(A!==B){const t=(near-a[2])/(b[2]-a[2]);out.push(a.map((v,j)=>v+t*(b[j]-v)))}}return out}
+ // Room focus can leave the rest of the building behind the orbit camera.
+ // Clip polygons before perspective division; projecting those vertices first
+ // reflects them across the screen and makes large wall/floor triangles appear.
+ function orbitProject(points,view,bounds,width,height){
+  if(view.projection!=='perspective')return points.map(p=>project(p,view,bounds,width,height));
+  const R=bounds.radius,D=R*3,scale=Math.min(width,height)*.43/R*view.zoom;
+  const camera=points.map(p=>{const q=rotate(sub(p,bounds.center),view);return [q[0],q[1],D-q[2]]});
+  return clipNear(camera,R*.01).map(p=>[width/2+view.pan[0]*width+p[0]*scale*D/p[2],height/2+view.pan[1]*height+p[1]*scale*D/p[2],(D*D-R*R)/p[2]-D]);
+ }
  function walkProject(points,w,width,height,radius){const near=w.unit*.04,f=height/(2*Math.tan((w.verticalFov||60)*Math.PI/360));return clipNear(points.map(p=>cameraPoint(p,w)),near).map(p=>[width/2+p[0]*f/p[2],height/2-p[1]*f/p[2],radius*1.1*(2*near/p[2]-1)])}
  function rayFor(p,view,bounds,width,height){
   if(view.walk){const w=view.walk,b=walkBasis(w),f=height/(2*Math.tan((w.verticalFov||60)*Math.PI/360)),x=(p[0]-width/2)/f,y=-(p[1]-height/2)/f;return {origin:w.position,direction:normal(b.forward.map((v,i)=>v+x*b.right[i]+y*b.up[i]))}}
@@ -124,7 +133,7 @@
   }
   draw(){if(this.disposed)return;const c=this.canvas;if(!c.isConnected){this.dispose();return}const w=c.clientWidth,h=c.clientHeight;if(!w||!h||!this.bounds)return;const dpr=drawingScale(w,h,window.devicePixelRatio||1);if(c.width!==Math.round(w*dpr))c.width=Math.round(w*dpr);if(c.height!==Math.round(h*dpr))c.height=Math.round(h*dpr);
    const walking=!!this.view.walk,transparent=walking?false:this.view.transparent;
-   const visible=this.visibleFaces(),faces=visible.map(f=>({...f,points:walking?walkProject(f.points,this.view.walk,w,h,this.bounds.radius):f.points.map(p=>project(p,this.view,this.bounds,w,h))})).filter(f=>f.points.length>=3).sort((a,b)=>(Number(!!b.floor)-Number(!!a.floor))||a.points.reduce((s,p)=>s+p[2],0)/a.points.length-b.points.reduce((s,p)=>s+p[2],0)/b.points.length);
+   const visible=this.visibleFaces(),faces=visible.map(f=>({...f,points:walking?walkProject(f.points,this.view.walk,w,h,this.bounds.radius):orbitProject(f.points,this.view,this.bounds,w,h)})).filter(f=>f.points.length>=3).sort((a,b)=>(Number(!!b.floor)-Number(!!a.floor))||a.points.reduce((s,p)=>s+p[2],0)/a.points.length-b.points.reduce((s,p)=>s+p[2],0)/b.points.length);
    if(this.renderer===undefined){try{this.renderer=new DepthRenderer(c)}catch(_){this.renderer=null}}
    c.dataset.faceCount=faces.length;c.dataset.worldBounds=JSON.stringify(frame(visible));c.dataset.drawBounds=JSON.stringify(this.bounds);c.dataset.contextLost=String(this.renderer?.gl.isContextLost()||false);this.hits=faces.filter(f=>f.id||!f.architecture||!this.view.transparent);
    if(this.renderer){const depth=depthRadius(faces,this.bounds.radius);c.dataset.depthRadius=String(depth);this.renderer.draw(faces,w,h,depth,transparent,this.view.edges);}
@@ -134,5 +143,5 @@
   }
   dispose(){this.disposed=true;if(this.resizeFrame)cancelAnimationFrame(this.resizeFrame);this.resizeFrame=null;if(this.animation)cancelAnimationFrame(this.animation);this.animation=null;this.keys?.clear();this.observer?.disconnect();this.renderer?.dispose();this.renderer=undefined;this.drag=null}
  }
- const api={drawingScale,depthRadius,cutawayFaces,Viewer,defaults,cleanEdges,planePoint,rotate,frame,project,gesture,inside,pick,walkBasis,cameraPoint,clipNear,walkProject,rayFor,raycast,walkMove};if(typeof module!=='undefined')module.exports=api;else window.BlockModelViewer=api;
+ const api={drawingScale,depthRadius,cutawayFaces,Viewer,defaults,cleanEdges,planePoint,rotate,frame,project,orbitProject,gesture,inside,pick,walkBasis,cameraPoint,clipNear,walkProject,rayFor,raycast,walkMove};if(typeof module!=='undefined')module.exports=api;else window.BlockModelViewer=api;
 })();
