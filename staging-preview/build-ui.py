@@ -78,6 +78,9 @@ for i,(did,d) in enumerate(docs.items(),1):
 p={'id':'synthetic-ui','name':'Synthetic studio · two floors','rooms':rooms,'floor_plans':['plan-1','plan-2'],'manual_draft_id':'synthetic-floor-1','map_revision':1,'map_confirmed':True,'measurements':[],'style':'Synthetic fixtures for UI testing only','seed':1,'generation_phase':{'status':'simulated','allowances':{}},'created':1}
 pack={'state':{'projects':{p['id']:p},'assets':assets,'jobs':{},'engine':{'connected':True,'remote':False,'running':0,'pending':0},'settings':{},'activity':[]},'docs':docs,'scenes':scenes,'footprints':footprints}
 (APP/'ui-fixtures.json').write_text(json.dumps(pack))
+sys.path.insert(0,str(ROOT/'staging-preview'))
+from multi_room_fixture import build as build_multi_room
+(APP/'multi-room-fixtures.json').write_text(json.dumps(build_multi_room(pack,plan_drafts,MEDIA)))
 # Copy production components; omit all PC/settings/storage-management modules.
 html=(SOURCE/'static/index.html').read_text();omit={'studio-access.js','local-setup.js','system-status.js','project-files.js','plan-reading.js','raster-review.js','source-panels.js','construction-area.js','products.js'}
 names=set(re.findall(r'(?:src|href)="/([^"?]+)',html));names|={'furniture-meshes.json'}
@@ -90,9 +93,9 @@ for name in names:
   text=text.replace('/icons/','/ps/app/icons/').replace("'/floor-plan.html","'/ps/app/floor-plan.html").replace('"/floor-plan.html','"/ps/app/floor-plan.html').replace("'/?project=","'/ps/?project=")
   # Isolate every production local preference in the staging origin namespace.
   text=text.replace('pixeloid-','pixeloid-ui-staging-')
-  text=text.replace('/ps/app/floor-plan.html#','/ps/app/floor-plan.html?preview=ui7#')
-  text=text.replace("link.href='/ps/app/floor-plan.html'", "link.href='/ps/app/floor-plan.html?preview=ui7'")
-  text=text.replace("location.href='/ps/app/floor-plan.html'+(stage==='surfaces'?'?stage=surfaces':'')", "location.href='/ps/app/floor-plan.html?preview=ui7'+(stage==='surfaces'?'&stage=surfaces':'')")
+  text=text.replace('/ps/app/floor-plan.html#','/ps/app/floor-plan.html?preview=ui8#')
+  text=text.replace("link.href='/ps/app/floor-plan.html'", "link.href='/ps/app/floor-plan.html?preview=ui8'")
+  text=text.replace("location.href='/ps/app/floor-plan.html'+(stage==='surfaces'?'?stage=surfaces':'')", "location.href='/ps/app/floor-plan.html?preview=ui8'+(stage==='surfaces'?'&stage=surfaces':'')")
 
  if name=='app.js':
   text=re.sub(r'<div class="manual-plan-choice">.*?</div>','',text)
@@ -116,16 +119,17 @@ html=html.replace('</body>','<script src="/ps/app/ui-controls.js"></script></bod
 (OUT/'index.html').write_text(html)
 # Existing real Plan/Surface components keep the staging API boundary.
 floor=(APP/'floor-plan.html').read_text().replace('staging-api.js','ui-adapter.js').replace('staging.css','ui-staging.css');floor=re.sub(r'<div class="staging-bar">.*?</div>','',floor);floor=floor.replace('</body>','<script src="/ps/app/ui-controls.js"></script></body>');(APP/'floor-plan.html').write_text(floor)
-floorjs=(APP/'floor-plan.js').read_text().replace('Apartment saved. Shared scene updated.','Synthetic draft saved in this browser. No backend validation.').replace('window.Staging.api(path,body,raw)','window.Staging.planApi(path,body,raw)').replace('pixeloid-','pixeloid-ui-staging-').replace("'/ps/?project='","'/ps/?preview=ui7&project='");floorjs = floorjs.rsplit('})();',1)[0]+'\nwindow.Staging.hasUnsaved=()=>dirty;window.Staging.discardForReset=()=>{dirty=false;saveTicket++;changeSerial++;};\n})();\n'
+floorjs=(APP/'floor-plan.js').read_text().replace('Apartment saved. Shared scene updated.','Synthetic draft saved in this browser. No backend validation.').replace('window.Staging.api(path,body,raw)','window.Staging.planApi(path,body,raw)').replace('pixeloid-','pixeloid-ui-staging-').replace("'/ps/?project='","'/ps/?preview=ui8&project='");floorjs = floorjs.rsplit('})();',1)[0]+'\nwindow.Staging.hasUnsaved=()=>dirty;window.Staging.discardForReset=()=>{dirty=false;saveTicket++;changeSerial++;};\n})();\n'
 (APP/'floor-plan.js').write_text(floorjs)
 # Reuse the existing Surface Design assignment flow with a bundled reference provider.
-surface=(APP/'surface-design.js').read_text();start=surface.index('async function readReference(');end=surface.index('\nasync function action(',start)
+surface=(APP/'surface-design.js').read_text().replace('pixeloid-','pixeloid-ui-staging-');start=surface.index('async function readReference(');end=surface.index('\nasync function action(',start)
 surface=surface[:start]+"async function readReference(texture=false){const target=texture?finishTarget():selectedItems()[0];if(!target)throw Error('Select an item first.');const reference=await window.Staging.reference();update(()=>{const owner=texture?(target.finish||={}):target;owner.reference={...owner.reference,...reference};});h.toast('Bundled synthetic reference assigned; dimensions unchanged.');}\n"+surface[end:]
 (APP/'surface-design.js').write_text(surface)
 for name in ['ui-adapter.js','ui-controls.js','ui-staging.css']:shutil.copy2(ROOT/'staging-preview'/name,APP/name)
 # Version resources so an updated Pages deployment cannot mix old browser scripts with new fixtures.
 fixture_hash=hashlib.sha256((APP/'ui-fixtures.json').read_bytes()).hexdigest()[:12]
 adapter=(APP/'ui-adapter.js').read_text().replace("'ui-fixtures.json'",f"'ui-fixtures.json?v={fixture_hash}'")
+adapter=adapter.replace("'multi-room-fixtures.json'","'multi-room-fixtures.json?v="+hashlib.sha256((APP/'multi-room-fixtures.json').read_bytes()).hexdigest()[:12]+"'")
 (APP/'ui-adapter.js').write_text(adapter)
 for page in [OUT/'index.html',APP/'floor-plan.html']:
  def versioned(m):

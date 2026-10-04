@@ -1,6 +1,8 @@
 # Synthetic UI-testing staging
 
-Production UI source commit: see `preview-manifest.json`. The ui7 editing update builds on source `198a701c2098241a2e0578b5f761169de7caa9c5`. See `docs/EDITING-UI7-VERIFICATION.md` for private-copy testing scope and limitations.
+Production UI source commit: see `preview-manifest.json`. This is the consolidated **ui8** build. See [the verification report](https://github.com/Maninder-Singh-Bali/ps/blob/dashboard-review/docs/EDITING-UI8-VERIFICATION.md).
+
+Open `?preview=ui8&project=synthetic-ui&stage=furnish&scenario=multi-room`, then click **Load scenario** in Testing controls. The new 16-room, two-floor fixture has its own browser-local dataset. The earlier basic fixture and saved work remain available by choosing **populated**. Reset affects only the currently selected synthetic dataset.
 All six workspaces use the production browser components. Staging-only transport, fixtures, testing controls and clear simulation labels are added at build time; deployed production files are never edited.
 
 No live backend is deployed. Synthetic saves, revisions, reviews, masks, camera settings, progress and jobs are stored in each visitor's browser. Testing controls select populated/empty/loading/success/failure/disconnected states and save faults. Reset affects only this synthetic namespace.

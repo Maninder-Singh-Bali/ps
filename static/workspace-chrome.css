@@ -114,8 +114,8 @@ body.studio-dashboard #main{scroll-padding:18px;padding-bottom:24px}
 @media(max-width:850px){
  .video-review-workspace{grid-template-columns:minmax(0,1fr)}
  .video-review-workspace>.video-next{grid-column:1;grid-row:1}
- .video-review-workspace>.video-preview{grid-column:1;grid-row:2}
- .video-review-workspace>.video-review{grid-column:1;grid-row:3}
+ .video-review-workspace>.video-preview{grid-column:1;grid-row:3}
+ .video-review-workspace>.video-review{grid-column:1;grid-row:2}
  .video-preview video.output-media{max-height:230px}
  .output-context{gap:8px}
  #plan-editor-inline .block-workspace.with-library{grid-template-columns:minmax(130px,.8fr) minmax(0,1fr)}
@@ -211,3 +211,18 @@ body.surface-editing .tools{display:none}
 #plan-editor-inline .block-model-controls{height:auto;min-height:32px;flex:0 0 auto;padding-bottom:2px}#plan-editor-inline .block-model-controls label{margin-left:0}#plan-editor-inline .block-model-controls #model-placement-hint:empty{display:none}
 
 .surface-editing #inspector h2{margin:0 0 10px}.surface-editing #inspector>.field{margin:8px 0}.surface-editing #inspector>.actions{margin:8px 0}.surface-editing #inspector .surface-tabs{padding:6px 0;margin:6px 0}.surface-editing #inspector .surface-item-catalogue{padding:6px 0;margin:6px 0}.surface-editing #inspector h3{margin:8px 0;font-size:12px}.surface-editing #inspector .surface-reference .design-reference{width:44px;height:44px}.surface-editing #inspector .surface-reference{gap:8px}
+/* Keep the editing essentials together; evidence remains available below them. */
+.selected-furniture-inspector>.object-reference{margin:6px 0;padding:5px 0;border-bottom:1px solid var(--line)}
+.selected-furniture-inspector .reference-heading{display:flex;align-items:center;gap:6px}
+.selected-furniture-inspector .reference-heading img,.selected-furniture-inspector .reference-empty{width:38px;height:38px;object-fit:contain;flex:none}
+.selected-furniture-inspector .reference-heading small{font-size:10px;line-height:1.2}
+.selected-furniture-inspector .object-reference select{margin:4px 0;width:100%}
+.selected-furniture-inspector .actions{gap:4px;margin:4px 0;flex-wrap:wrap}
+.selected-furniture-inspector .block-fields{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
+.selected-furniture-inspector>.block-fields{margin-top:4px}
+.selected-furniture-inspector>details{margin-top:6px;font-size:11px}
+.surface-editing #inspector .surface-item-catalogue:not([open])>summary{display:list-item}
+.surface-editing #inspector .surface-reference{margin:4px 0}
+.surface-editing #inspector .pair{gap:4px}
+.surface-editing #inspector .surface-tabs{margin:3px 0;padding:3px 0}
+.surface-editing #inspector>.field{margin:5px 0}
