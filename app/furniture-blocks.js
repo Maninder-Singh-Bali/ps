@@ -535,7 +535,7 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
  }
  function scaleControls(){
   const s=ctx.scene?.model_scale||{},h=s.wall_height_m||3;
-  if(walls.doc.manual_draft_id)return `<details class="model-scale"><summary class="btn small">${h.toFixed(2)} m walls</summary><p class="help">Scale and wall heights come from the linked floor plan.</p><a class="btn small" href="/ps/app/floor-plan.html?preview=ui3#${encodeURIComponent(walls.doc.manual_draft_id)}">Edit scale & heights</a></details>`;
+  if(walls.doc.manual_draft_id)return `<details class="model-scale"><summary class="btn small">${h.toFixed(2)} m walls</summary><p class="help">Scale and wall heights come from the linked floor plan.</p><a class="btn small" href="/ps/app/floor-plan.html?preview=ui4#${encodeURIComponent(walls.doc.manual_draft_id)}">Edit scale & heights</a></details>`;
   return `<details class="model-scale"><summary class="btn small" title="Wall height and real-world scale">${h.toFixed(2)} m walls</summary><div class="model-scale-fields"><strong>Scale & height</strong><span class="help">${esc(s.measured?'Measured plan':s.scale_source||'Estimated scale')}</span>${number('model-wall-height','Wall height (m)',h,.1)}${number('model-floor-width','Floor width (m)',+(ctx.scene?.width||10).toFixed(3),.1)}${number('model-human-height','Human height (ft)',+((s.human_height_m||1.6764)/.3048).toFixed(2),.1)}${number('model-fov','Walk field of view (°)',s.vertical_fov||60,5)}<span class="help">Eye level ${((s.human_height_m||1.6764)-.11).toFixed(2)} m · Current floor</span>${btn('Apply','apply-model-scale')}${btn('Balance furniture','balance-furniture')}<span class="help">Standard furniture sizes · Both floors</span></div></details>`;
  }
  function draw3d(){
