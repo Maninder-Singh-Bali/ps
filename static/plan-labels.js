@@ -22,7 +22,7 @@
  function drawObjects(svg,group,scale){
   if(!objectsVisible)return;
   const rect=svg.getBoundingClientRect(),viewport={x:rect.left,y:rect.top,w:rect.width,h:rect.height},matrix=svg.getScreenCTM().inverse(),occupied=[...group.querySelectorAll('text')].map(e=>{const b=e.getBoundingClientRect();return{x:b.left,y:b.top,w:b.width,h:b.height}});
-  const nodes=[...svg.querySelectorAll('[data-object-label],[data-plan-kind]')].filter(e=>e.dataset.objectLabel||['wall','window','door','sliding_door','opening'].includes(e.dataset.planKind));
+  const nodes=[...svg.querySelectorAll('[data-object-label],[data-plan-kind]')].filter(e=>!e.dataset.skipLabel&&(e.dataset.objectLabel||['wall','window','door','sliding_door','opening'].includes(e.dataset.planKind)));
   for(const el of nodes){
    const doorArc=el.dataset.planKind==='opening'&&[...el.querySelectorAll('path[d]')].some(p=>/[aA]/.test(p.getAttribute('d')));
    const label=el.dataset.objectLabel||(doorArc?'Door':names[el.dataset.planKind]),b=el.getBoundingClientRect();

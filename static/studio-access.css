@@ -1,1 +1,9 @@
 #studio-status{position:relative;font-size:12px}#studio-status summary{cursor:pointer;padding:8px;border:1px solid #d6ddd1;border-radius:7px}#studio-status>div{position:absolute;right:0;top:38px;z-index:110;width:290px;background:white;border:1px solid #d6ddd1;border-radius:9px;padding:14px;box-shadow:0 6px 20px #0002}#studio-status button{display:block;width:100%;margin:6px 0;padding:8px;border:1px solid #cdd4c8;border-radius:5px;background:#f4f5ef;cursor:pointer}#studio-status button:disabled{opacity:.45;cursor:default}#studio-status small{display:block;margin-top:10px;color:#687467}
+/* Status controls follow Appearance; hidden ownership/offline controls stay hidden. */
+#studio-status summary{border-color:var(--line,#d6ddd1)}
+#studio-status>div{background:var(--surface,#fff);color:var(--ink,#202322);border-color:var(--line,#d6ddd1)}
+#studio-status button{background:var(--raised,#f4f5ef);color:var(--ink,#202322);border-color:var(--line,#cdd4c8)}
+#studio-status button:hover:not(:disabled){background:var(--soft,#e8ede5)}
+#studio-status button:focus-visible{outline:2px solid var(--accent,#416c9b);outline-offset:2px}
+#studio-status button[hidden]{display:none}
+#studio-status small{color:var(--muted,#687467)}

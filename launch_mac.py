@@ -4,7 +4,7 @@ from pathlib import Path
 import requests
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('--data',required=True);ap.add_argument('--remote-config',required=True);ap.add_argument('--port',type=int,default=8777);a=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument('--data',required=True);ap.add_argument('--remote-config',required=True);ap.add_argument('--port',type=int,default=8777);ap.add_argument('--drafts');a=ap.parse_args()
     root=Path(__file__).resolve().parent;data=Path(a.data).resolve();data.mkdir(parents=True,exist_ok=True)
     c=Path(a.remote_config).resolve()
     if not c.is_file():raise ValueError('Configure the private PC pairing file first.')
@@ -14,7 +14,7 @@ def main():
         if existing.status_code==200:raise ValueError('A dashboard already uses this port. Open it or deliberately stop it before changing data directories.')
     except requests.ConnectionError:pass
     with (data/'dashboard.log').open('ab') as log:
-        p=subprocess.Popen([sys.executable,str(root/'server.py'),'--port',str(a.port),'--data',str(data),'--remote-config',str(c)],cwd=root,stdout=log,stderr=log,start_new_session=True)
+        p=subprocess.Popen([sys.executable,str(root/'server.py'),'--port',str(a.port),'--data',str(data),'--remote-config',str(c)]+(['--drafts',str(Path(a.drafts).resolve())] if a.drafts else []),cwd=root,stdout=log,stderr=log,start_new_session=True)
     (data/'dashboard.pid').write_text(str(p.pid))
     for _ in range(30):
         if p.poll() is not None:raise RuntimeError('Dashboard startup failed; inspect dashboard.log.')

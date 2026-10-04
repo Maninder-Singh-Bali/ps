@@ -75,6 +75,8 @@ class Handler(BaseHTTPRequestHandler):
         if not isinstance(d,dict):raise ValueError('Expected a JSON object.')
         return d
     def do_GET(self):
+        with plan_drafts.use_root(self.server.drafts_root):return self.get_in_workspace()
+    def get_in_workspace(self):
         try:
             self.origin_check();path=urlparse(self.path).path
             access=self.server.access
@@ -87,7 +89,7 @@ class Handler(BaseHTTPRequestHandler):
                 if path=='/':
                     self.send_response(303);self.send_header('Location','/login');self.send_header('Content-Length','0');self.end_headers();return
                 return self.reply({'error':'Sign in to Studio.','signin':True},401)
-            if path=='/api/studio/status':return self.reply(self.server.services.snapshot() if self.server.services else {'state':'Not prepared','managed':False,'message':'Background controls are available in the managed launcher.'})
+            if path=='/api/studio/status':return self.reply((self.server.services.snapshot(force=parse_qs(urlparse(self.path).query).get('check')==['1']) if hasattr(self.server.engine,'remote') else self.server.services.snapshot()) if self.server.services else {'state':'Not prepared','managed':False,'message':'Background controls are available in the managed launcher.'})
             if path=='/api/plan-drafts':
                 import manual_project
                 return self.reply(manual_project.listing(self.store))
@@ -96,7 +98,8 @@ class Handler(BaseHTTPRequestHandler):
                 key,name=draft_match.groups()
                 if name:
                     if name not in ('original.pdf','original.png','original.jpg','original.jpeg','original.webp') and not re.fullmatch(r'page-\d+\.png',name):raise ValueError('Unknown draft file.')
-                    return self.send_file(plan_drafts.folder(key)/name)
+                    import manual_project
+                    return self.send_file(manual_project.source_file(self.store,key,name))
                 import manual_project
                 return self.reply(manual_project.get(self.store,key))
             if path=='/api/state':return self.reply(public_state(self.store,self.server.engine))
@@ -197,6 +200,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_PATCH(self):self.mutate('PATCH')
     def do_DELETE(self):self.mutate('DELETE')
     def mutate(self,method):
+        with plan_drafts.use_root(self.server.drafts_root):return self.mutate_in_workspace(method)
+    def mutate_in_workspace(self,method):
         try:
             self.origin_check();u=urlparse(self.path);parts=u.path.strip('/').split('/')
             access=self.server.access
@@ -212,6 +217,14 @@ class Handler(BaseHTTPRequestHandler):
             if access and u.path=='/api/choose-folder':raise ValueError('Enter a desktop storage path in Settings. The remote browser cannot open a Windows folder dialog.')
             if len(parts)==4 and parts[:2]==['api','projects'] and parts[3]=='upload' and method=='POST':
                 with self.store.lock:return self.reply(self.upload(parts[2],parse_qs(u.query)))
+            if len(parts)==4 and parts[:2]==['api','plan-drafts'] and parts[3]=='reference' and method=='POST':
+                n=int(self.headers.get('Content-Length','0'))
+                if not 0<n<=32*1024*1024:raise ValueError('Choose a reference up to 32 MB.')
+                import manual_project
+                linked=manual_project.linked_plan(self.store,parts[2])
+                if linked and not (plan_drafts.folder(parts[2])/'draft.json').exists():
+                    plan_drafts.atomic(plan_drafts.folder(parts[2])/'draft.json',linked['manual_document'])
+                return self.reply(plan_drafts.upload_reference(parts[2],self.rfile.read(n),unquote(self.headers.get('X-Filename','reference'))))
             if parts==['api','plan-drafts','import'] and method=='POST':
                 n=int(self.headers.get('Content-Length','0'))
                 if not 0<n<=MAX_UPLOAD:raise ValueError('Choose a PDF or image up to 32 MB.')
@@ -222,6 +235,9 @@ class Handler(BaseHTTPRequestHandler):
                 if len(parts)==3 and parts[2]=='preview':
                     import manual_project
                     return self.reply(manual_project.preview(self.store,d))
+                if len(parts)==4 and parts[3]=='activate':
+                    import manual_project
+                    return self.reply(manual_project.activate(self.store,parts[2],d))
                 if len(parts)==4 and parts[3]=='create':return self.reply(plan_drafts.create(parts[2],d.get('page')))
                 if len(parts)==3:
                     import manual_project
@@ -585,11 +601,11 @@ class StudioHTTPServer(ThreadingHTTPServer):
     def get_request(self):
         connection,address=super().get_request();connection.settimeout(30);return connection,address
 
-def make_server(data,port=8777,start_worker=True,access_config=None,remote_config=None):
+def make_server(data,port=8777,start_worker=True,access_config=None,remote_config=None,drafts_root=None):
     # Bind before opening/mutating the database: an occupied port cannot disturb saved work.
     bind='0.0.0.0' if access_config and access_config.get('lan_ip') else '127.0.0.1'
     http=StudioHTTPServer((bind,port),Handler);http.access=None;http.services=None
-    st=Store(data);scene_control.restore_edit_lineage(st)
+    st=Store(data);st.drafts_root=Path(drafts_root).resolve() if drafts_root else st.root/'drafts';http.drafts_root=st.drafts_root;scene_control.restore_edit_lineage(st)
     if remote_config:
         from remote_processing import RemoteEngine
         engine=RemoteEngine(st,ROOT,remote_config);http.services=engine.services
@@ -606,8 +622,8 @@ def make_server(data,port=8777,start_worker=True,access_config=None,remote_confi
     return http
 
 if __name__=='__main__':
-    ap=argparse.ArgumentParser();ap.add_argument('--port',type=int,default=8777);ap.add_argument('--data',default=str(ROOT/'data'));ap.add_argument('--remote-config');args=ap.parse_args()
-    http=make_server(args.data,args.port,remote_config=args.remote_config)
+    ap=argparse.ArgumentParser();ap.add_argument('--port',type=int,default=8777);ap.add_argument('--data',default=str(ROOT/'data'));ap.add_argument('--remote-config');ap.add_argument('--drafts',help='Explicit draft collection; defaults to DATA/drafts. No automatic migration.');args=ap.parse_args()
+    http=make_server(args.data,args.port,remote_config=args.remote_config,drafts_root=args.drafts)
     (ROOT/'server.pid').write_text(str(os.getpid()))
     print(f'Pixeloid Studio is ready at http://127.0.0.1:{http.server_port}',flush=True)
     try:http.serve_forever()

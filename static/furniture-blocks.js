@@ -19,7 +19,7 @@
 
   history=null;placement=null;multi.clear();modelView=BlockModelViewer.defaults();ctx={pid:projectId,rid:roomId,showOriginal:false,drafts:{},view:options.view?[...options.view]:null};productLookup=null;const r=room();if(!r?.bbox)return toast('Map a section on the plan first.');
 
-  const opening=ctx;
+  const opening=ctx;opening.savedSource=savedSource();
 
   try{await FurnitureMeshes.load();opening.drawing=await api(`/api/projects/${projectId}/plans/${r.plan_id}/drawing`,{},'GET')}catch(err){toast('Could not load the editor: '+err.message);return}
 
@@ -27,9 +27,45 @@
 
   ctx.savedDrawing=structuredClone({edits:ctx.drawing.edits,features:ctx.drawing.features,site:ctx.drawing.site});
   walls=new PlanWalls(ctx.drawing,{svg:()=>$('#block-plan'),redraw:()=>draw(),select:()=>{selected=null;popupOpen=false},changed:()=>{const check=$('#block-reviewed');if(check)check.checked=false},error:toast,commit:()=>call('check').catch(err=>toast(err.message))});
-  ctx.revision=r.revision;items=structuredClone(r.block_layout?.items||[]);selected=options.inline?null:items[0]?.id;issues=[];dirty=false;popupOpen=false;render();await call(r.block_layout?'check':'propose',{automatic:true});
+  ctx.revision=r.revision;items=structuredClone(r.block_layout?.items||[]);selected=options.inline?null:items[0]?.id;issues=[];dirty=false;popupOpen=false;render();await call(r.block_layout?'check':'propose',{automatic:true});if(ctx===opening)ctx.ready=true;
 
  };
+
+ // A mounted editor is a snapshot, not the saved architecture authority.
+ function savedSource(){
+  const p=state.projects[ctx.pid],a=plan();
+  return JSON.stringify([p.map_revision,a.manual_document?.revision,a.drawing,a.raster_geometry]);
+ }
+ function sourceNotice(message=''){
+  let notice=$('#block-source-status');
+  if(!notice&&$('#block-edit-status')){notice=document.createElement('p');notice.id='block-source-status';notice.className='help';notice.setAttribute('role','status');$('#block-edit-status').after(notice)}
+  if(notice&&notice.syncMessage!==message){notice.syncMessage=message;notice.hidden=!message;notice.textContent=message;if(message){const button=document.createElement('button');button.type='button';button.className='btn small';button.textContent='Reload saved plan';button.onclick=async()=>{if(pendingChanges()&&!confirm('Discard unsaved Furnish edits and load the latest saved plan?'))return;try{await openFurnitureBlocks(ctx.pid,ctx.rid,{reload:true,inline:true,view:ctx.view})}catch(err){toast(err.message)}};notice.append(' ',button)}}
+ }
+ function interacting(){return busy||drag||groupDrag||panDrag||walls?.drag||placement||['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)}
+ async function syncSaved(){
+  if(!ctx?.ready||!walls||modalType!=='blocks'||ctx.syncing||savedSource()===ctx.savedSource)return;
+  if(pendingChanges()){sourceNotice('Plan changed. Your unsaved furniture edits are kept; reload when ready.');return}
+  if(interacting())return;
+  const current=ctx,section=ctx.rid,source=savedSource(),r=room();current.syncing=true;
+  const valid=()=>ctx===current&&ctx.rid===section&&modalType==='blocks'&&savedSource()===source&&!pendingChanges()&&!interacting();
+  try{
+   const path=`/api/projects/${ctx.pid}/plans/${r.plan_id}/drawing`;
+   const drawing=await api(path,{},'GET');if(!valid())return;
+   const result=await api(`/api/projects/${ctx.pid}/rooms/${section}/blocks`,{action:'check',revision:r.revision,items:structuredClone(r.block_layout?.items||[])});
+   if(!valid())return;
+   // Check the drawing again so a save between the drawing and 3D requests
+   // cannot produce a mixed-revision pair. Retry on the next normal state poll.
+   const latest=await api(path,{},'GET');if(!valid()||JSON.stringify(drawing)!==JSON.stringify(latest))return;
+   if(result.revision!==r.revision)return;
+   ctx.drawing=drawing;walls.saved(drawing);ctx.savedDrawing=walls.snapshot();ctx.savedSource=source;
+   items=result.items;issues=result.issues;ctx.dimensions=result.room_dimensions;ctx.architecture=result.architecture;
+   ctx.scene=result.preview_scene;ctx.floors=result.preview_floors||[{room_id:section,scene:result.preview_scene}];ctx.revision=result.revision;
+   ctx.drafts={};history=null;multi.clear();walls.clear();
+   if(selected&&!items.some(v=>v.id===selected)){selected=null;popupOpen=false}
+   render();sourceNotice();
+  }catch(err){if(ctx===current)sourceNotice('Could not refresh the saved plan. '+err.message)}
+  finally{current.syncing=false}
+ }
 
  function historySnapshot(){
   return {rid:ctx.rid,selected,multi:[...multi],wallSelected:walls.selected,layouts:Object.fromEntries(state.projects[ctx.pid].rooms.filter(r=>r.plan_id===room().plan_id&&r.bbox).map(r=>[r.id,structuredClone(r.id===ctx.rid?items:ctx.drafts[r.id]?.items||r.block_layout?.items||[])])),drawing:walls.snapshot()};
@@ -74,6 +110,7 @@
   render();await call('check');
  }
  async function call(action,extra={}){
+  if(ctx.ready&&savedSource()!==ctx.savedSource)throw Error('Plan changed. Your edits are kept; reload the saved plan before checking or saving furniture.');
   if(busy)throw Error('Wait for the current placement check.');busy=true;const busyHost=$('#plan-editor-inline');if(busyHost){busyHost.setAttribute('aria-busy','true');busyHost.inert=true}
   try{
    items=items.map(v=>{const corrected=FurnitureLibrary.consistentSofa(v,plan());if(corrected!==v)dirty=true;return corrected});
@@ -81,14 +118,14 @@
    if(walls?.dirty)payload.drawing=walls.payload();
    if(action==='save'){
     if(walls.first)throw Error('Finish the wall or opening, or press Escape.');
-    if(!walls.doc.site?.model?.metres_per_pixel&&ctx.scene?.model_scale){const s=ctx.scene.model_scale;walls.doc.site={...walls.doc.site,model:{...walls.doc.site?.model,metres_per_pixel:s.metres_per_pixel,scale_source:s.scale_source}};walls.dirty=true;payload.drawing=walls.payload()}
+    if(!walls.doc.manual_draft_id&&!walls.doc.site?.model?.metres_per_pixel&&ctx.scene?.model_scale){const s=ctx.scene.model_scale;walls.doc.site={...walls.doc.site,model:{...walls.doc.site?.model,metres_per_pixel:s.metres_per_pixel,scale_source:s.scale_source}};walls.dirty=true;payload.drawing=walls.payload()}
     stashDraft();payload.action='save-plan';
     payload.drafts=Object.entries(ctx.drafts).filter(([id,d])=>id===ctx.rid||d.dirty).map(([id,d])=>({room_id:id,revision:d.revision,items:d.items,reviewed:id===ctx.rid&&extra.reviewed===true}));
    }
    const requestContext=ctx,result=await api(`/api/projects/${ctx.pid}/rooms/${ctx.rid}/blocks`,payload);
    if(ctx!==requestContext)return result;
    items=result.items;issues=result.issues;ctx.dimensions=result.room_dimensions;ctx.architecture=result.architecture;ctx.scene=result.preview_scene;ctx.floors=result.preview_floors||[{room_id:ctx.rid,scene:result.preview_scene}];ctx.revision=result.revision;
-   if(action==='save'){await refresh(true);dirty=false;ctx.drafts={};if(result.drawing){ctx.drawing=result.drawing;walls.saved(ctx.drawing);ctx.savedDrawing=walls.snapshot()}}
+   if(action==='save'){await refresh(true);if(ctx!==requestContext)return result;dirty=false;ctx.drafts={};if(result.drawing){ctx.drawing=result.drawing;walls.saved(ctx.drawing);ctx.savedDrawing=walls.snapshot();ctx.savedSource=savedSource()}}
    if(action==='suggest'||action==='propose')dirty=dirty||JSON.stringify(items)!==JSON.stringify(room().block_layout?.items||[]);
    if(selected&&!items.some(v=>v.id===selected))selected=items[0]?.id;
    render();if(ctx.resumeWalk){ctx.resumeWalk=false;startWalk()}return result;
@@ -128,7 +165,7 @@ ${ctx.architecture?`<details class="block-structure-status"><summary>Structure r
 
 <div class="workspace-modes" role="group" aria-label="Workspace mode"><button type="button" class="btn small active" aria-pressed="true">Furniture</button>${btn('Camera','camera')}</div><div class="block-toolbar">${btn('Furniture library','library')}${btn('Full plan','fit-plan')}${btn('This section','fit-section')}${btn('Add block','add')}${btn('Scan section into blocks','propose')}${btn('Suggest clear position','suggest')}${btn('Check placement','check')}<label class="block-map-toggle"><input id="block-object-labels" type="checkbox" ${PlanLabels.objectsVisible?'checked':''}> Object labels</label><label class="block-map-toggle"><input id="block-original-map" type="checkbox" ${ctx.showOriginal?'checked':''}> Original map</label></div>
 
-<div class="block-workspace with-library"><div class="block-left-panel"><div class="block-left-tabs" role="group" aria-label="Furniture panel">${btn('Shapes','library')}${btn('Reference','reference')}</div><div id="block-library-panel">${libraryMarkup()}</div><div id="block-popover" class="block-details-panel" aria-label="Selected furniture details"></div></div><section><h3>Full plan · furniture & walls</h3>${walls.toolbar()}<div class="block-map-wrap"><svg id="block-plan" aria-label="Original floor plan with draggable furniture blocks"></svg></div><p id="block-edit-status" role="status"></p></section>
+<div class="block-workspace with-library"><div class="block-left-panel"><div class="block-left-tabs" role="group" aria-label="Furniture panel">${btn('Shapes','library')}${btn('Reference','reference')}</div><div id="block-library-panel">${libraryMarkup()}</div><div id="block-popover" class="block-details-panel" aria-label="Selected furniture details"></div></div><section><h3>Full plan · furniture & walls</h3>${walls.toolbar()}<div class="block-map-wrap"><svg id="block-plan" aria-label="Original floor plan with draggable furniture blocks" aria-description="Two-finger swipe to pan. Pinch to zoom."></svg></div><p id="block-edit-status" role="status"></p></section>
 
 <aside class="block-inspector"><div class="block-model-panel"><div class="block-model-heading"><h3>3D model</h3><select id="model-projection" aria-label="3D projection"><option value="orthographic" ${modelView.projection!=='perspective'?'selected':''}>Orthographic</option><option value="perspective" ${modelView.projection==='perspective'?'selected':''}>Perspective</option></select><button type="button" class="btn small" id="model-walk" ${modelView.projection!=='perspective'?'hidden':''} aria-pressed="${!!modelView.walk}">${modelView.walk?'Exit walk':'Walk'}</button><span>${esc(r.floor)}</span>${scaleControls()}</div><canvas id="block-preview" tabindex="0" aria-label="Interactive 3D floor model"></canvas><div class="block-model-controls"><button type="button" class="btn small" id="model-place" ${!selected||modelView.projection!=='perspective'?'hidden':''}>Move object</button><span id="model-placement-hint" role="status">${placement?'Click a wall, ceiling or floor · Esc to cancel':modelView.walk?'WASD / arrows · Drag to look':''}</span><button type="button" class="btn small" data-model="reset">Fit</button><button type="button" class="btn small" data-model="top">Top</button><button type="button" class="btn small" data-model="out" aria-label="Zoom out 3D model">−</button><button type="button" class="btn small" data-model="in" aria-label="Zoom in 3D model">+</button><label><input id="model-transparent" type="checkbox" ${modelView.transparent?'checked':''}> See through walls</label></div><p class="block-model-hint" id="block-model-geometry"></p><p class="block-model-hint">Drag to rotate · Middle-drag to pan · Scroll to zoom</p>${btn('Set camera','camera')}</div><label class="field"><span>Section</span><select id="block-room">${state.projects[ctx.pid].rooms.filter(x=>x.plan_id===r.plan_id&&x.bbox).map(x=>`<option value="${x.id}" ${x.id===r.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label>
 
@@ -220,7 +257,7 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
   writeSelection(action==='remove'?rows:FurnitureLibrary.transformGroup(rows,plan(),options),{duplicate:action==='duplicate',remove:action==='remove'});await call('check');
  }
  function groupPointerDown(e){
-  const object=e.target.closest('[data-block-id]'),wall=e.target.closest('[data-plan-element]'),handle=e.target.closest('[data-group-handle]')?.dataset.groupHandle,key=object?'f:'+object.dataset.blockRoom+':'+object.dataset.blockId:wall?'w:'+wall.dataset.planElement:null;
+  const object=e.target.closest('[data-block-id]'),wall=e.target.closest('[data-plan-element]'),handle=e.target.closest('[data-group-handle]')?.dataset.groupHandle,key=object?'f:'+object.dataset.blockRoom+':'+object.dataset.blockId:wall&&!walls.doc.manual_draft_id?'w:'+wall.dataset.planElement:null;
   if(walls.tool!=='select')return false;
   if(key&&(e.shiftKey||e.ctrlKey||e.metaKey)){toggleSelection(key);return true}
   if(multi.size&&(handle||key&&multi.has(key))){const svg=$('#block-plan'),p=new DOMPoint(e.clientX,e.clientY).matrixTransform(svg.getScreenCTM().inverse());syncHistory();const rows=selectionRows();
@@ -304,7 +341,20 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
 
   svg.onauxclick=e=>{if(e.button===1)e.preventDefault()};
 
-  svg.onwheel=e=>{e.preventDefault();if(drag||groupDrag||panDrag||walls.drag)return;const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(svg.getScreenCTM().inverse());zoomTarget=DrawingGeometry.zoom(zoomTarget||ctx.view,[p.x,p.y],e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?300:1),a.width);if(!zoomFrame){const tick=()=>{const target=$('#block-plan');if(!target){zoomFrame=null;zoomTarget=null;return}ctx.view=ctx.view.map((v,i)=>v+(zoomTarget[i]-v)*.35);const done=Math.max(...ctx.view.map((v,i)=>Math.abs(v-zoomTarget[i])))<.001;if(done)ctx.view=zoomTarget;target.setAttribute('viewBox',ctx.view.join(' '));walls.handles();popover();zoomFrame=done?null:requestAnimationFrame(tick);if(done)zoomTarget=null};zoomFrame=requestAnimationFrame(tick)}};
+  svg.onwheel=e=>{e.preventDefault();if(drag||groupDrag||panDrag||walls.drag)return;
+   // Match the plan editor: two-finger scrolling pans; Ctrl+wheel is pinch.
+   const unit=e.deltaMode===1?16:e.deltaMode===2?svg.clientHeight:1;
+   if(!e.ctrlKey){
+    if(zoomFrame)cancelAnimationFrame(zoomFrame);zoomFrame=null;zoomTarget=null;
+    const matrix=svg.getScreenCTM();if(!matrix)return;
+    ctx.view=[ctx.view[0]+e.deltaX*unit/matrix.a,ctx.view[1]+e.deltaY*unit/matrix.d,...ctx.view.slice(2)];
+    svg.setAttribute('viewBox',ctx.view.join(' '));walls.handles();popover();return;
+   }
+   if(zoomFrame)cancelAnimationFrame(zoomFrame);zoomFrame=null;zoomTarget=null;
+   const matrix=svg.getScreenCTM();if(!matrix)return;
+   const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(matrix.inverse());
+   ctx.view=DrawingGeometry.pinchZoom(ctx.view,[p.x,p.y],e.deltaY*unit,a.width);
+   svg.setAttribute('viewBox',ctx.view.join(' '));walls.handles();popover();};
 
   svg.ondragover=e=>{if([...e.dataTransfer.types].includes('application/x-pixeloid-furniture')){e.preventDefault();e.dataTransfer.dropEffect='copy';svg.classList.add('library-drop-active')}};
 
@@ -485,6 +535,7 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
  }
  function scaleControls(){
   const s=ctx.scene?.model_scale||{},h=s.wall_height_m||3;
+  if(walls.doc.manual_draft_id)return `<details class="model-scale"><summary class="btn small">${h.toFixed(2)} m walls</summary><p class="help">Scale and wall heights come from the linked floor plan.</p><a class="btn small" href="/floor-plan.html#${encodeURIComponent(walls.doc.manual_draft_id)}">Edit scale & heights</a></details>`;
   return `<details class="model-scale"><summary class="btn small" title="Wall height and real-world scale">${h.toFixed(2)} m walls</summary><div class="model-scale-fields"><strong>Scale & height</strong><span class="help">${esc(s.measured?'Measured plan':s.scale_source||'Estimated scale')}</span>${number('model-wall-height','Wall height (m)',h,.1)}${number('model-floor-width','Floor width (m)',+(ctx.scene?.width||10).toFixed(3),.1)}${number('model-human-height','Human height (ft)',+((s.human_height_m||1.6764)/.3048).toFixed(2),.1)}${number('model-fov','Walk field of view (°)',s.vertical_fov||60,5)}<span class="help">Eye level ${((s.human_height_m||1.6764)-.11).toFixed(2)} m · Current floor</span>${btn('Apply','apply-model-scale')}${btn('Balance furniture','balance-furniture')}<span class="help">Standard furniture sizes · Both floors</span></div></details>`;
  }
  function draw3d(){
@@ -670,6 +721,6 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
   if(busy||pendingChanges()&&!confirm('Discard unsaved furniture changes in this window?')){e.preventDefault();e.stopImmediatePropagation()}
  },true);
  document.querySelector('#modal').addEventListener('cancel',e=>{if(modalType==='blocks'&&(busy||pendingChanges()&&!confirm('Discard unsaved furniture changes in this window?')))e.preventDefault()});
- window.FurnitureEditor={redraw:()=>draw(),fitFloor:()=>{ctx.view=InlinePlan.planView(room().floor);if(!modelView.walk)modelView={...BlockModelViewer.defaults(),projection:modelView.projection};render()},reload:()=>ctx&&openFurnitureBlocks(ctx.pid,ctx.rid,{reload:true,inline:true,view:ctx.view}),pending:()=>!!ctx&&pendingChanges(),roomId:()=>ctx?.rid,switchSection,dispose(){modelViewer?.dispose();modelViewer=null;if(zoomFrame)cancelAnimationFrame(zoomFrame);zoomFrame=null;zoomTarget=null;ctx=null;walls=null;history=null;dirty=false}};
+ window.FurnitureEditor={syncSaved,redraw:()=>draw(),fitFloor:()=>{ctx.view=InlinePlan.planView(room().floor);if(!modelView.walk)modelView={...BlockModelViewer.defaults(),projection:modelView.projection};render()},reload:()=>ctx&&openFurnitureBlocks(ctx.pid,ctx.rid,{reload:true,inline:true,view:ctx.view}),pending:()=>!!ctx&&pendingChanges(),roomId:()=>ctx?.rid,switchSection,dispose(){modelViewer?.dispose();modelViewer=null;if(zoomFrame)cancelAnimationFrame(zoomFrame);zoomFrame=null;zoomTarget=null;ctx=null;walls=null;history=null;dirty=false}};
 })();
 

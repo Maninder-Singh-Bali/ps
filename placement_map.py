@@ -55,6 +55,9 @@ def validate_layout(room,data):
 def room_dimensions(store,room):
     """Map room spans to metres using the saved original drawing calibration."""
     p=store.project(store.asset(room['plan_id'])['project_id']);a=store.asset(room['plan_id'])
+    if a.get('manual_document',{}).get('calibration') and room.get('bbox'):
+        mpp=a['manual_document']['calibration']['metres_per_pixel']
+        return {'width_m':room['bbox'][2]*a['width']*mpp,'depth_m':room['bbox'][3]*a['height']*mpp,'method':'manual calibration','estimated':True}
     record=next((m for m in p.get('measurements',[]) if m['plan_id']==room['plan_id'] and m['floor']==room['floor']),None)
     if not record or record['scale']['mode']=='percent':return None
     s=record['scale'];factor=1 if s['unit']=='m' else .3048;b=bounds(record['outline'])

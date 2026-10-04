@@ -5,8 +5,15 @@
  const paused=()=>typeof P==='function'&&P()?.generation_phase?.status==='paused';
  function blocked(button){if(button?.dataset.action==='recover-job'){const job=state?.jobs?.[button.dataset.id],phase=state?.projects?.[job?.project_id]?.generation_phase;return ['image','video','reference'].includes(job?.kind)&&phase?.status==='paused'&&!phase.continuing_job_ids?.includes(job.id)}return paused()}
  function apply(){
-  const stop=paused(),main=document.querySelector('#main'),existing=document.querySelector('#generation-phase-notice');
-  if(stop&&main&&!existing){const note=document.createElement('div');note.id='generation-phase-notice';note.className='generation-phase-notice';note.setAttribute('role','status');note.textContent=message+' '+Object.entries(P().generation_phase.allowances||{}).map(([name,a])=>name.replaceAll('_',' ')+': '+a.used+'/'+a.limit).join(' · ')+'. Viewing and review remain available.';main.prepend(note)}
+  const stop=paused(),header=document.querySelector('.topbar'),existing=document.querySelector('#generation-phase-notice');
+  if(stop&&header){
+   const note=existing||document.createElement('span');
+   if(!existing){note.id='generation-phase-notice';note.className='generation-phase-notice';note.setAttribute('role','status');note.tabIndex=0;}
+   const detail=message+' '+Object.entries(P().generation_phase.allowances||{}).map(([name,a])=>name.replaceAll('_',' ')+': '+a.used+'/'+a.limit).join(' · ')+'. Viewing and review remain available.';
+   if(note.textContent!=='Generation paused')note.textContent='Generation paused';
+   if(note.title!==detail){note.title=detail;note.setAttribute('aria-label',detail);}
+   if(note.parentElement!==header)header.insertBefore(note,header.querySelector('.top-actions'));
+  }
   if(!stop)existing?.remove();
   const modal=document.querySelector('#modal-body');
   if(stop&&modal?.querySelector(selector)&&!modal.querySelector('.generation-phase-notice')){const note=document.createElement('p');note.className='generation-phase-notice';note.id='generation-phase-modal-notice';note.textContent=message;modal.prepend(note)}

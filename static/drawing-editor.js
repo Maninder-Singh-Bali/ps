@@ -61,7 +61,7 @@
    // reviewed walls/openings remain individual editable features above it.
    const referenceOnly=doc.base_asset_id&&doc.elements.length>3000&&!Object.keys(doc.edits).length&&doc.elements.every(e=>e.kind==='detail');
    const art=referenceOnly?`<image href="${url(doc.base_asset_id)}" width="${doc.width}" height="${doc.height}" pointer-events="none"/>`:doc.elements.filter(e=>!e.absorbed_by&&!doc.edits[e.id]?.hidden).map(e=>`<g data-plan-kind="${esc(e.kind)}" ${editable?`data-plan-element="${esc(e.id)}"`:''} transform="${trans(doc.edits[e.id])}">${e.svg}</g>`).join('');
-   return `<g class="drawing-art" pointer-events="${editable?'auto':'none'}">${art}${doc.features.map(e=>`<g data-plan-feature="true" ${editable?`data-plan-element="${esc(e.id)}"`:''} data-plan-kind="${esc(e.kind)}">${feature(e)}</g>`).join('')}</g>`
+   return `<g class="drawing-art" pointer-events="${editable?'auto':'none'}">${art}${doc.features.map(e=>`<g data-plan-feature="true" ${e.fillet?'data-skip-label="true"':''} ${editable?`data-plan-element="${esc(e.id)}"`:''} data-plan-kind="${esc(e.kind)}">${feature(e)}</g>`).join('')}</g>`
   },
   finish(root){root.querySelectorAll('[data-plan-kind="wall"]:not([data-plan-feature])').forEach(solidWall)}
  };

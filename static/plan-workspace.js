@@ -1,7 +1,7 @@
 'use strict';
 // A single main-page host for plan, furniture, walls and camera editing.
 (() => {
- let mountedKey=null,mode='blocks',opening=0;const hiddenFloors=new Set();
+ let mountedKey=null,mode='blocks',opening=0,mountReady=Promise.resolve();const hiddenFloors=new Set();
  const key=()=>`${pid}:${planId}`;
  const candidates=()=>P()?.rooms.filter(r=>r.plan_id===planId&&r.bbox&&(tab!=='references'||!A(planId)?.construction_selection?.confirmed||r.floor===A(planId).construction_selection.floor))||[];
  const pending=()=>mode==='camera'?window.CameraEditor?.pending():window.FurnitureEditor?.pending();
@@ -12,7 +12,7 @@
  function floorGroups(){return [...new Set(candidates().map(r=>r.floor))].map(f=>`<section class="floor-section-group"><div class="floor-group-heading"><button type="button" class="floor-section-heading ${R()?.floor===f?'active':''}" data-workspace-floor="${esc(f)}" aria-pressed="${R()?.floor===f}">${esc(floorName(f))}<span>${candidates().filter(r=>r.floor===f).length}</span></button><button type="button" class="floor-visibility" data-floor-visibility="${esc(f)}" aria-label="${hiddenFloors.has(f)?'Show':'Hide'} ${esc(floorName(f))}" title="${hiddenFloors.has(f)?'Show':'Hide'} ${esc(floorName(f))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>${hiddenFloors.has(f)?'<path d="M3 3l18 18"/>':''}</svg></button></div>${candidates().filter(r=>r.floor===f).map(r=>`<button type="button" class="floor-room ${r.id===rid?'selected':''}" data-action="room" data-id="${r.id}">${esc(r.name)}</button>`).join('')}</section>`).join('')}
  function markup(){
   if(!candidates().some(r=>r.id===rid))rid=candidates()[0].id;
-  return `<div class="inline-plan-heading"><h1>${tab==='references'?'Style':'Plan'}</h1><select id="plan-select" class="control" aria-label="Floor plan page">${P().floor_plans.map((id,i)=>`<option value="${id}" ${id===planId?'selected':''}>Page ${i+1} · ${esc(A(id).display_name||A(id).name)}</option>`).join('')}</select><div class="actions">${tab==='references'?'<button class="btn small" data-surfaces-open>Surfaces</button>':btn('Select area to construct','construction-area','','small')}${btn('Upload plan','upload-plan','','small')}<details class="inline-more"><summary class="btn small">Advanced</summary><div>${btn('Area & sections','plan-areas','','small')}${btn('Detect objects','structure-check','','small')}${btn('North & sunlight','refine-drawing','','small')}${btn(A(planId)?.construction_selection?.confirmed?'Confirm selected shell':P().map_confirmed?'Map confirmed ✓':'Confirm map','confirm-map','','small')}</div></details></div></div><div class="inline-plan-grid"><section id="plan-editor-inline" class="panel" aria-label="Plan editing workspace"><div class="empty">Building 3D from the plan…</div></section><aside class="panel inline-sections"><div class="panel-head"><h2>Sections</h2>${btn('+','add-room','aria-label="Add section"','small')}</div><div id="inline-room-list" class="room-list">${floorGroups()}</div><div id="inline-section-details">${sectionDetails()}</div></aside></div>`;
+  return `<div class="inline-plan-heading"><h1>Furnish</h1><select id="plan-select" class="control" aria-label="Floor plan page">${P().floor_plans.map((id,i)=>`<option value="${id}" ${id===planId?'selected':''}>Page ${i+1} · ${esc(A(id).display_name||A(id).name)}</option>`).join('')}</select><div class="actions">${tab==='references'?'<button class="btn small" data-surfaces-open>Surfaces</button>':btn('Select area to construct','construction-area','','small')}${btn('Upload plan','upload-plan','','small')}<details class="inline-more"><summary class="btn small">Advanced</summary><div>${btn('Area & sections','plan-areas','','small')}${btn('Detect objects','structure-check','','small')}${btn('North & sunlight','refine-drawing','','small')}${btn(A(planId)?.construction_selection?.confirmed?'Confirm selected shell':P().map_confirmed?'Map confirmed ✓':'Confirm map','confirm-map','','small')}</div></details></div></div><div class="inline-plan-grid"><section id="plan-editor-inline" class="panel" aria-label="Plan editing workspace"><div class="empty">Building 3D from the plan…</div></section><aside class="panel inline-sections"><div class="panel-head"><h2>Sections</h2>${btn('+','add-room','aria-label="Add section"','small')}</div><div id="inline-room-list" class="room-list">${floorGroups()}</div><div id="inline-section-details">${sectionDetails()}</div></aside></div>`;
  }
  function syncSections(){
   window.WorkspaceSelection?.remember();
@@ -22,16 +22,19 @@
  }
  function preserve(){if(!canRender()||mountedKey!==key()||!$('#plan-editor-inline'))return false;const editorId=mode==='blocks'?window.FurnitureEditor?.roomId():rid;if(editorId&&!P().rooms.some(r=>r.id===editorId))return false;syncSections();return true}
  function reset(){if(mountedKey!==null){window.FurnitureEditor?.dispose();window.CameraEditor?.dispose();if(!$('#modal').open&&['blocks','camera'].includes(modalType))modalType=''}mountedKey=null;opening++;document.body.classList.remove('inline-plan-active')}
- async function mount(){
+ function mount(){mountReady=mountEditor();return mountReady;}
+ async function mountEditor(){
   if(!canRender()||!$('#plan-editor-inline'))return;
   mountedKey=key();document.body.classList.add('inline-plan-active');mode='blocks';const ticket=++opening;
   try{await openFurnitureBlocks(pid,rid,{inline:true,view:planView(R()?.floor)})}catch(err){if(ticket===opening){$('#plan-editor-inline').innerHTML=`<div class="empty">${esc(err.message)} ${btn('Retry','furniture-blocks','','small')}</div>`;toast(err.message)}}
  }
  function show(title,body,footer,type){
   const host=$('#plan-editor-inline');if(!host||!['plan','references'].includes(tab)||!['blocks','camera'].includes(type))return false;
-  mode=type;modalType=type;host.dataset.mode=type;
+  mode=type;modalType=type;host.dataset.mode=type;const heading=document.querySelector('.inline-plan-heading h1');if(heading)heading.textContent=type==='camera'?'Cameras':'Furnish';window.setWorkflowHighlight?.(currentWorkspaceStage());
   host.innerHTML=`<div class="inline-editor-top"></div><div class="inline-editor-body">${body}</div><div class="inline-editor-footer">${footer}</div>`;
-  const top=host.querySelector('.inline-editor-top'),modes=host.querySelector('.workspace-modes');if(modes)top.append(modes);
+  const top=host.querySelector('.inline-editor-top');
+  // The shared workflow bar owns navigation in the inline workspace.
+  host.querySelector('.workspace-modes')?.remove();
   const floor=document.createElement('select');floor.id='workspace-floor';floor.className='control';floor.setAttribute('aria-label','Active floor');floor.innerHTML=[...new Set(candidates().map(r=>r.floor))].map(f=>`<option value="${esc(f)}" ${f===R()?.floor?'selected':''}>${esc(floorName(f))}</option>`).join('');top.append(floor);
   const save=host.querySelector('[data-block="save"],[data-camera="save"]');if(save){save.classList.add('primary');top.append(save)}
   host.querySelector('[data-block="close"],[data-camera="close"]')?.remove();host.querySelector('.inline-editor-footer')?.remove();
@@ -95,5 +98,5 @@
  },true);
  window.addEventListener('beforeunload',e=>{if($('#plan-editor-inline')&&pending()){e.preventDefault();e.returnValue=''}});
  document.querySelector('#modal').addEventListener('close',()=>{if($('#plan-editor-inline')){modalType=mode;syncSections();if(mode==='blocks'&&!pending())window.FurnitureEditor?.reload()?.catch(err=>toast(err.message))}});
- window.InlinePlan={applyFloorVisibility,floorVisible:f=>!hiddenFloors.has(f)&&(!A(planId)?.construction_selection?.confirmed||f===A(planId).construction_selection.floor),canRender,markup,preserve,reset,mount,show,select,syncSections,planView,active:()=>!!$('#plan-editor-inline'),mode:()=>mode};
+ window.InlinePlan={ready:()=>mountReady,applyFloorVisibility,floorVisible:f=>!hiddenFloors.has(f)&&(!A(planId)?.construction_selection?.confirmed||f===A(planId).construction_selection.floor),canRender,markup,preserve,reset,mount,show,select,syncSections,planView,active:()=>!!$('#plan-editor-inline'),mode:()=>mode};
 })();

@@ -1,5 +1,5 @@
 """Mac/lightweight backend adapter. Browser never receives the worker credential."""
-import hashlib, ipaddress, json, time
+import copy, hashlib, ipaddress, json, threading, time
 from pathlib import Path
 from urllib.parse import urlparse
 import requests
@@ -34,14 +34,30 @@ class RemoteServices:
     # The client lane must stay alive to reconcile even when renderer is stopped.
     prepared=True
     process=None
-    def __init__(self,engine):self.engine=engine
-    def snapshot(self):
-        try:
-            status=self.engine.remote.get('/v1/status');expected=contract(self.engine.app_root)
-            from hardware_status import describe
-            status={**status,'checks':[describe(c) for c in status.get('checks',[])]}
-            return {**status,'remote':True,'video_capture_compatible':status.get('video_capture')==expected['video_capture'],'video_compatible':bool(status.get('video') and all(status.get(k)==expected[k] for k in ('protocol','workflow','video_workflow')))}
-        except Exception:return {'state':'Disconnected','message':'PC worker unreachable. Check LAN, certificate and pairing; saved jobs remain on the PC.', 'remote':True,'prepared':False,'ownership':'none','active_jobs':0}
+    def __init__(self,engine):
+        self.engine=engine;self._status=None;self._check_lock=threading.Lock()
+    def snapshot(self,force=False):
+        # Passive dashboard reads must never wake/contact the PC. Dispatch and
+        # persistent job reconciliation retain their own live protocol checks.
+        if force:
+            with self._check_lock:
+                try:
+                    status=self.engine.remote.request('GET','/v1/status',timeout=5).json()
+                    expected=contract(self.engine.app_root)
+                    from hardware_status import describe
+                    self._status={**status,'remote':True,'reachable':True,'checked':time.time(),
+                        'checks':[describe(c) for c in status.get('checks',[])],
+                        'video_capture_compatible':status.get('video_capture')==expected['video_capture'],
+                        'video_compatible':bool(status.get('video') and all(status.get(k)==expected[k] for k in ('protocol','workflow','video_workflow')))}
+                except Exception:
+                    self._status={'state':'PC unavailable','message':'The PC could not be reached. You can keep designing on this Mac.',
+                        'remote':True,'reachable':False,'checked':time.time(),'prepared':False,'ownership':'none','active_jobs':0}
+        status=copy.deepcopy(self._status) if self._status else {
+            'state':'Local design','message':'PC not checked. Keep it off for local design; image and video generation require the PC.',
+            'remote':True,'reachable':False,'checked':None,'prepared':False,'ownership':'none','active_jobs':0}
+        status['cached']=not force
+        status['stale']=not status['checked'] or time.time()-status['checked']>30
+        return status
     def prepare(self):return self.engine.remote.post('/v1/actions/prepare',{})
     def release(self):return self.engine.remote.post('/v1/actions/release',{})
     def stop_services(self):return self.engine.remote.post('/v1/actions/stop',{})
@@ -59,7 +75,7 @@ class RemoteEngine(Engine):
                     job.update(status='queued',stage='Reconnecting to saved PC job')
             store.save()
     def health(self,force=False):
-        s=self.services.snapshot();return {'connected':s.get('prepared',False),'running':s.get('active_jobs',0),'pending':0,'device':'Windows PC worker','checked':time.time(),'remote':True}
+        s=self.services.snapshot(force=force);return {'connected':bool(s.get('prepared') and not s['stale']),'running':s.get('active_jobs',0),'pending':0,'device':'Windows PC worker','checked':s['checked'],'cached':s['cached'],'stale':s['stale'],'remote':True}
     def get(self,route,timeout=20):
         if route=='/object_info':return self.remote.get('/v1/nodes')
         raise ValueError('This local renderer operation is unavailable in remote mode.')

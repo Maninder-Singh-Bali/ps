@@ -80,19 +80,26 @@ def prepare(plan, room, folder):
     for kind,rows in [('surface',design['surfaces']),('item',design['items'])]:
         for row in rows:
             for role,r in [('product',row.get('reference',{})),('finish',row.get('finish',{}).get('reference',{}))]:
-                if not r.get('image'):continue
-                raw=base64.b64decode(r['image'].split(',',1)[1],validate=True);sha=hashlib.sha256(raw).hexdigest()
-                ext={'png':'png','jpeg':'jpg','webp':'webp'}[r['image'].split(';')[0].split('/')[1]]
+                if not r.get('image') and not r.get('asset'):continue
+                asset=r.get('asset');preview_only=not bool(asset)
+                if asset:
+                    source=plan.get('surface_reference_files',{}).get(asset['sha256'])
+                    if not source:raise ValueError('Original surface reference is unavailable; reattach it. Thumbnail substitution is not allowed.')
+                    raw=Path(source).read_bytes();sha=hashlib.sha256(raw).hexdigest();ext=asset['file'].rsplit('.',1)[1]
+                    if sha!=asset['sha256'] or len(raw)!=asset['bytes']:raise ValueError('Original surface reference failed its hash/size check.')
+                else:
+                    raw=base64.b64decode(r['image'].split(',',1)[1],validate=True);sha=hashlib.sha256(raw).hexdigest()
+                    ext={'png':'png','jpeg':'jpg','webp':'webp'}[r['image'].split(';')[0].split('/')[1]]
                 path=folder/('surface-reference-'+sha+'.'+ext)
                 path.write_bytes(raw)
                 refs.append({'id':f'design:{kind}:{row["id"]}:{role}','path':str(path),'sha256':sha,
                     'category':row.get('kind','surface')+' '+role,'design_target':f'{kind}:{row["id"]}',
                     'placement':f'Only {role} for {kind} {row["id"]}; use its saved surface placement and dimensions.',
-                    'reference':compact(r),'preview_only':True})
+                    'reference':compact(r),'preview_only':preview_only,'input_role':'legacy embedded preview' if preview_only else 'original uploaded reference','conditioning_derivative':None})
     info={'version':1,'floor':room['floor'],'design':identity(plan,room['floor']),
           'references':[{k:v for k,v in r.items() if k!='path'}|{'file':Path(r['path']).name} for r in refs],
           'units':'item placement and dimensions in metres; boundaries in original source pixels',
-          'scope':'Saved design intent and preview references; not measured product fidelity. Links are metadata, not downloaded product images.',
+          'scope':'Saved design intent and hash-verified original references where available; legacy previews explicitly identified. Not measured product fidelity. Links are metadata, not downloaded product images.',
           'visibility':'All physical items included, independent of editor visibility/cutaway.'}
     (folder/'surface-design-inputs.json').write_text(json.dumps(info,indent=2))
     return info,refs

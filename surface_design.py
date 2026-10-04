@@ -26,6 +26,8 @@ def reference(r):
     for key in ('product_url',):
         u=r.get(key,'')
         if not isinstance(u,str) or len(u)>2048 or u and not re.match(r'^https?://[^\s]+$',u):raise ValueError('Use an http(s) product link.')
+    a=r.get('asset')
+    if a and (not isinstance(a,dict) or not re.fullmatch(r'[0-9a-f]{64}',a.get('sha256','')) or not re.fullmatch(a['sha256']+r'\.(png|jpg|webp)',a.get('file',''))):raise ValueError('Invalid original reference identity')
     image_data(r.get('image'))
     if r.get('dimension_status','assumed') not in ('assumed','extracted','verified'):raise ValueError('Invalid dimension status')
 

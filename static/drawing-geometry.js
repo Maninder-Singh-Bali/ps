@@ -26,6 +26,11 @@
   if(f.points[1].some((v,i)=>!Number.isFinite(v)||v<0||v>[width,height][i]))throw Error('The resized wall would extend outside the plan.');
   return f;
  }
+ // Shared Plan/Furnish pinch response; ordinary wheel zoom keeps its own policy.
+ function pinchZoom(view,anchor,delta,planWidth){
+  const width=Math.max(planWidth*.02,Math.min(planWidth*8,view[2]*Math.exp(delta*.01))),ratio=width/view[2];
+  return [anchor[0]+(view[0]-anchor[0])*ratio,anchor[1]+(view[1]-anchor[1])*ratio,width,view[3]*ratio];
+ }
  function zoom(view,anchor,delta,planWidth){
   const width=Math.min(planWidth*8,Math.max(planWidth/100,view[2]*Math.exp(Math.max(-500,Math.min(500,delta))*.0015))),ratio=width/view[2];
   return [anchor[0]-(anchor[0]-view[0])*ratio,anchor[1]-(anchor[1]-view[1])*ratio,width,view[3]*ratio];
@@ -94,6 +99,6 @@
   if((1-hi)*L>=.2)out.push({...clone(wall),id:id(),points:[at(hi),clone(b)]});
   return out;
  }
- const api={project,insert,resize,zoom,split,dragEndpoint,resizeOutline,snapPoint,snapSegment,snapBounds,cutOpening};
+ const api={project,insert,resize,zoom,pinchZoom,split,dragEndpoint,resizeOutline,snapPoint,snapSegment,snapBounds,cutOpening};
  if(typeof module!=='undefined')module.exports=api;else window.DrawingGeometry=api;
 })();

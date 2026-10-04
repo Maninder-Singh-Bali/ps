@@ -109,7 +109,18 @@ def door(node,edit):
 
 def hosted_features(features):
     """Resolve attached openings from host coordinates without changing saved evidence."""
-    rows=copy.deepcopy(features);walls={f['id']:f for f in rows if f['kind']=='wall'}
+    rows=copy.deepcopy(features)
+    used={f['id'] for f in rows if f.get('id')}
+    if len(used)!=sum(bool(f.get('id')) for f in rows):
+        raise ValueError('Repeated drawing element IDs. Give each wall/opening a unique ID before resolving attachments.')
+    for i,f in enumerate(rows):
+        if f.get('id'):continue
+        candidate=f.get('source_id') or f'typed:{i}'
+        if candidate in used:candidate=f'typed:{i}'
+        suffix=0;root=candidate
+        while candidate in used:suffix+=1;candidate=f'{root}:{suffix}'
+        f['id']=candidate;used.add(candidate)
+    walls={f['id']:f for f in rows if f['kind']=='wall'}
     for f in rows:
         if not f.get('host_wall_id'):continue
         wall=walls.get(f['host_wall_id'])

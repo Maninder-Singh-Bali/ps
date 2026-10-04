@@ -5,14 +5,23 @@ No engine, queue or apply route. Files are atomic and optimistic revision checke
 import copy, hashlib, io, json, math, os, re, threading, uuid
 from pathlib import Path
 from datetime import datetime, timezone
+from contextvars import ContextVar
+from contextlib import contextmanager
 from PIL import Image, ImageOps
 
 ROOT=Path(__file__).resolve().parent.parent/'working-drafts'
+_workspace_root=ContextVar('draft_workspace_root',default=None)
+@contextmanager
+def use_root(root):
+    token=_workspace_root.set(Path(root).resolve())
+    try:yield
+    finally:_workspace_root.reset(token)
+def workspace_root():return _workspace_root.get() or ROOT
 LOCK=threading.RLock()
 def stamp():return datetime.now(timezone.utc).isoformat()
 def folder(key):
     if not re.fullmatch(r'[a-zA-Z0-9_-]{1,64}',key):raise ValueError('Invalid draft identity.')
-    return ROOT/key
+    return workspace_root()/key
 
 def atomic(path,data):
     path.parent.mkdir(parents=True,exist_ok=True);tmp=path.with_suffix('.tmp')
@@ -21,7 +30,7 @@ def atomic(path,data):
 
 def get(key):return json.loads((folder(key)/'draft.json').read_text())
 def listing():
-    return [{'id':d['id'],'name':d['name'],'revision':d['revision'],'updated':d.get('updated'),'count':len(d['features'])} for p in sorted(ROOT.glob('*/draft.json')) for d in [json.loads(p.read_text())]]
+    return [{'id':d['id'],'name':d['name'],'revision':d['revision'],'updated':d.get('updated'),'count':len(d['features'])} for p in sorted(workspace_root().glob('*/draft.json')) for d in [json.loads(p.read_text())]]
 def number(v,lo,hi,label):
     if type(v) not in (int,float) or not math.isfinite(v) or not lo<=v<=hi:raise ValueError('Invalid '+label)
     return float(v)
@@ -76,7 +85,7 @@ def save(key,data):
     with LOCK:
         base=get(key)
         if data.get('revision')!=base['revision']:raise ValueError('This draft changed in another window. Reopen before saving; your changes were not written.')
-        d=validate(data,base);d['revision']+=1;d['updated']=stamp();atomic(folder(key)/'draft.json',d);return d
+        d=validate(data,base);reference_files(d);d['revision']+=1;d['updated']=stamp();atomic(folder(key)/'draft.json',d);return d
 
 def upload(raw,name):
     if not raw or len(raw)>32*1024*1024:raise ValueError('Choose a PDF or image up to 32 MB.')
@@ -118,6 +127,7 @@ def scene_store(data, camera=None):
     pad=max(10,max(xx-x,yy-y)*.03);bounds=[(x-pad)/d['width'],(y-pad)/d['height'],(xx-x+pad*2)/d['width'],(yy-y+pad*2)/d['height']]
     room={'id':'preview','plan_id':d['id'],'name':'Correction draft','floor':'Draft','bbox':bounds,'block_layout':{'items':[]}}
     plan={'draft_only':True,'id':d['id'],'project_id':'draft','width':d['width'],'height':d['height'],'drawing':{'features':d['features'],'site':{'model':{'metres_per_pixel':d['calibration']['metres_per_pixel'],'scale_source':'User drawing calibration; not surveyed','wall_heights':{'Draft':d['wall_height_m']}}}}}
+    plan['surface_reference_files']=reference_files(d)
     project={'id':'draft','rooms':[room],'measurements':[]}
     class Snapshot:
         db={'assets':{d['id']:plan}}
@@ -140,3 +150,33 @@ def footprint(data):
     d=validate(data,data)
     import wall_junctions
     return wall_junctions.resolve(d['features'],d['wall_height_m'])
+
+def upload_reference(key,raw,name):
+    """Keep original bytes outside JSON; the embedded derivative is display-only."""
+    root=folder(key)
+    if not (root/'draft.json').exists():raise ValueError('Save/import this draft before adding a reference.')
+    if not raw or len(raw)>32*1024*1024:raise ValueError('Choose a reference up to 32 MB.')
+    with Image.open(io.BytesIO(raw)) as im:
+        ext={'PNG':'png','JPEG':'jpg','WEBP':'webp'}.get(im.format)
+        if not ext or im.width*im.height>64_000_000:raise ValueError('Choose PNG, JPEG or WebP up to 64 megapixels.')
+        width,height=im.size;im.load();thumb=ImageOps.exif_transpose(im).convert('RGB');display_width,display_height=thumb.size;thumb.thumbnail((512,512));buf=io.BytesIO();thumb.save(buf,'JPEG',quality=85);preview=buf.getvalue()
+    sha=hashlib.sha256(raw).hexdigest();target=root/'references'/(sha+'.'+ext);target.parent.mkdir(parents=True,exist_ok=True)
+    with LOCK:
+        if target.exists() and hashlib.sha256(target.read_bytes()).hexdigest()!=sha:raise ValueError('Reference file failed its hash check.')
+        if not target.exists():
+            tmp=target.with_suffix('.tmp');tmp.write_bytes(raw);tmp.replace(target)
+    import base64
+    return {'asset':{'sha256':sha,'bytes':len(raw),'file':target.name,'width':width,'height':height,'source_name':Path(name).name},'image':'data:image/jpeg;base64,'+base64.b64encode(preview).decode(),'image_width':display_width,'image_height':display_height,'preview_only':True,'thumbnail':{'sha256':hashlib.sha256(preview).hexdigest(),'width':thumb.width,'height':thumb.height,'format':'JPEG','quality':85,'purpose':'UI/guide preview; generation uses original asset'}}
+
+def reference_files(d,existing=None):
+    files={};design=d.get('surface_design') or {}
+    for row in design.get('surfaces',[])+design.get('items',[]):
+        for r in (row.get('reference',{}),row.get('finish',{}).get('reference',{})):
+            a=r.get('asset')
+            if not a:continue
+            if not re.fullmatch(r'[0-9a-f]{64}\.(png|jpg|webp)',a.get('file','')) or not a['file'].startswith(a.get('sha256','')+'.'):raise ValueError('Invalid reference asset identity.')
+            path=folder(d['id'])/'references'/a['file']
+            if not path.exists() and existing and a['sha256'] in existing:path=Path(existing[a['sha256']])
+            if not path.is_file() or path.is_symlink() or hashlib.sha256(path.read_bytes()).hexdigest()!=a['sha256']:raise ValueError('Original reference is missing or changed. Reattach the original file before saving or preparing generation.')
+            files[a['sha256']]=str(path.resolve())
+    return files

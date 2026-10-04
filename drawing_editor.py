@@ -69,7 +69,7 @@ def get_document(st,pid,aid):
     from raster_reconstruction import elements as raster_elements
     elements.extend(raster_elements(a))
     elements=combine_wall_edges(elements,saved.get('edits',{}),a['width'],a['height'])
-    return {'review':copy.deepcopy(a.get('structure_review')), 'revision':saved.get('revision',0),'base_asset_id':base,'elements':elements,'edits':copy.deepcopy(saved.get('edits',{})),'features':copy.deepcopy(saved.get('features',[])),'site':copy.deepcopy(saved.get('site',{})),'width':a['width'],'height':a['height'],'map_revision':p['map_revision']}
+    return {'manual_draft_id':a.get('manual_draft_id'), 'review':copy.deepcopy(a.get('structure_review')), 'revision':saved.get('revision',0),'base_asset_id':base,'elements':elements,'edits':copy.deepcopy(saved.get('edits',{})),'features':copy.deepcopy(saved.get('features',[])),'site':copy.deepcopy(saved.get('site',{})),'width':a['width'],'height':a['height'],'map_revision':p['map_revision']}
 
 def clean_changes(doc,data):
     edits=data.get('edits',{});features=data.get('features',[])
@@ -148,6 +148,12 @@ def save_document(st,pid,aid,data):
     p=st.project(pid);doc=get_document(st,pid,aid);a=st.asset(aid)
     if editing_busy(st,pid):raise ValueError('Finish the active generation before changing this drawing.')
     if data.get('revision')!=doc['revision'] or data.get('map_revision')!=p['map_revision']:raise ValueError('The drawing changed. Reopen it before saving.')
+    if a.get('manual_document'):
+        # Canonical manual geometry includes junctions, opening hosts and surfaces.
+        # The older SVG editor cannot round-trip these records losslessly.
+        if any(data.get(k,{ } if k!='features' else [])!=doc[k] for k in ('edits','features','site')):
+            raise ValueError('Edit architecture, scale and wall heights in the linked floor plan editor. Furniture and cameras remain editable here.')
+        return {'ok':True,'revision':doc['revision']}
     edits,features=clean_changes(doc,data);site=clean_site(data.get('site',{}))
     geometry=edits!=doc['edits'] or features!=doc['features'];site_changed=site!=doc['site']
     if not geometry and not site_changed:return {'ok':True,'revision':doc['revision']}

@@ -24,10 +24,15 @@ def export_project(database,pid,destination):
         files[key]=raw;mapping[str(path)]=key;return key
     for a in payload['assets'].values():
         if not include(a['path']):raise ValueError('Missing registered asset: '+a['id'])
+        for path in a.get('surface_reference_files',{}).values():
+            if not include(path):raise ValueError('Missing original surface reference.')
+        for path in a.get('manual_source_files',{}).values():
+            if not include(path):raise ValueError('Missing manual plan source.')
     def rewrite(value,key=''):
         if isinstance(value,dict):
             return {k:rewrite(v,k) for k,v in value.items() if k not in ('storage_path','work_dir','remote_job_id','remote_result')}
         if isinstance(value,list):return [rewrite(v,key) for v in value]
+        if isinstance(value,str) and re.fullmatch(r'/api/plan-drafts/[a-zA-Z0-9_-]+/files/[a-zA-Z0-9_.-]+',value):return value
         if isinstance(value,str) and (re.match(r'^[A-Za-z]:[\\/]',value) or value.startswith('/')):
             if value in mapping:return {'$file':mapping[value]}
             # Original plans, saved overlays and source evidence linked by metadata.

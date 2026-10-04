@@ -29,18 +29,54 @@ function trace(a,b,t,face){const L=dist(a,b);if(L<.001)return [a,b];const sign=f
 function junctions(fs){const out=copy(fs);for(const w of out.filter(f=>f.kind==='wall'))w.junction_ids=w.points.map((p,i)=>w.junction_ids?.[i]||'j:legacy:'+p.map(v=>v.toFixed(6)).join(':'));return out;}
 function members(fs,id,index){const rows=junctions(fs),w=rows.find(w=>w.id===id),key=anchors(w).find(a=>a.index===index)?.id;return rows.filter(w=>w.kind==='wall').flatMap(w=>anchors(w).flatMap(a=>a.id===key?[{id:w.id,index:a.index,point:a.point}]:[]));}
 function junctionTarget(p,fs,tolerance,exclude=[],enabled=true){if(!enabled)return null;const omitted=new Set(exclude.map(e=>e.id+':'+e.index)),walls=fs.filter(f=>f.kind==='wall');let best=null;
- for(const w of walls)for(let i=0;i<2;i++){if(omitted.has(w.id+':'+i))continue;const distance=dist(p,w.points[i]);if(distance<=tolerance&&(!best||distance<best.distance))best={wall:w.id,index:i,point:[...w.points[i]],distance};}
+ for(const w of walls)for(const a of anchors(w)){if(omitted.has(w.id+':'+a.index))continue;const distance=dist(p,a.point);if(distance<=tolerance&&(!best||distance<best.distance))best={wall:w.id,index:a.index,point:[...a.point],distance};}
  if(best)return best;
  for(const w of walls){if(exclude.some(e=>e.id===w.id))continue;const q=project(p,w);if(q.t>.01&&q.t<q.length-.01&&q.distance<=tolerance&&(!best||q.distance<best.distance))best={wall:w.id,t:q.t,point:q.point,distance:q.distance};}return best;
 }
 function checkJunctionChange(before,after){for(const w of after.filter(f=>f.kind==='wall'))if(dist(...w.points)<.01)throw Error('This would collapse a wall. Choose another junction.');for(const o of after.filter(f=>f.host_wall_id)){const prior=before.find(f=>f.id===o.id);let wasValid=true;try{if(prior)checkOpening(before,prior);}catch(_){wasValid=false;}if(wasValid)checkOpening(after,o);}return after;}
-function detachEndpoint(fs,id,index,newId){const out=junctions(fs),w=out.find(w=>w.id===id);w.junction_ids[index]='j:detached:'+newId;return out;}
-function connectEndpoint(fs,id,index,target,newId){let out=junctions(fs),w=out.find(w=>w.id===id);const sourceKey=anchors(w).find(a=>a.index===index).id;out=materialize(out,new Set([sourceKey]));w=out.find(w=>w.kind==='wall'&&w.junction_ids.includes(sourceKey));index=w.junction_ids.indexOf(sourceKey);if(!target)return out;const own=w.junction_ids[index];let host=out.find(w=>w.id===target.wall);if(!host)throw Error('Junction target is missing.');let ti=target.index>1?undefined:target.index;
+function detachEndpoint(fs,id,index,newId){let out=junctions(fs);const w=out.find(w=>w.id===id),key=anchors(w).find(a=>a.index===index)?.id;if(index<2){w.junction_ids[index]='j:detached:'+newId;return out;}const root=w.split_root||w.id;out=materialize(out,new Set([key]));for(const row of out.filter(row=>row.kind==='wall'&&(row.id===id||row.split_root===root)))row.junction_ids=row.junction_ids.map(k=>k===key?'j:detached:'+newId:k);return out;}
+// An explicit join between a retained branch and its wall end must not first
+// split off a zero-length tail. Keep the host ID and coalesce the chosen anchors.
+function joinBranchEnd(fs,id,index,target){
+ if(!target)return null;
+ const out=junctions(fs),source=out.find(w=>w.id===id),a=anchors(source).find(a=>a.index===index),host=out.find(w=>w.id===target.wall);
+ if(!a||!host)return null;
+ const b=anchors(host).find(b=>target.index!==undefined?b.index===target.index:dist(b.point,target.point)<1e-6);
+ if(!b)return null;if(a.id===b.id)return out;
+ const carriers=out.filter(w=>w.kind==='wall'&&((w.junction_ids.includes(a.id)&&(w.junction_nodes||[]).some(n=>n.id===b.id))||(w.junction_ids.includes(b.id)&&(w.junction_nodes||[]).some(n=>n.id===a.id))));
+ if(!carriers.length)return null;
+ if(out.some(w=>w.fillet&&anchors(w).some(n=>n.id===a.id)))throw Error('Undo the rounded corner before joining this junction.');
+ for(const w of out.filter(w=>w.kind==='wall')){
+  w.points=w.points.map((p,i)=>{if(w.junction_ids[i]!==a.id)return p;w.junction_ids[i]=b.id;return [...b.point];});
+  if(w.junction_nodes)w.junction_nodes=w.junction_nodes.map(n=>n.id===a.id?{id:b.id,point:[...b.point]}:n).filter(n=>!w.points.some((p,i)=>w.junction_ids[i]===n.id&&dist(p,n.point)<1e-6));
+  if((w.junction_nodes||[]).some(n=>{const q=project(n.point,w);return q.distance>1e-6||q.t<=0||q.t>=q.length;}))throw Error('This join would remove or displace another branch. Join the adjacent corner instead.');
+ }
+ // Trimming the A end must not slide existing openings along the carrier.
+ for(const w of carriers)for(const o of out.filter(o=>o.host_wall_id===w.id)){
+  const old=fs.find(f=>f.id===o.id),original=fs.find(f=>f.id===w.id),L=dist(...original.points),p=original.points[0].map((v,i)=>v+(original.points[1][i]-v)*old.offset/L);
+  o.offset=project(p,w).t;
+ }
+ return checkJunctionChange(fs,hosted(out));
+}
+function connectSingleEndpoint(fs,id,index,target,newId){const joined=joinBranchEnd(fs,id,index,target);if(joined)return joined;let out=junctions(fs),w=out.find(w=>w.id===id);const sourceKey=anchors(w).find(a=>a.index===index).id;out=materialize(out,new Set([sourceKey]));w=out.find(w=>w.kind==='wall'&&w.junction_ids.includes(sourceKey));index=w.junction_ids.indexOf(sourceKey);if(!target)return out;const own=w.junction_ids[index];let host=out.find(w=>w.id===target.wall);if(!host)throw Error('Junction target is missing.');let ti=target.index>1?undefined:target.index;
  if(ti===undefined){const root=host.split_root||host.id;host=out.filter(f=>f.kind==='wall'&&(f.id===root||f.split_root===root)).find(f=>project(target.point,f).distance<1e-6);if(!host)throw Error('Junction target changed. Select it again.');const q=project(target.point,host);if(q.t<.01)ti=0;else if(q.t>q.length-.01)ti=1;else{out=split(out,host.id,q.t,newId);host=out.find(f=>f.id===host.id);ti=1;}}
  const key=host.junction_ids[ti],point=host.points[ti];if(own===key)return out;
  for(const row of out.filter(f=>f.kind==='wall'))row.points=row.points.map((p,i)=>{if(row.junction_ids[i]!==own)return p;row.junction_ids[i]=key;return [...point];});return checkJunctionChange(fs,hosted(out));
 }
-function moveEndpoint(fs,id,index,p){const base=junctions(fs),original=base.find(f=>f.id===id);if(original.kind!=='wall'){original.points[index]=[...p];return base;}const key=anchors(original).find(a=>a.index===index)?.id,out=materialize(base,new Set([key]));for(const f of out.filter(f=>f.kind==='wall'))f.points=f.points.map((q,i)=>f.junction_ids[i]===key?[...p]:q);return checkJunctionChange(fs,hosted(out));}
+// One atomic contact operation for drawing, explicit joins and drag previews.
+// Coincident contact anchors join together; nearby points and explicitly detached
+// neighbours are never swept in merely because their wall footprints overlap.
+function connectEndpoint(fs,id,index,target,newId){
+ let out=connectSingleEndpoint(fs,id,index,target,newId);if(!target)return out;
+ const contact=()=>out.filter(w=>w.kind==='wall').flatMap(w=>anchors(w).filter(a=>dist(a.point,target.point)<1e-6).map(a=>({wall:w.id,...a}))).find(a=>a.wall===id)||out.filter(w=>w.kind==='wall').flatMap(w=>anchors(w).filter(a=>dist(a.point,target.point)<1e-6).map(a=>({wall:w.id,...a})))[0];
+ for(const [i,other] of (target.others||[]).entries()){const a=contact();if(!a)throw Error('Junction changed. Select its corner again.');out=connectSingleEndpoint(out,a.wall,a.index,other,newId+':contact:'+i);}
+ const a=contact();if(!a)return out;
+ const keys=new Set(out.filter(w=>w.kind==='wall').flatMap(w=>anchors(w)).filter(b=>dist(b.point,a.point)<1e-6&&!b.id.startsWith('j:detached:')).map(b=>b.id));
+ keys.add(a.id);
+ for(const w of out.filter(w=>w.kind==='wall')){w.junction_ids=w.junction_ids.map(k=>keys.has(k)?a.id:k);if(w.junction_nodes)w.junction_nodes=w.junction_nodes.map(n=>keys.has(n.id)?{...n,id:a.id}:n).filter(n=>!w.junction_ids.includes(n.id));}
+ return checkJunctionChange(fs,out);
+}
+function moveEndpoint(fs,id,index,p){const base=junctions(fs),original=base.find(f=>f.id===id);if(original.kind!=='wall'){original.points[index]=[...p];return base;}const key=anchors(original).find(a=>a.index===index)?.id;if(base.some(w=>w.fillet&&anchors(w).some(a=>a.id===key)))throw Error('A rounded corner cannot be stretched. Undo the fillet to change its radius or tangency.');const out=materialize(base,new Set([key]));for(const f of out.filter(f=>f.kind==='wall'))f.points=f.points.map((q,i)=>f.junction_ids[i]===key?[...p]:q);return checkJunctionChange(fs,hosted(out));}
 function split(fs,id,t,newId){const out=junctions(fs),w=out.find(f=>f.id===id),L=dist(...w.points);if(t<=.01||t>=L-.01)throw Error('Choose a point inside the wall.');const attached=out.filter(f=>f.host_wall_id===id);if(attached.some(f=>f.offset<t&&f.offset+f.width>t))throw Error('Cannot form a junction through an attached opening.');
  for(const o of out.filter(f=>!f.host_wall_id&&['door','window','sliding_door'].includes(f.kind))){const ps=o.points.map(p=>project(p,w));if(ps.every(p=>p.distance<=Math.max(w.thickness,o.thickness||0)/2+.001)&&Math.min(...ps.map(p=>p.t))<t&&Math.max(...ps.map(p=>p.t))>t)throw Error('Cannot form a junction through a source opening.');}
  const [a,b]=w.points,q=a.map((v,i)=>v+(b[i]-v)*t/L),key=w.junction_nodes?.find(n=>dist(n.point,q)<1e-6)?.id||'j:split:'+newId,root=w.split_root||w.id,next={...copy(w),id:newId,points:[q,b],junction_ids:[key,w.junction_ids[1]],split_root:root};next.junction_nodes=(w.junction_nodes||[]).filter(n=>project(n.point,w).t>t+1e-6);w.junction_nodes=(w.junction_nodes||[]).filter(n=>project(n.point,w).t<t-1e-6);w.points=[a,q];w.junction_ids[1]=key;w.split_root=root;out.push(next);for(const f of attached)if(f.offset>=t){f.host_wall_id=newId;f.offset-=t;}return hosted(out);}
@@ -77,7 +113,7 @@ function mergeWalls(fs,ids,newId,defaultHeight=2.5){
  out=out.filter(f=>!set.has(f.id));out.push(merged);out=hosted(out);for(const o of out.filter(f=>f.host_wall_id===merged.id))checkOpening(out,o);
  return {features:out,ids:[merged.id],kind:'wall',message:'Merged into one wall. Openings and branch junctions retained.'};
 }
-function moveWalls(fs,ids,delta){const base=junctions(fs),keys=new Set(base.filter(w=>ids.includes(w.id)).flatMap(w=>anchors(w).map(a=>a.id))),out=materialize(base,keys);for(const w of out.filter(w=>w.kind==='wall'))w.points=w.points.map((p,i)=>keys.has(w.junction_ids[i])?p.map((v,j)=>v+delta[j]):p);return checkJunctionChange(fs,hosted(out));}
+function moveWalls(fs,ids,delta){if(fs.some(w=>w.fillet&&members(fs,w.id,0).concat(members(fs,w.id,1)).some(m=>ids.includes(m.id))))throw Error('Move the complete merged rounded chain, or undo its fillet before stretching walls.');const base=junctions(fs),keys=new Set(base.filter(w=>ids.includes(w.id)).flatMap(w=>anchors(w).map(a=>a.id))),out=materialize(base,keys);for(const w of out.filter(w=>w.kind==='wall'))w.points=w.points.map((p,i)=>keys.has(w.junction_ids[i])?p.map((v,j)=>v+delta[j]):p);return checkJunctionChange(fs,hosted(out));}
 function boxSelect(fs,a,b){const lo=a.map((v,i)=>Math.min(v,b[i])),hi=a.map((v,i)=>Math.max(v,b[i]));return fs.filter(w=>w.kind==='wall'&&w.points.every(p=>p.every((v,i)=>v>=lo[i]&&v<=hi[i]))).map(w=>w.id);}
 function crossing(a,b){const p=a.points[0],q=b.points[0],u=a.points[1].map((v,i)=>v-p[i]),v=b.points[1].map((x,i)=>x-q[i]),den=u[0]*v[1]-u[1]*v[0];if(Math.abs(den)<1e-9)return null;const d=q.map((x,i)=>x-p[i]),t=(d[0]*v[1]-d[1]*v[0])/den,s=(d[0]*u[1]-d[1]*u[0])/den;return t>=0&&t<=1&&s>=0&&s<=1?p.map((x,i)=>x+t*u[i]):null;}
 // All tolerances are supplied by the view in source pixels per screen pixel.
@@ -150,7 +186,29 @@ function mergeChain(fs,ids,newId){
 function unmergeChain(fs,chain){const out=copy(fs);for(const w of out)if(w.wall_chain_id===chain)delete w.wall_chain_id;return out;}
 function externalConnections(fs,ids){const rows=junctions(fs),selected=new Set(ids),keys=new Set(rows.filter(w=>selected.has(w.id)).flatMap(w=>anchors(w).map(a=>a.id)));return rows.filter(w=>w.kind==='wall'&&!selected.has(w.id)).flatMap(w=>anchors(w).filter(a=>keys.has(a.id)).map(a=>({wall:w.id,junction:a.id,point:a.point})));}
 function detachOutside(fs,ids,newId){const out=junctions(fs),keys=new Set(externalConnections(out,ids).map(c=>c.junction)),map=new Map([...keys].map((k,i)=>[k,'j:object:'+newId+':'+i]));for(const w of out.filter(w=>ids.includes(w.id))){w.junction_ids=w.junction_ids.map(k=>map.get(k)||k);for(const a of w.junction_nodes||[])a.id=map.get(a.id)||a.id;}return out;}
-function moveObject(fs,ids,delta){const selected=new Set(expandChains(fs,ids));if(externalConnections(fs,[...selected]).length)throw Error('Move blocked: this object is connected to outside walls. Detach outside connections or cancel; no walls have moved.');const out=copy(fs);for(const w of out.filter(w=>w.kind==='wall'&&selected.has(w.id))){w.points=w.points.map(p=>p.map((v,i)=>v+delta[i]));for(const a of w.junction_nodes||[])a.point=a.point.map((v,i)=>v+delta[i]);}return checkJunctionChange(fs,hosted(out));}
+function moveObject(fs,ids,delta){const selected=new Set(expandChains(fs,ids));if(externalConnections(fs,[...selected]).length)throw Error('Move blocked: this object is connected to outside walls. Detach outside connections or cancel; no walls have moved.');const out=copy(fs);for(const w of out.filter(w=>w.kind==='wall'&&selected.has(w.id))){w.points=w.points.map(p=>p.map((v,i)=>v+delta[i]));if(w.fillet)w.fillet.centre=w.fillet.centre.map((v,i)=>v+delta[i]);for(const a of w.junction_nodes||[])a.point=a.point.map((v,i)=>v+delta[i]);}return checkJunctionChange(fs,hosted(out));}
 
-const api={chainMembers,expandChains,mergeChain,unmergeChain,externalConnections,detachOutside,moveObject,anchors,materialize,mergeWalls,moveWalls,boxSelect,smartSnap,snapOpening,junctions,members,junctionTarget,connectEndpoint,detachEndpoint,copy,dist,hosted,project,checkOpening,openingRange,slideOpening,snap,trace,moveEndpoint,split,issues,rooms,parseLength};if(typeof module!=='undefined')module.exports=api;else window.TraceGeometry=api;
+// Bounded right-angle fillet, centreline radius. Arc is resolved into <=5 degree
+// chords shared by plan and mesh builders; metadata records approximation.
+function fillet(fs,id,index,radius,newId,defaultHeight=2.5){
+ const out=junctions(fs),group=members(out,id,index);if(group.length!==2||group.some(m=>m.index>1))throw Error('Fillet requires exactly two endpoint-connected walls; T/cross junctions are unsupported.');
+ const first=out.find(w=>w.id===id),other=group.find(m=>m.id!==id);if(!other)throw Error('Choose a simple L corner.');const second=out.find(w=>w.id===other.id),j=other.index,corner=first.points[index];
+ if(dist(corner,second.points[j])>1e-6)throw Error('Join the endpoints before adding a fillet.');
+ for(const k of new Set([...Object.keys(first),...Object.keys(second)])){if(['id','points','junction_ids','junction_nodes','split_root','wall_chain_id','review_note','evidence','source_id','source','provenance','confidence','dimension_provenance'].includes(k))continue;if(JSON.stringify(first[k]??(k==='height_m'?defaultHeight:null))!==JSON.stringify(second[k]??(k==='height_m'?defaultHeight:null)))throw Error('Fillet requires matching '+k+'; no properties were discarded.');}
+ if(first.fillet||second.fillet)throw Error('Undo this fillet before changing its radius.');
+ const lengths=[dist(...first.points),dist(...second.points)],u=first.points[1-index].map((v,i)=>(v-corner[i])/lengths[0]),v=second.points[1-j].map((q,i)=>(q-corner[i])/lengths[1]);
+ if(Math.abs(u[0]*v[0]+u[1]*v[1])>1e-6)throw Error('Initial fillet supports right-angle L corners only.');
+ if(!Number.isFinite(radius)||radius<=first.thickness/2||radius>=Math.min(...lengths)/2)throw Error('Centreline radius must exceed half the thickness and be less than half the shorter wall.');
+ const affected=[first,second];for(let n=0;n<2;n++){const w=affected[n],end=n?j:index;
+ if((w.junction_nodes||[]).length)throw Error('Fillet cannot alter a wall with intermediate branch junctions.');
+ for(const o of out.filter(o=>['door','window','sliding_door'].includes(o.kind))){const ps=o.points.map(p=>project(p,w));if(o.host_wall_id===w.id||(!o.host_wall_id&&ps.every(p=>p.distance<=w.thickness/2))){const lo=o.host_wall_id===w.id?o.offset:Math.min(...ps.map(p=>p.t)),hi=o.host_wall_id===w.id?o.offset+o.width:Math.max(...ps.map(p=>p.t));if(end===0?lo<radius+1e-6:hi>lengths[n]-radius-1e-6)throw Error('Radius would intersect an opening. Choose a smaller radius.');}}
+ }
+ const centre=corner.map((q,i)=>q+radius*(u[i]+v[i])),a=corner.map((q,i)=>q+radius*u[i]),b=corner.map((q,i)=>q+radius*v[i]),angle=Math.atan2(a[1]-centre[1],a[0]-centre[0]);let sweep=Math.atan2(b[1]-centre[1],b[0]-centre[0])-angle;while(sweep>Math.PI)sweep-=2*Math.PI;while(sweep<-Math.PI)sweep+=2*Math.PI;
+ const steps=18,ps=Array.from({length:steps+1},(_,n)=>[centre[0]+radius*Math.cos(angle+sweep*n/steps),centre[1]+radius*Math.sin(angle+sweep*n/steps)]);ps[0]=a;ps[steps]=b;
+ first.points[index]=a;second.points[j]=b;first.junction_ids[index]='j:'+newId+':0';second.junction_ids[j]='j:'+newId+':'+steps;
+ for(const [w,end] of [[first,index],[second,j]])if(end===0)for(const o of out.filter(o=>o.host_wall_id===w.id))o.offset-=radius;
+ for(let n=0;n<steps;n++){const arc={...copy(first),id:newId+':'+n,points:[ps[n],ps[n+1]],junction_ids:['j:'+newId+':'+n,'j:'+newId+':'+(n+1)],fillet:{radius,convention:'centreline',centre,group:newId,chord_degrees:5,max_error:radius*(1-Math.cos(Math.PI/72))},review_note:[first.review_note,second.review_note].filter(Boolean).join(' | ')};delete arc.junction_nodes;delete arc.split_root;out.push(arc);}
+ return checkJunctionChange(fs,hosted(out));
+}
+const api={fillet,chainMembers,expandChains,mergeChain,unmergeChain,externalConnections,detachOutside,moveObject,anchors,materialize,mergeWalls,moveWalls,boxSelect,smartSnap,snapOpening,junctions,members,junctionTarget,connectEndpoint,detachEndpoint,copy,dist,hosted,project,checkOpening,openingRange,slideOpening,snap,trace,moveEndpoint,split,issues,rooms,parseLength};if(typeof module!=='undefined')module.exports=api;else window.TraceGeometry=api;
 })();

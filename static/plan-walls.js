@@ -15,7 +15,7 @@
   payload(){if(this.first)throw Error('Finish the wall or opening, or press Escape.');return {revision:this.doc.revision,map_revision:this.doc.map_revision,edits:this.doc.edits,features:this.doc.features,site:this.doc.site}}
   saved(doc){this.doc=doc;this.dirty=false;this.history=[];this.future=[];this.selected=null;this.first=null;this.tool='select'}
   clear(){this.selected=null;this.first=null;this.tool='select';this.guides=[];this.host=null}
-  toolbar(){return `<div class="inline-wall-tools" role="toolbar" aria-label="Plan editing tools">${[['select','Select / move'],['wall','Add wall'],['door','Add door'],['window','Add window'],['sliding_door','Add sliding door']].map(([key,label])=>`<button type="button" class="btn drawing-icon ${this.tool===key?'selected':''}" data-wall-tool="${key}" aria-label="${label}" title="${label}" aria-pressed="${this.tool===key}"><svg viewBox="0 0 24 24">${icons[key]}</svg></button>`).join('')}${button('Undo','undo')}${button('Redo','redo')}<label class="wall-snap-toggle"><input type="checkbox" id="wall-snapping" ${this.snapping?'checked':''}> Snap</label></div>`}
+  toolbar(){if(this.doc.manual_draft_id)return `<a class="btn small" href="/floor-plan.html#${encodeURIComponent(this.doc.manual_draft_id)}">Edit walls & openings</a>`;return `<div class="inline-wall-tools" role="toolbar" aria-label="Plan editing tools">${[['select','Select / move'],['wall','Add wall'],['door','Add door'],['window','Add window'],['sliding_door','Add sliding door']].map(([key,label])=>`<button type="button" class="btn drawing-icon ${this.tool===key?'selected':''}" data-wall-tool="${key}" aria-label="${label}" title="${label}" aria-pressed="${this.tool===key}"><svg viewBox="0 0 24 24">${icons[key]}</svg></button>`).join('')}${button('Undo','undo')}${button('Redo','redo')}<label class="wall-snap-toggle"><input type="checkbox" id="wall-snapping" ${this.snapping?'checked':''}> Snap</label></div>`}
   source(){return this.doc.features.find(f=>f.id===this.selected)||this.doc.elements.find(f=>f.id===this.selected)}
   element(){return this.hooks.svg()?.querySelector(`[data-plan-element="${this.selected}"]`)}
   geometry(key=this.selected){
@@ -84,6 +84,7 @@
    return `<div class="wall-properties"><strong>${names[source.kind]||'Outline'}</strong>${f?`<div class="block-fields"><label class="field"><span>Length (plan units)</span><input id="wall-length" type="number" min=".2" step=".1" value="${Math.hypot(f.points[1][0]-f.points[0][0],f.points[1][1]-f.points[0][1]).toFixed(2)}"></label><label class="field"><span>Thickness</span><input id="wall-thickness" type="number" min=".1" max="50" step=".1" value="${f.thickness.toFixed(2)}"></label></div>${button('Apply size','size')}`:''}<div class="block-toolbar">${source.kind==='wall'?button('Split wall','split')+button('Insert window','insert-window'):''}${source.kind==='door'?button('Flip swing','flip'):''}${button('Delete','remove')}</div></div>`;
   }
   decorate(){
+   if(this.doc.manual_draft_id)return;
    const svg=this.hooks.svg();if(!svg)return;
    svg.querySelectorAll('[data-plan-element]').forEach(el=>{
     if(!kinds.includes(el.dataset.planKind))return;
@@ -111,6 +112,7 @@
   point(e){const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(this.hooks.svg().getScreenCTM().inverse());return[Math.max(0,Math.min(this.doc.width,p.x)),Math.max(0,Math.min(this.doc.height,p.y))]}
   nearWall(p){const wall=this.geometry();if(wall?.kind!=='wall')throw Error('Select a straight wall first.');const q=DrawingGeometry.project(wall.points,p),scale=this.hooks.svg().getScreenCTM().a;if(Math.hypot(p[0]-q.point[0],p[1]-q.point[1])*scale>Math.max(12,wall.thickness*scale/2+5))throw Error('Click on the selected wall.');return {wall,point:q.point}}
   pointerDown(e){
+   if(this.doc.manual_draft_id)return false;
    if(e.button!==0)return false;
    const el=e.target.closest('[data-plan-element]'),handle=e.target.closest('[data-wall-handle]')?.dataset.wallHandle;let p=this.point(e);
    if(this.tool!=='select'){
@@ -151,6 +153,7 @@
   }
   pointerUp(e,cancel=false){if(!this.drag)return false;const drag=this.drag;if(cancel){Object.assign(this.doc,clone(drag.before));this.selected=drag.selected;if(drag.moved)this.history.pop()}else if(drag.moved){this.pointerMove(e);this.autoSplit()}this.drag=null;this.guides=[];this.host=null;const svg=this.hooks.svg();if(svg.hasPointerCapture(e.pointerId))svg.releasePointerCapture(e.pointerId);this.hooks.redraw();if(drag.moved&&!cancel)this.hooks.commit?.();return true}
   action(action){
+   if(this.doc.manual_draft_id)throw Error("Use Edit walls & openings for this linked plan.");
    if(action==='undo'||action==='redo'){const from=action==='undo'?this.history:this.future,to=action==='undo'?this.future:this.history;if(from.length){to.push(this.snapshot());Object.assign(this.doc,from.pop());this.clear();this.changed()}this.hooks.redraw();this.hooks.commit?.();return}
    const source=this.source();if(!source)throw Error('Select a wall or opening first.');
    if(action==='split'||action==='insert-window'){if(this.geometry()?.kind!=='wall')throw Error('Select a straight wall first.');this.tool=action;this.first=null}

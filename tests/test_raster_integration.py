@@ -79,7 +79,7 @@ class RasterReviewTests(unittest.TestCase):
 
 class JobControlTests(unittest.TestCase):
  def engine(self):
-  e=Mock();e.store.update_job.side_effect=lambda jid,**kw:kw;return e
+  tmp=tempfile.TemporaryDirectory();self.addCleanup(tmp.cleanup);st=Store(tmp.name);p=st.create_project('Recovery fixture');e=Mock();e.store=Mock(wraps=st);e.project_id=p['id'];e.store.update_job.side_effect=lambda jid,**kw:kw;return e
  def test_interrupt_only_owned_running_prompt(self):
   e=self.engine();e.get.return_value={'queue_running':[[0,'ours']],'queue_pending':[]}
   job_control.cancel(e,{'id':'j','status':'running','prompt_id':'ours'})
@@ -90,13 +90,14 @@ class JobControlTests(unittest.TestCase):
   e.post.assert_called_once_with('/queue',{'delete':['ours']})
  def test_ambiguous_submission_never_retried(self):
   e=self.engine();e.get.side_effect=[{'queue_running':[],'queue_pending':[]},{}]
-  with self.assertRaises(ValueError):job_control.recover(e,{'id':'j','status':'failed','submission_intent':1})
+  with self.assertRaises(ValueError):job_control.recover(e,{'id':'j','project_id':e.project_id,'kind':'image','status':'failed','submission_intent':1})
   e.store.update_job.assert_not_called()
  def test_recover_matches_owned_history(self):
   e=self.engine();e.get.side_effect=[{'queue_running':[],'queue_pending':[]},{'p':{'prompt':[0,'p',{}, {'pixeloid_job_id':'j'}]}}]
-  job={'id':'j','status':'failed','submission_intent':1};result=job_control.recover(e,job)
+  job={'id':'j','project_id':e.project_id,'kind':'image','status':'failed','submission_intent':1};result=job_control.recover(e,job)
   self.assertEqual(job['prompt_id'],'p');self.assertEqual(result['status'],'queued')
  def test_cancelled_render_requires_new_version(self):
-  with self.assertRaises(ValueError):job_control.recover(self.engine(),{'id':'j','status':'cancelled','prompt_id':'p'})
+  e=self.engine()
+  with self.assertRaises(ValueError):job_control.recover(e,{'id':'j','project_id':e.project_id,'kind':'image','status':'cancelled','prompt_id':'p'})
 
 if __name__=='__main__':unittest.main()
