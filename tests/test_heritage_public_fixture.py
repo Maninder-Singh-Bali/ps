@@ -20,6 +20,11 @@ class HeritagePublicFixture(unittest.TestCase):
   self.assertFalse(self.project['map_confirmed']);self.assertEqual(self.project['generation_phase']['status'],'paused')
  def test_metric_scale_and_saved_camera(self):
   self.assertEqual(self.doc['calibration']['metres_per_pixel'],.032);self.assertEqual(self.doc['wall_height_m'],3)
-  r=next(r for r in self.project['rooms'] if r['id']=='room-1');c=r['camera_views']['view-1']['camera'];self.assertEqual(c['height'],1.5);self.assertEqual(c['horizontal_fov'],60)
+  r=next(r for r in self.project['rooms'] if r['id']=='room-1');c=r['camera_views']['view-1']['camera'];self.assertEqual(c['height'],1.4);self.assertEqual(c['horizontal_fov'],50)
   scene=self.pack['scenes']['heritage-floor-1'];self.assertTrue(scene['static_fixture']);self.assertGreater(len(scene['surfaces']),6000)
+ def test_corrected_dining_chair_facing(self):
+  room=next(r for r in self.project['rooms'] if r['name']=='Dining / open circulation')
+  chairs=[v for v in room['block_layout']['items'] if v['kind']=='chair']
+  self.assertEqual(len(chairs),6)
+  for chair in chairs:self.assertEqual(chair['angle'],270 if 'west' in chair['id'] else 90)
 if __name__=='__main__':unittest.main()
