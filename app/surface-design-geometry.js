@@ -38,12 +38,14 @@ function conflicts(d,s,o){const c=context(d,s);if(c.missing)return ['Host wall m
 function world(d,s,o,p=[0,0],depth=0){const c=context(d,s);if(c.missing)return null;const r=o.rotation*Math.PI/180,x=o.x+p[0]*Math.cos(r)-p[1]*Math.sin(r),y=o.y+p[0]*Math.sin(r)+p[1]*Math.cos(r);if(s.kind==='wall'){const offset=c.wall.thickness*c.m/2+.003+depth;return [c.origin[0]+c.u[0]*x+c.n[0]*offset,c.origin[1]+c.u[1]*x+c.n[1]*offset,y];}return [c.origin[0]+x,c.origin[1]+y,s.kind==='ceiling'?(s.elevation_m??2.5)-(o.drop||0)-depth:(s.elevation_m||0)+.005+depth];}
 function snap(d,s,o,tol){const c=context(d,s),xs=[0,c.L/2,c.L],ys=[0,c.H/2,c.H],others=[...openingRects(d,s),...(d.surface_design?.items||[]).filter(q=>q.surface_id===s.id&&q.id!==o.id)];for(const q of others){const ps=corners(q);xs.push(Math.min(...ps.map(p=>p[0])),q.x,Math.max(...ps.map(p=>p[0])));ys.push(Math.min(...ps.map(p=>p[1])),q.y,Math.max(...ps.map(p=>p[1])));}const out=copy(o),guides=[];for(const [axis,refs] of [[0,xs],[1,ys]]){const ps=corners(out),positions=[Math.min(...ps.map(p=>p[axis])),out[axis?'y':'x'],Math.max(...ps.map(p=>p[axis]))];let best=null;for(const ref of refs)for(const pos of positions){const delta=ref-pos;if(Math.abs(delta)<=tol&&(!best||Math.abs(delta)<Math.abs(best.delta)))best={delta,ref};}if(best){out[axis?'y':'x']+=best.delta;guides.push({axis,value:best.ref});}}return {item:out,guides};}
 function align(items,mode){const out=copy(items);if(out.length<2)throw Error('Shift-click at least two items on this face.');if(mode==='space'){if(out.length<3)throw Error('Select at least three items to distribute.');out.sort((a,b)=>a.x-b.x);const first=out[0],last=out.at(-1),gap=(last.x+last.width/2-(first.x-first.width/2)-out.reduce((s,o)=>s+o.width,0))/(out.length-1);let edge=first.x-first.width/2;for(const o of out){o.x=edge+o.width/2;edge+=o.width+gap;}return out;}const axis=['left','right','centre-x'].includes(mode)?'x':'y',edge=mode==='left'||mode==='bottom'?-1:mode==='right'||mode==='top'?1:0,extent=o=>{const ps=corners(o).map(p=>p[axis==='x'?0:1]);return edge<0?Math.min(...ps):edge>0?Math.max(...ps):o[axis];},target=extent(out[0]);for(const o of out)o[axis]+=target-extent(o);return out;}
-// Drag the local +X/+Y corner; keep the opposite local corner fixed.
-function resize(o,delta){
+// Drag any local corner; keep its opposite fixed (default +X/+Y for compatibility).
+function resize(o,delta,corner=2,fromCentre=false){
+ if(fromCentre)delta=delta.map(v=>v*2);
  const out=copy(o),r=o.rotation*Math.PI/180,c=Math.cos(r),s=Math.sin(r),dx=delta[0]*c+delta[1]*s,dy=-delta[0]*s+delta[1]*c;
- out.width=Math.max(.01,o.width+dx);out.height=Math.max(.01,o.height+dy);
- if(o.reference?.aspect_locked!==false&&!o.reference?.crop&&o.reference?.image_width){const ratio=o.reference.image_width/o.reference.image_height;out.height=out.width/ratio;}
- const x=(out.width-o.width)/2,y=(out.height-o.height)/2;out.x+=x*c-y*s;out.y+=x*s+y*c;return out;
+ const [sx,sy]=[[-1,-1],[1,-1],[1,1],[-1,1]][corner]||[1,1];
+ out.width=Math.max(.01,o.width+sx*dx);out.height=Math.max(.01,o.height+sy*dy);
+ if(o.reference?.aspect_locked!==false){const factor=Math.max(.01/Math.min(o.width,o.height),1+(sx*dx*o.width+sy*dy*o.height)/(o.width*o.width+o.height*o.height));out.width=o.width*factor;out.height=o.height*factor;}
+ const x=fromCentre?0:sx*(out.width-o.width)/2,y=fromCentre?0:sy*(out.height-o.height)/2;out.x+=x*c-y*s;out.y+=x*s+y*c;return out;
 }
 function translate(items,dx,dy){return items.map(o=>({...copy(o),x:o.x+dx,y:o.y+dy}));}
 const api={roomPolygon,roomWallSpans,roomWallSide,wallPartitions,copy,kinds,context,corners,inside,overlaps,openingRects,conflicts,world,snap,align,resize,translate};if(typeof module!=='undefined')module.exports=api;else window.SurfaceDesignGeometry=api;

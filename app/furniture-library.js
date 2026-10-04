@@ -178,7 +178,7 @@
   scaleModules(copy,factor,factor);
   return copy;
  }
- function transform(item,plan,handle,start,point,snap=true){
+ function transform(item,plan,handle,start,point,snap=true,fromCentre=false){
   item=consistentSofa(item,plan);
   const out=structuredClone(item),cx=item.x*plan.width,cy=item.y*plan.height,a=item.angle*Math.PI/180,c=Math.cos(a),s=Math.sin(a);
   if(handle==='rotate'){
@@ -186,7 +186,7 @@
    if(snap)angle=Math.round(angle/10)*10;out.angle=(angle%360+360)%360;return out;
   }
   const sides={nw:[-1,-1],n:[0,-1],ne:[1,-1],e:[1,0],se:[1,1],s:[0,1],sw:[-1,1],w:[-1,0]},side=sides[handle];if(!side)return out;
-  const [sx,sy]=side,W=item.width*plan.width,D=item.depth*plan.height,dx=point[0]-start[0],dy=point[1]-start[1],lx=dx*c+dy*s,ly=-dx*s+dy*c;
+  const [sx,sy]=side,W=item.width*plan.width,D=item.depth*plan.height,dx=(point[0]-start[0])*(fromCentre?2:1),dy=(point[1]-start[1])*(fromCentre?2:1),lx=dx*c+dy*s,ly=-dx*s+dy*c;
   let w=W,d=D;
   if(sx&&sy){const factor=Math.max(Math.max(.005/item.width,.005/item.depth),Math.min(Math.min(1/item.width,1/item.depth),1+(lx*sx*W+ly*sy*D)/(W*W+D*D)));w=W*factor;d=D*factor}
   else if(item.kind==='stair'&&item.preset_id!=='staircase-spiral'){if(sx)w=Math.max(.005*plan.width,Math.min(plan.width,W+sx*lx));if(sy)d=Math.max(.005*plan.height,Math.min(plan.height,D+sy*ly))}
@@ -216,7 +216,7 @@
    w=m.width*(m.columns*1.15-.15)*plan.width;d=m.depth*(m.rows*1.15-.15)*plan.height;
    out.chair_modules=m;
   }else scaleModules(out,w/W,d/D);
-  const ox=sx*(w-W)/2,oy=sy*(d-D)/2;
+  const ox=fromCentre?0:sx*(w-W)/2,oy=fromCentre?0:sy*(d-D)/2;
   out.x=(cx+ox*c-oy*s)/plan.width;out.y=(cy+ox*s+oy*c)/plan.height;
   if(out.x<0||out.x>1||out.y<0||out.y>1)return structuredClone(item);
   out.width=w/plan.width;out.depth=d/plan.height;
