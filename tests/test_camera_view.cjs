@@ -52,4 +52,27 @@ async function flush(){const pending=[...timers.values()];timers.clear();for(con
  await action('furniture');
  assert.equal(furnitureSwitch[1],'room');assert.deepEqual([...furnitureSwitch[2].view],[10,20,30,40]);
  console.log('Shared camera workspace: corrected walls, all-room furniture, and retained view passed');
+ // A room without cameras can discover saved views on the same floor.
+ const other=sandbox.state.projects.project.rooms.find(r=>r.id==='other-room');
+ const cam={position:[.7,.7],target:[.6,.3],height:1.4,target_height:1.4,horizontal_fov:50};
+ other.name='other-room';other.revision=2;other.camera_views={saved:{id:'saved',name:'Living view',revision:6,camera:cam}};
+ sandbox.state.projects.project.rooms.push({id:'upstairs',plan_id:'plan',floor:'upper',camera_views:{hidden:{id:'hidden',name:'Upstairs',camera:cam}}});
+ sandbox.openCameraView=sandbox.window.openCameraView;
+ const selected=[];sandbox.window.WorkspaceSelection={selectRoom:id=>selected.push(['room',id]),selectCamera:id=>selected.push(['camera',id])};
+ await sandbox.window.openCameraView('project','room',{viewId:null});
+ assert.match(element('#camera-saved-view').innerHTML,/other-room/);
+ assert(!element('#camera-saved-view').innerHTML.includes('Upstairs'));
+ assert.match(element('#camera-plan').innerHTML,/data-saved-camera="saved"/);
+ await action('preview');assert.match(element('#camera-empty').textContent,/Choose a saved view/);
+ for(const fn of handlers.change)await fn({target:{id:'camera-saved-view',value:'saved'}});
+ await flush();assert.equal(requests.at(-1).data.room_id,'other-room');assert.equal(element('#camera-preview').hidden,false);
+ assert.deepEqual(selected,[['room','other-room'],['camera','saved']]);
+ assert.deepEqual(other.camera_views.saved.camera,cam);
+ // Cancelling a dirty switch retains the selected camera and its draft.
+ element('#camera-name').value='Unsaved name';for(const fn of handlers.input)fn({target:{id:'camera-name'}});
+ sandbox.confirm=()=>false;const count=selected.length;
+ for(const fn of handlers.change)await fn({target:{id:'camera-saved-view',value:''}});
+ assert.equal(selected.length,count);assert.equal(element('#camera-saved-view').value,'saved');
+ console.log('Saved camera discovery: floor isolation, cross-room preview and unsaved-change protection passed');
+
 })().catch(e=>{console.error(e);process.exitCode=1});
