@@ -1,32 +1,38 @@
-# UI review fixes — 2026-10-04
+# ui6 polish verification — 2026-10-04
 
-Reviewed Pages baseline: `33141fe7bbf3441880ff94dca58cf728539c44c0`. The updated production-code commit is recorded in `preview-manifest.json`.
+Baseline: source `b87d62e11748648e65fa22e2de0074a84e40b7f5`, Pages ui5 `6974eae29710c36b8a096ceff15f4905ea528589`. Exact released source is in `preview-manifest.json`.
 
-These are frontend checks against synthetic browser-local responses, plus isolated unit tests. They do not establish production backend correctness, shared-geometry rebuilding or image/video generation.
+These are frontend checks with synthetic browser-local responses. They do not prove production backend, shared geometry, inference or video generation correctness.
 
-## Browser checks in this revision
+## Changes
 
-- **Plan:** both floors; floor-to-Cameras handoff; trace wall (11 → 12 elements), select, dimensions, undo (11), redo (12), save/reload (12). Set feet, save, return to Furnish; a 0.55 m chair shows 1.804 ft. Rounded-corner fixture loads on floor 2.
-- **Furnish:** add sofa/chair, select, drag, precise width/height/rotation, duplicate, delete, assign bundled reference, save/reload. Selected inspector remains accessible at narrow width. Percentage controls remain in Advanced.
-- **Surfaces:** select wall face, place painting, change width to 0.75 m, assign bundled reference, change finish, reject a save, recover with a successful save, reload retained changes.
-- **Cameras:** place and aim a new camera, name it QA corner view, save and immediately select it, reload, switch floors and return, switch saved views and Images, browser Back/Forward. Floor changes stay in Cameras. Static preview is explicitly labelled.
-- **Images:** switch versions, open parent/result comparison, full-room/close-up toggle and mask outline, draw/save a rectangular mask with instructions. Keep a discarded candidate: card, selector and comparison say Kept for review; current note no longer says discarded; prior decision remains in history. Kept is not approval.
-- **Video:** sample playback (768 × 432, two seconds), source and preset selection, fixed preview motion, next-job preset survives source-triggered refresh, larger closable viewing dialog, disabled reason when a camera has no approved source. Simulated progress, cancel, recover same job, failure scenario, disconnect/reconnect and completion. No real job submitted.
-- **Save controls:** selecting a fault does not apply it; explicit Apply does. Rejected/conflicting saves retain edits and show Not saved. Delayed saves show Saving before Saved; repeated submission is blocked while busy. Stage navigation protects unsaved edits. Scenario replacement offers Keep editing / Discard edits and replace data; Keep editing retains edits. Fault setting is independent of scenario/reset.
-- **Appearance/accessibility:** persistent Light/Dark switch, 2 px keyboard focus ring, readable monochrome tool icons, unchanged media pixels. Desktop 1440 × 900, laptop 1024 × 768, narrow 640 × 800 and 390 × 844; no document horizontal overflow in the checked Video/Furnish layouts. Narrow editors require vertical scrolling. No application-origin console warnings/errors observed in the local verification tab.
+- Shared production Video component separates Create next video from Review selected output. Approval/download identify the saved version; output metadata is independent of next-job settings. Adaptive player and paired Room/Camera selectors preserve laptop space; creation appears before the player on narrow screens.
+- Testing is a header action opening a bounded keyboard-dismissible dialog, rather than a floating panel over actions.
+- Shared furniture component has an Add furniture catalogue dialog; selected physical dimensions/actions remain beside the canvas. Search/category survive closing/reopening. Reference details open explicitly. Browsing is click-to-add, then move on canvas; catalogue drag-out is not offered.
+- Generic architecture labels are off initially, explicit preferences persist, contextual furniture labels show dimensions, and room/object identification remains. Mock validation is one compact disclosure; actionable save errors remain visible.
+- Narrow toolbar wrapping and compact stage buttons prevent horizontal overflow. Existing dark default and explicit theme preferences remain.
 
-## Focused automated checks
+## Actual browser checks this round
 
-- Six JavaScript regression suites pass: workspace selection, camera interactions, furniture history, editor save/navigation races, Surface navigation, and video presets. Added per-room camera memory/direct-link/new-view checks and next-job settings persistence.
-- Seven Python tests pass for review transitions/history and revision comparison.
-- Twelve staging-adapter test groups pass, including review history, save faults, independent scenario/fault state, delayed-write reset races, camera persistence, simulated jobs and blocked backend/external requests.
-- All bundled JavaScript passes syntax checking.
+- **Layouts:** Video and selected-furniture layouts at 1280×720, 1366×768, 1440×900 and 390×844. No document horizontal overflow in these checked layouts. Video create actions remain above the player on narrow screens; desktop review actions fit without a progress panel. With job progress, review is reachable by scrolling. Native dialogs fit the viewport and scroll internally. Plan/Surfaces narrow toolbar overflow was found, fixed and rechecked at 390×844.
+- **Video:** changed next preset to native eight seconds while saved Version 1 metadata remained two seconds/768×432. Larger-view dialog opened and dismissed. Simulated queued progress, cancellation, same-job recovery and inline cancellation worked. Missing current approval visibly disables creation after a synthetic scene edit. No real job submitted.
+- **Furnish:** catalogue search/category, Chair addition, selected physical width 0.7 m and rotation 30°, Apply, save/reload retained values; reopen retained search/category. Duplicate/delete and bundled reference assignment persisted through save/reload. Selected contextual dimension label and explicit All object labels preference worked. Precise transforms, rather than mouse dragging/resize handles, were used in this round.
+- **Save recovery:** explicitly armed rejected save, confirmed Not saved and retained edits, retried successfully, reloaded retained edit. Adapter tests separately cover delayed/conflicting saves.
+- **Navigation:** all six stages opened; primary controls accessible. Cameras floor change remained Cameras, Upper lounge saved-view selection survived reload, and Back/Forward restored Cameras/Images. Plan/Surfaces handoff retained floor 2.
+- **Images:** discarded Version 3 was kept through comparison; selector said Kept for review, distinct from approval.
+- **Accessibility/appearance:** catalogue and Testing Escape dismissal return focus to their opener; keyboard focus has a visible 2 px outline. Light choice survived reload and Dark was restored. Dark/light appearance checked; no media inversion. No application-origin warnings/errors observed in the local verification tab.
+- Before/after 1280×720 screenshots captured for Video and selected furniture. Screenshots are verification artifacts, not private project content.
 
-## Limits and cases not re-exercised
+## Automated checks
 
-- This round used precise sizing; furniture resize handles, every Surface alignment tool, every rounded-junction edit and all catalogue objects were not exhaustively retested. Earlier coverage is not counted as a fresh pass here.
-- Metric and feet were exercised in the UI. Inches use the same canonical conversion path but were not separately exercised in this round.
-- Native OS/browser fullscreen differs in embedded browsers; the explicit larger dialog was verified. Touch devices, screen readers, native browser-chrome zoom and other browser engines were not tested in this round.
-- Architecture/camera fixtures remain static; furniture proxies use the real client renderer. Plan changes do not trigger a production shared-scene rebuild in this preview.
-- Saves, review decisions, conflicts and job responses have no real backend validation. Simulated results reuse bundled images/MP4 irrespective of camera, masks, presets or reference instructions.
-- Production route integration, real worker operation and inference were not executed. Private project data, approvals, allowances and the Mac/PC deployment were not modified by these tests.
+- Eight JavaScript suites pass: workspace selection, camera view, furniture history, editor save/navigation races, Surface navigation, video presets, new review-layout/output-identity checks, and new label-preference checks.
+- Twelve staging-adapter groups pass, including browser-local saves, review transitions, masks, references, revision conflicts, reset races, simulated jobs and external/backend request blocking.
+- Bundled JavaScript syntax checked. Published manifest and code-only static artifact checked before deployment.
+
+## Limits / not re-exercised
+
+- No exhaustive catalogue, touch-device, screen-reader, native browser-chrome zoom or cross-browser testing. Narrow workspaces still require vertical scrolling; Plan uses a toggleable inspector overlay.
+- Plan tracing/junction edits, Surface placement/alignment, camera placement, image masks, MP4 playback, native fullscreen, furniture drag/resize handles and all unit conversions were covered in earlier work but not freshly rerun here. This release checks their workspace entry points and relevant isolated regressions only.
+- Repeated video submission while an existing simulated job is active was not tested; queued cancellation/recovery was tested. Real output approval routes were not exercised.
+- Architecture and camera previews remain static fixtures; furniture proxies update in the actual browser renderer. Mock saves/reviews have no backend validation. Simulated outputs reuse bundled samples irrespective of camera, presets, references or masks.
+- No production projects, approvals, allowances, credentials, worker services or PC operations changed.

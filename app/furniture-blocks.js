@@ -15,6 +15,7 @@
 
  const displayUnit=()=>plan()?.manual_document?.units||ctx?.drawing?.units||'m';
  const unitFactor=()=>displayUnit()==='ft'?.3048:displayUnit()==='in'?.0254:1;
+ function dimensionHint(v,owner){const d=ctx?.dimensions,b=owner?.bbox,f=unitFactor();return owner?.id===ctx.rid&&b&&d?.width_m>0&&d?.depth_m>0?`${(v.width/b[2]*d.width_m/f).toFixed(2)} × ${(v.depth/b[3]*d.depth_m/f).toFixed(2)} ${displayUnit()}`:''}
  function selectedInspector(v){
   if(!v)return '';const d=ctx.dimensions,b=room().bbox,known=Number(d?.width_m)>0&&Number(d?.depth_m)>0,factor=unitFactor(),unit=displayUnit();
   const field=(key,label,value)=>`<label class="field">${label} (${unit})<input id="selected-${key}" type="number" min="0.001" step="0.01" ${value==null?'disabled placeholder="Unknown"':`value="${(value/factor).toFixed(3)}"`}></label>`;
@@ -109,11 +110,11 @@
  }
  async function switchSection(id,blockId=null,options={}){
   if(busy){$('#block-room').value=ctx.rid;toast('Placement check in progress. Select the section again when it finishes.');return}
-  if(id===ctx.rid){if(blockId){selected=blockId;popupOpen=true;libraryOpen=false;render()}return}
+  if(id===ctx.rid){if(blockId){selected=blockId;popupOpen=false;libraryOpen=true;render()}return}
   const next=state.projects[ctx.pid].rooms.find(r=>r.id===id&&r.plan_id===room().plan_id&&r.bbox);if(!next)return;
   const floorChanged=next.floor!==room().floor;if(floorChanged&&!options.preserveModel)multi.clear();walls.clear();stashDraft();ctx.rid=id;if(floorChanged){ctx.view=window.InlinePlan?.planView(next.floor)||null;if(!options.preserveModel){ctx.resumeWalk=!!modelView.walk;modelView={...BlockModelViewer.defaults(),projection:modelView.projection}}}const draft=ctx.drafts[id];ctx.revision=draft?.revision??next.revision;
   items=structuredClone(draft?.items||next.block_layout?.items||[]);selected=blockId||draft?.selected||items[0]?.id;
-  dirty=draft?.dirty||false;issues=[];productLookup=null;popupOpen=!!blockId;if(blockId)libraryOpen=false;ctx.scene=null;ctx.dimensions=null;
+  dirty=draft?.dirty||false;issues=[];productLookup=null;popupOpen=false;libraryOpen=true;ctx.scene=null;ctx.dimensions=null;
   if(window.InlinePlan?.active()){rid=id;window.InlinePlan.syncSections();if(!blockId)selected=null}
   render();await call('check');
  }
@@ -141,9 +142,14 @@
   }catch(err){if(action==='save')saveStatus('Not saved · '+err.message);throw err;}finally{busy=false;const busyHost=$('#plan-editor-inline');if(busyHost){busyHost.setAttribute('aria-busy','false');busyHost.inert=false}}
  }
 
- function libraryCards(){const list=FurnitureLibrary.presets.filter(p=>(libraryCategory==='All'||p.category===libraryCategory)&&p.label.toLowerCase().includes(libraryQuery.toLowerCase()));return list.map(p=>`<button type="button" draggable="true" data-furniture-preset="${p.id}" title="Drag ${p.label} onto the plan, or click to add" aria-label="Add ${p.label}"><svg viewBox="0 0 100 100" aria-hidden="true">${FurnitureLibrary.symbol(p)}</svg><span>${p.label}</span></button>`).join('')||'<span>No matching shapes</span>'}
+ let catalogueReturn=null;
+ function closeCatalogue(){const d=document.querySelector('#furniture-catalogue');if(!d)return;d.close();d.remove();(catalogueReturn?.isConnected?catalogueReturn:document.querySelector('[data-block="library"]'))?.focus();}
+ function openCatalogue(){
+  closeCatalogue();catalogueReturn=document.activeElement;const d=document.createElement('dialog');d.id='furniture-catalogue';d.setAttribute('aria-labelledby','catalogue-title');d.innerHTML=`<header><h2 id="catalogue-title">Add furniture</h2><button class="btn" data-catalogue-close aria-label="Close furniture catalogue">×</button></header>${libraryMarkup()}`;document.body.append(d);d.querySelector('[data-catalogue-close]').onclick=closeCatalogue;d.addEventListener('cancel',e=>{e.preventDefault();closeCatalogue()});d.showModal();d.querySelector('#furniture-search').focus();
+ }
+ function libraryCards(){const list=FurnitureLibrary.presets.filter(p=>(libraryCategory==='All'||p.category===libraryCategory)&&p.label.toLowerCase().includes(libraryQuery.toLowerCase()));return list.map(p=>`<button type="button" draggable="false" data-furniture-preset="${p.id}" title="Add ${p.label} to the plan" aria-label="Add ${p.label}"><svg viewBox="0 0 100 100" aria-hidden="true">${FurnitureLibrary.symbol(p)}</svg><span>${p.label}</span></button>`).join('')||'<span>No matching shapes</span>'}
 
- function libraryMarkup(){return `<div class="furniture-library" aria-label="Furniture library"><div class="library-heading"><strong>Shape library</strong><span>Drag onto the plan</span><select id="furniture-category" aria-label="Library category">${['All',...Object.keys(FurnitureLibrary.categories)].map(c=>`<option ${c===libraryCategory?'selected':''}>${c}</option>`).join('')}</select><input id="furniture-search" aria-label="Search shapes" placeholder="Search shapes" value="${esc(libraryQuery)}"></div><div class="furniture-library-grid">${libraryCards()}</div></div>`}
+ function libraryMarkup(){return `<div class="furniture-library" aria-label="Furniture library"><div class="library-heading"><strong>Shape library</strong><span>Choose an item to place</span><select id="furniture-category" aria-label="Library category">${['All',...Object.keys(FurnitureLibrary.categories)].map(c=>`<option ${c===libraryCategory?'selected':''}>${c}</option>`).join('')}</select><input id="furniture-search" aria-label="Search shapes" placeholder="Search shapes" value="${esc(libraryQuery)}"></div><div class="furniture-library-grid">${libraryCards()}</div></div>`}
 
  document.addEventListener('input',e=>{if(e.target.id==='furniture-search'){libraryQuery=e.target.value;document.querySelector('.furniture-library-grid').innerHTML=libraryCards()}});
 
@@ -172,9 +178,9 @@
 
 ${ctx.architecture?`<details class="block-structure-status"><summary>Structure review</summary><p class="help">${ctx.architecture.typed_wall_count} mapped wall segments · ${ctx.architecture.typed_opening_count} mapped openings (whole plan). ${ctx.architecture.study_reviewed?'Plan study reviewed.':'Structure review pending; furniture remains a draft.'}</p>${ctx.architecture.notes.map(n=>`<p class="help">${esc(n)}</p>`).join('')}</details>`:''}
 
-<div class="workspace-modes" role="group" aria-label="Workspace mode"><button type="button" class="btn small active" aria-pressed="true">Furniture</button>${btn('Camera','camera')}</div><div class="block-toolbar">${btn('Furniture library','library')}${btn('Full plan','fit-plan')}${btn('This section','fit-section')}${btn('Add block','add')}${btn('Scan section into blocks','propose')}${btn('Suggest clear position','suggest')}${btn('Check placement','check')}<label class="block-map-toggle"><input id="block-object-labels" type="checkbox" ${PlanLabels.objectsVisible?'checked':''}> Object labels</label><label class="block-map-toggle"><input id="block-original-map" type="checkbox" ${ctx.showOriginal?'checked':''}> Original map</label></div>
+<div class="workspace-modes" role="group" aria-label="Workspace mode"><button type="button" class="btn small active" aria-pressed="true">Furniture</button>${btn('Camera','camera')}</div><div class="block-toolbar">${btn('Add furniture','library')}${btn('Full plan','fit-plan')}${btn('This section','fit-section')}${btn('Add block','add')}${btn('Scan section into blocks','propose')}${btn('Suggest clear position','suggest')}${btn('Check placement','check')}<label class="block-map-toggle"><input id="block-object-labels" type="checkbox" ${PlanLabels.objectsVisible?'checked':''}> All object labels</label><label class="block-map-toggle"><input id="block-original-map" type="checkbox" ${ctx.showOriginal?'checked':''}> Original map</label></div>
 
-<div class="block-workspace with-library"><div class="block-left-panel"><div class="block-left-tabs" role="group" aria-label="Furniture panel">${btn('Shapes','library')}${btn('Reference','reference')}</div><div id="block-library-panel">${libraryMarkup()}</div><div id="block-popover" class="block-details-panel" aria-label="Selected furniture details"></div></div><section><h3>Full plan · furniture & walls</h3>${walls.toolbar()}<div class="block-map-wrap"><svg id="block-plan" aria-label="Original floor plan with draggable furniture blocks" aria-description="Two-finger swipe to pan. Pinch to zoom."></svg></div><p id="block-edit-status" role="status"></p></section>
+<div class="block-workspace with-library"><div class="block-left-panel"><p class="furniture-edit-empty">Select an object to edit.</p><div id="block-popover" class="block-details-panel" aria-label="Selected furniture details"></div></div><section><h3>Full plan · furniture & walls</h3>${walls.toolbar()}<div class="block-map-wrap"><svg id="block-plan" aria-label="Original floor plan with draggable furniture blocks" aria-description="Two-finger swipe to pan. Pinch to zoom."></svg></div><p id="block-edit-status" role="status"></p></section>
 
 <aside class="block-inspector"><div class="block-model-panel"><div class="block-model-heading"><h3>3D model</h3><select id="model-projection" aria-label="3D projection"><option value="orthographic" ${modelView.projection!=='perspective'?'selected':''}>Orthographic</option><option value="perspective" ${modelView.projection==='perspective'?'selected':''}>Perspective</option></select><button type="button" class="btn small" id="model-walk" ${modelView.projection!=='perspective'?'hidden':''} aria-pressed="${!!modelView.walk}">${modelView.walk?'Exit walk':'Walk'}</button><span>${esc(r.floor)}</span>${scaleControls()}</div><canvas id="block-preview" tabindex="0" aria-label="Interactive 3D floor model"></canvas><div class="block-model-controls"><button type="button" class="btn small" id="model-place" ${!selected||modelView.projection!=='perspective'?'hidden':''}>Move object</button><span id="model-placement-hint" role="status">${placement?'Click a wall, ceiling or floor · Esc to cancel':modelView.walk?'WASD / arrows · Drag to look':''}</span><button type="button" class="btn small" data-model="reset">Fit</button><button type="button" class="btn small" data-model="top">Top</button><button type="button" class="btn small" data-model="out" aria-label="Zoom out 3D model">−</button><button type="button" class="btn small" data-model="in" aria-label="Zoom in 3D model">+</button><label><input id="model-transparent" type="checkbox" ${modelView.transparent?'checked':''}> See through walls</label></div><p class="block-model-hint" id="block-model-geometry"></p><p class="block-model-hint">Drag to rotate · Middle-drag to pan · Scroll to zoom</p>${btn('Set camera','camera')}</div><label class="field"><span>Section</span><select id="block-room">${state.projects[ctx.pid].rooms.filter(x=>x.plan_id===r.plan_id&&x.bbox).map(x=>`<option value="${x.id}" ${x.id===r.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label>
 
@@ -194,7 +200,7 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
 
 <p class="help">Preset sizes are editable estimates.</p>
 
-<div id="block-feedback" role="status">${walls.dirty?'Walls changed · check placement before saving.':issues.length?`<strong>${issues.length} placement issue(s)</strong><ul>${issues.map(x=>`<li>${esc(x.message)}</li>`).join('')}</ul>`:'Mock check only; placement has no backend validation. Review geometry manually.'}</div>
+<div id="block-feedback" role="status">${walls.dirty?'Walls changed · check placement before saving.':issues.length?`<strong>${issues.length} placement issue(s)</strong><ul>${issues.map(x=>`<li>${esc(x.message)}</li>`).join('')}</ul>`:'<details class="placement-details"><summary>Mock check · not validated</summary><p>No backend validation runs in this preview. Review geometry manually.</p></details>'}</div>
 
 <label class="block-review"><input id="block-reviewed" type="checkbox" ${r.block_layout?.reviewed&&!dirty&&!walls.dirty&&!issues.length?'checked':''}> I checked these blocks against the original plan.</label><p class="help">Suggestions avoid known obstructions only. They do not identify missing objects or certify an accurate plan.</p></aside></div>`,`${btn('Close','close')}${btn('Save plan','save')}`,'blocks');
 
@@ -308,7 +314,7 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
 
    const pts=footprint(v),t=v.angle*Math.PI/180,x=v.x*a.width,y=v.y*a.height,L=Math.min(v.width*a.width,v.depth*a.height)*.3;
 
-   return `<g data-block-id="${v.id}" data-block-room="${owner.id}" data-object-label="${esc(PlanLabels.objectName(v))}" data-object-kind="${esc(v.kind)}" aria-label="${esc(v.label)} in ${esc(owner.name)}"><title>${esc(v.label)} - ${esc(owner.name)}</title>${pieces(v).map(part=>`<polygon points="${part.map(p=>p.join(',')).join(' ')}" fill="${(owner.id===ctx.rid&&selected===v.id||multi.has('f:'+owner.id+':'+v.id))?'#e9b72b':'#89959c'}" fill-opacity=".55" stroke="${owner.id===ctx.rid&&issues.some(z=>z.id===v.id)?'#b34334':'#354247'}" stroke-width=".8" vector-effect="non-scaling-stroke"/>`).join('')}<g pointer-events="none" transform="translate(${x} ${y}) rotate(${v.angle}) translate(${-v.width*a.width/2} ${-v.depth*a.height/2}) scale(${v.width*a.width/100} ${v.depth*a.height/100})" class="furniture-symbol">${FurnitureLibrary.symbol(v)}</g><line x1="${x}" y1="${y}" x2="${x+Math.sin(t)*L*(v.flip_y?-1:1)}" y2="${y-Math.cos(t)*L*(v.flip_y?-1:1)}" stroke="#243336" stroke-width=".8" vector-effect="non-scaling-stroke"/></g>`;
+   return `<g data-block-id="${v.id}" data-block-room="${owner.id}" data-object-label="${esc(PlanLabels.objectName(v))}" data-object-kind="${esc(v.kind)}" data-label-detail="${esc(dimensionHint(v,owner))}" aria-label="${esc(v.label)} in ${esc(owner.name)}"><title>${esc(v.label)} - ${esc(owner.name)}</title>${pieces(v).map(part=>`<polygon points="${part.map(p=>p.join(',')).join(' ')}" fill="${(owner.id===ctx.rid&&selected===v.id||multi.has('f:'+owner.id+':'+v.id))?'#e9b72b':'#89959c'}" fill-opacity=".55" stroke="${owner.id===ctx.rid&&issues.some(z=>z.id===v.id)?'#b34334':'#354247'}" stroke-width=".8" vector-effect="non-scaling-stroke"/>`).join('')}<g pointer-events="none" transform="translate(${x} ${y}) rotate(${v.angle}) translate(${-v.width*a.width/2} ${-v.depth*a.height/2}) scale(${v.width*a.width/100} ${v.depth*a.height/100})" class="furniture-symbol">${FurnitureLibrary.symbol(v)}</g><line x1="${x}" y1="${y}" x2="${x+Math.sin(t)*L*(v.flip_y?-1:1)}" y2="${y-Math.cos(t)*L*(v.flip_y?-1:1)}" stroke="#243336" stroke-width=".8" vector-effect="non-scaling-stroke"/></g>`;
 
   }).join('');
 
@@ -344,7 +350,7 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
 
   svg.onpointermove=e=>{if(groupPointerMove(e))return;if(walls.pointerMove(e))return;if(panDrag){ctx.view=[panDrag.view[0]-(e.clientX-panDrag.start[0])/panDrag.scale,panDrag.view[1]-(e.clientY-panDrag.start[1])/panDrag.scale,...panDrag.view.slice(2)];svg.setAttribute('viewBox',ctx.view.join(' '));popover();return}if(drag&&(drag.moved||Math.hypot(e.clientX-drag.start[0],e.clientY-drag.start[1])>3)){drag.moved=true;move(e)}};
 
-  svg.onpointerup=async e=>{if(groupDrag){try{await groupPointerUp(e)}catch(err){toast(err.message)}return}if(walls.pointerUp(e))return;svg.style.cursor='';if(panDrag){panDrag=null;if(svg.hasPointerCapture(e.pointerId))svg.releasePointerCapture(e.pointerId);popover();return}if(!drag)return;const moved=drag.moved;if(moved)move(e);drag=null;walls.guides=[];if(svg.hasPointerCapture(e.pointerId))svg.releasePointerCapture(e.pointerId);popupOpen=true;libraryOpen=false;if(moved)try{await call('check')}catch(err){toast(err.message);render()}else render()};
+  svg.onpointerup=async e=>{if(groupDrag){try{await groupPointerUp(e)}catch(err){toast(err.message)}return}if(walls.pointerUp(e))return;svg.style.cursor='';if(panDrag){panDrag=null;if(svg.hasPointerCapture(e.pointerId))svg.releasePointerCapture(e.pointerId);popover();return}if(!drag)return;const moved=drag.moved;if(moved)move(e);drag=null;walls.guides=[];if(svg.hasPointerCapture(e.pointerId))svg.releasePointerCapture(e.pointerId);popupOpen=false;libraryOpen=true;if(moved)try{await call('check')}catch(err){toast(err.message);render()}else render()};
 
   svg.onpointercancel=e=>{if(groupDrag){groupPointerUp(e,true);return}if(walls.pointerUp(e,true))return;svg.style.cursor='';panDrag=null;walls.guides=[];if(drag){Object.assign(active(),drag.original);drag=null}render()};
 
@@ -372,7 +378,7 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
   svg.ondrop=async e=>{const key=e.dataTransfer.getData('application/x-pixeloid-ui-staging-furniture');if(!key)return;e.preventDefault();svg.classList.remove('library-drop-active');const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(svg.getScreenCTM().inverse());try{await addPreset(key,[Math.max(0,Math.min(1,p.x/a.width)),Math.max(0,Math.min(1,p.y/a.height))])}catch(err){toast(err.message)}};
 
   document.querySelectorAll('[data-block-select]').forEach(el=>el.classList.toggle('selected',el.dataset.blockSelect===selected));
-  draw3d();walls.decorate();window.InlinePlan?.applyFloorVisibility(svg);window.ConstructionArea?.overlay(svg,a);objectTools();if(!drag)popover();window.PlanLabels?.attach(svg,state.projects[ctx.pid].rooms.filter(r=>r.plan_id===a.id&&r.bbox&&(!window.InlinePlan||InlinePlan.floorVisible(r.floor))),a,ctx.rid);
+  draw3d();walls.decorate();window.InlinePlan?.applyFloorVisibility(svg);window.ConstructionArea?.overlay(svg,a);objectTools();if(!drag)popover();svg.querySelectorAll('[data-block-id],[data-plan-element]').forEach(el=>{el.dataset.labelActive=String(el.dataset.blockId===selected||el.dataset.planElement===walls.selected)});window.PlanLabels?.attach(svg,state.projects[ctx.pid].rooms.filter(r=>r.plan_id===a.id&&r.bbox&&(!window.InlinePlan||InlinePlan.floorVisible(r.floor))),a,ctx.rid);
 
  }
 
@@ -418,7 +424,8 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
 
   const host=$('#block-popover'),v=active();if(!host)return;
   if(!v||multi.size)libraryOpen=true;
-  $('#block-library-panel').hidden=!libraryOpen;
+  const empty=document.querySelector('.furniture-edit-empty');if(empty)empty.hidden=!!v;
+  const library=$('#block-library-panel');if(library)library.hidden=!libraryOpen;
   document.querySelectorAll('.block-left-tabs [data-block]').forEach(el=>{const pressed=el.dataset.block===(libraryOpen?'library':'reference');el.classList.toggle('selected',pressed);el.setAttribute('aria-pressed',String(pressed))});
   host.hidden=libraryOpen||!v||!popupOpen||!!(drag||panDrag);
   if(!v||!popupOpen){host.innerHTML='';return}
@@ -544,7 +551,7 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
  }
  function scaleControls(){
   const s=ctx.scene?.model_scale||{},h=s.wall_height_m||3;
-  if(walls.doc.manual_draft_id)return `<details class="model-scale"><summary class="btn small">${h.toFixed(2)} m walls</summary><p class="help">Scale and wall heights come from the linked floor plan.</p><a class="btn small" href="/ps/app/floor-plan.html?preview=ui5#${encodeURIComponent(walls.doc.manual_draft_id)}">Edit scale & heights</a></details>`;
+  if(walls.doc.manual_draft_id)return `<details class="model-scale"><summary class="btn small">${h.toFixed(2)} m walls</summary><p class="help">Scale and wall heights come from the linked floor plan.</p><a class="btn small" href="/ps/app/floor-plan.html?preview=ui6#${encodeURIComponent(walls.doc.manual_draft_id)}">Edit scale & heights</a></details>`;
   return `<details class="model-scale"><summary class="btn small" title="Wall height and real-world scale">${h.toFixed(2)} m walls</summary><div class="model-scale-fields"><strong>Scale & height</strong><span class="help">${esc(s.measured?'Measured plan':s.scale_source||'Estimated scale')}</span>${number('model-wall-height','Wall height (m)',h,.1)}${number('model-floor-width','Floor width (m)',+(ctx.scene?.width||10).toFixed(3),.1)}${number('model-human-height','Human height (ft)',+((s.human_height_m||1.6764)/.3048).toFixed(2),.1)}${number('model-fov','Walk field of view (°)',s.vertical_fov||60,5)}<span class="help">Eye level ${((s.human_height_m||1.6764)-.11).toFixed(2)} m · Current floor</span>${btn('Apply','apply-model-scale')}${btn('Balance furniture','balance-furniture')}<span class="help">Standard furniture sizes · Both floors</span></div></details>`;
  }
  function draw3d(){
@@ -575,9 +582,9 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
   if(e.target.closest('[data-action="furniture-blocks"]')){const r=R();if(r?.bbox)return openFurnitureBlocks(pid,r.id);return toast('Select a mapped section first.')}
 
   const groupButton=e.target.closest('[data-group-action]');if(groupButton&&ctx){selectionAction(groupButton.dataset.groupAction).catch(err=>toast(err.message));return}
-  const tile=e.target.closest('[data-furniture-preset]');if(tile&&ctx&&modalType==='blocks'){try{if(modelView.projection==='perspective')armPlacement(tile.dataset.furniturePreset);else await addPreset(tile.dataset.furniturePreset)}catch(err){toast(err.message)}return}
+  const tile=e.target.closest('[data-furniture-preset]');if(tile&&ctx&&modalType==='blocks'){closeCatalogue();try{if(modelView.projection==='perspective')armPlacement(tile.dataset.furniturePreset);else await addPreset(tile.dataset.furniturePreset)}catch(err){toast(err.message)}return}
 
-  const select=e.target.closest('[data-block-select]');if(select){walls.clear();selected=select.dataset.blockSelect;popupOpen=true;libraryOpen=false;render();return}
+  const select=e.target.closest('[data-block-select]');if(select){walls.clear();selected=select.dataset.blockSelect;popupOpen=false;libraryOpen=true;render();return}
 
   const button=e.target.closest('[data-block]');if(!button||!ctx||busy)return;button.disabled=true;
 
@@ -604,7 +611,7 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
    }
    if(action==='fit-plan'){ctx.view=window.InlinePlan?.active()?InlinePlan.planView():[0,0,plan().width,plan().height];draw();return}
    if(action==='fit-section'){ctx.view=null;draw();return}
-   if(action==='library'){libraryOpen=true;popupOpen=false;render();return}
+   if(action==='library'){openCatalogue();return}
    if(action==='reference'){if(!active())return toast('Select a furniture object first.');libraryOpen=false;popupOpen=true;render();return}
 
    if(action==='hide-popup'){popupOpen=false;libraryOpen=true;popover();return}
@@ -737,6 +744,6 @@ ${v?`<details class="block-transform-panel" aria-label="Selected object controls
   if(busy||pendingChanges()&&!confirm('Discard unsaved furniture changes in this window?')){e.preventDefault();e.stopImmediatePropagation()}
  },true);
  document.querySelector('#modal').addEventListener('cancel',e=>{if(modalType==='blocks'&&(busy||pendingChanges()&&!confirm('Discard unsaved furniture changes in this window?')))e.preventDefault()});
- window.FurnitureEditor={syncSaved,redraw:()=>draw(),fitFloor:()=>{ctx.view=InlinePlan.planView(room().floor);if(!modelView.walk)modelView={...BlockModelViewer.defaults(),projection:modelView.projection};render()},reload:()=>ctx&&openFurnitureBlocks(ctx.pid,ctx.rid,{reload:true,inline:true,view:ctx.view}),pending:()=>!!ctx&&pendingChanges(),roomId:()=>ctx?.rid,switchSection,dispose(){modelViewer?.dispose();modelViewer=null;if(zoomFrame)cancelAnimationFrame(zoomFrame);zoomFrame=null;zoomTarget=null;ctx=null;walls=null;history=null;dirty=false}};
+ window.FurnitureEditor={syncSaved,redraw:()=>draw(),fitFloor:()=>{ctx.view=InlinePlan.planView(room().floor);if(!modelView.walk)modelView={...BlockModelViewer.defaults(),projection:modelView.projection};render()},reload:()=>ctx&&openFurnitureBlocks(ctx.pid,ctx.rid,{reload:true,inline:true,view:ctx.view}),pending:()=>!!ctx&&pendingChanges(),roomId:()=>ctx?.rid,switchSection,dispose(){closeCatalogue();modelViewer?.dispose();modelViewer=null;if(zoomFrame)cancelAnimationFrame(zoomFrame);zoomFrame=null;zoomTarget=null;ctx=null;walls=null;history=null;dirty=false}};
 })();
 

@@ -27,3 +27,24 @@
 @media(max-width:850px){#plan-editor-inline .camera-workspace{display:block}#plan-editor-inline #camera-plan{height:360px;flex:none}#plan-editor-inline .camera-settings{overflow:visible}}
 .sidebar .nav-item{color:var(--text,#dce1e8)}
 html[data-theme="dark"] .sidebar .nav-item img,html[data-theme="dark"] .sidebar-bottom button img{filter:invert(.85)}
+
+/* Test controls are a header action and a modal, never a floating workspace panel. */
+#staging-tools{position:static;flex-shrink:0;margin-left:auto;max-width:none;z-index:auto}
+#staging-toggle{min-height:30px;padding:4px 8px;font-size:11px;max-width:220px}
+#staging-controls-body{width:min(400px,calc(100vw - 24px));max-height:calc(100dvh - 32px);overflow:auto;background:var(--surface);color:var(--ink);border:1px solid var(--line);padding:16px;border-radius:9px;box-sizing:border-box}
+#staging-controls-body::backdrop{background:#10141b99}
+#staging-controls-body>header{display:flex;justify-content:space-between;align-items:center}
+#staging-controls-body .actions{display:flex;gap:6px;flex-wrap:wrap}
+#staging-controls-body label{flex-wrap:wrap}#staging-controls-body select{max-width:100%}
+.staging-preview-note{font-size:10px;line-height:1.4;margin:0 0 4px}
+body.studio-dashboard #engine-health{display:none}
+@media(max-width:850px){
+ #staging-tools{margin-left:auto}#staging-toggle{max-width:185px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ #plan-editor-inline .block-workspace.with-library{grid-template-columns:minmax(130px,.8fr) minmax(0,1fr);grid-template-rows:560px 360px}
+ #plan-editor-inline .block-workspace:not(:has(.selected-furniture-inspector)):not(:has(#block-wall-properties input)){grid-template-columns:1fr;grid-template-rows:440px 360px}
+}
+@media(max-width:850px){
+ header.topbar>#staging-tools{position:absolute;right:10px;top:42px;margin:0}
+ body.studio-plan>header>#staging-tools{position:absolute;right:10px;bottom:5px;margin:0}
+ body.studio-plan{grid-template-rows:auto 34px minmax(0,1fr) auto}
+}
