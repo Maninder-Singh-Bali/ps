@@ -83,12 +83,28 @@
    if(u>=0&&v>=0&&u+v<=1){const z=u*(a[2]||0)+v*(b[2]||0)+(1-u-v)*(c[2]||0);if(z>depth){best=f;depth=z}}
   }return best;
  }
+ // Clip every wall triangle against one vertical section plane. Testing triangle
+ // centroids independently left half-rectangles and floating caps in cutaway mode.
+ function depthRadius(faces,fallback=1){let extent=Math.max(1,fallback);for(const f of faces)for(const p of f.points)if(Number.isFinite(p[2]))extent=Math.max(extent,Math.abs(p[2]));return extent;}
+ function cutawayFaces(faces,view,bounds){
+  if(!view.cutaway||view.walk)return faces;
+  const n=[Math.sin(view.yaw),Math.cos(view.yaw),0],distance=p=>dot(sub(p,bounds.center),n),eps=1e-8;
+  return faces.flatMap(f=>{
+   if(!f.architecture||!['wall','joined_wall'].includes(f.surfaceKind))return [f];
+   const ds=f.points.map(distance);if(ds.every(d=>d<=eps))return [f];if(ds.every(d=>d>eps))return [];
+   const points=[];for(let i=0;i<f.points.length;i++){const a=f.points[i],b=f.points[(i+1)%f.points.length],da=ds[i],db=ds[(i+1)%ds.length],A=da<=eps,B=db<=eps;if(A)points.push(a);if(A!==B){const t=da/(da-db);points.push(a.map((v,j)=>v+t*(b[j]-v)));}}
+   const clean=points.filter((p,i)=>Math.hypot(...sub(p,points[(i+points.length-1)%points.length]))>eps);if(clean.length<3)return [];
+   const onEdge=(p,a,b)=>{const v=sub(b,a),q=sub(p,a),length=dot(v,v);return length>eps&&Math.hypot(...cross(v,q))<eps&&dot(q,v)>=-eps&&dot(q,v)<=length+eps;};
+   const edge_mask=clean.map((p,i)=>{const q=clean[(i+1)%clean.length];for(let j=0;j<f.points.length;j++)if(onEdge(p,f.points[j],f.points[(j+1)%f.points.length])&&onEdge(q,f.points[j],f.points[(j+1)%f.points.length]))return f.edge_mask?!!f.edge_mask[j]:true;return true;});
+   return [{...f,points:clean,edge_mask}];
+  });
+ }
  class Viewer {
   constructor(canvas,view,onSelect,options={}){this.options=options;this.keys=new Set();this.canvas=canvas;this.view=view;this.onSelect=onSelect;this.faces=[];this.hits=[];this.bind();this.observer=new ResizeObserver(()=>this.draw());this.observer.observe(canvas)}
   update(faces,focus=null){this.faces=cleanEdges(faces);this.bounds=focus||frame(faces.filter(f=>!f.ceiling));this.draw()}
   enterWalk(walk){this.view.projection='perspective';this.view.walk=walk;this.keys.clear();this.draw();this.canvas.focus()}
   leaveWalk(){delete this.view.walk;this.keys.clear();this.draw()}
-  visibleFaces(){return this.faces.filter(f=>(!f.ceiling||this.view.walk)&&(!this.view.cutaway||!f.architecture||!['wall','joined_wall'].includes(f.surfaceKind)||f.points.every(p=>p[2]===f.points[0][2])||rotate(f.points.reduce((s,p)=>s.map((v,i)=>v+p[i]/f.points.length),[0,0,0]).map((v,i)=>v-this.bounds.center[i]),this.view)[2]<=0))}
+  visibleFaces(){return cutawayFaces(this.faces.filter(f=>!f.ceiling||this.view.walk),this.view,this.bounds)}
   surfaceAt(p){const ray=rayFor(p,this.view,this.bounds,this.canvas.clientWidth,this.canvas.clientHeight),faces=this.visibleFaces();return (this.view.transparent?raycast(ray,faces.filter(f=>!f.architecture||f.surface_design&&f.object_key?.startsWith('design:item:'))):null)||raycast(ray,faces)}
   tick(time){if(!this.view.walk||!this.keys.size){this.animation=null;this.lastTime=null;return}const dt=this.lastTime?Math.min(.05,(time-this.lastTime)/1000):.016;this.lastTime=time;const k=this.keys;this.view.walk=walkMove(this.view.walk,Number(k.has('w')||k.has('arrowup'))-Number(k.has('s')||k.has('arrowdown')),Number(k.has('d')||k.has('arrowright'))-Number(k.has('a')||k.has('arrowleft')),dt,this.faces);this.draw();this.animation=requestAnimationFrame(t=>this.tick(t))}
   reset(top=false){delete this.view.walk;Object.assign(this.view,defaults(),{transparent:this.view.transparent,edges:this.view.edges,cutaway:this.view.cutaway,projection:this.view.projection});if(top){this.view.yaw=0;this.view.pitch=Math.PI/2}this.draw()}
@@ -107,15 +123,15 @@
   }
   draw(){const c=this.canvas;if(!c.isConnected){this.dispose();return}const w=c.clientWidth,h=c.clientHeight;if(!w||!h||!this.bounds)return;const dpr=window.devicePixelRatio||1;if(c.width!==Math.round(w*dpr))c.width=Math.round(w*dpr);if(c.height!==Math.round(h*dpr))c.height=Math.round(h*dpr);
    const walking=!!this.view.walk,transparent=walking?false:this.view.transparent;
-   const faces=this.visibleFaces().map(f=>({...f,points:walking?walkProject(f.points,this.view.walk,w,h,this.bounds.radius):f.points.map(p=>project(p,this.view,this.bounds,w,h))})).filter(f=>f.points.length>=3).sort((a,b)=>(Number(!!b.floor)-Number(!!a.floor))||a.points.reduce((s,p)=>s+p[2],0)/a.points.length-b.points.reduce((s,p)=>s+p[2],0)/b.points.length);
+   const visible=this.visibleFaces(),faces=visible.map(f=>({...f,points:walking?walkProject(f.points,this.view.walk,w,h,this.bounds.radius):f.points.map(p=>project(p,this.view,this.bounds,w,h))})).filter(f=>f.points.length>=3).sort((a,b)=>(Number(!!b.floor)-Number(!!a.floor))||a.points.reduce((s,p)=>s+p[2],0)/a.points.length-b.points.reduce((s,p)=>s+p[2],0)/b.points.length);
    if(this.renderer===undefined){try{this.renderer=new DepthRenderer(c)}catch(_){this.renderer=null}}
-   c.dataset.faceCount=faces.length;c.dataset.worldBounds=JSON.stringify(frame(this.visibleFaces()));c.dataset.drawBounds=JSON.stringify(this.bounds);c.dataset.contextLost=String(this.renderer?.gl.isContextLost()||false);this.hits=faces.filter(f=>f.id||!f.architecture||!this.view.transparent);
-   if(this.renderer)this.renderer.draw(faces,w,h,this.bounds.radius,transparent,this.view.edges);
+   c.dataset.faceCount=faces.length;c.dataset.worldBounds=JSON.stringify(frame(visible));c.dataset.drawBounds=JSON.stringify(this.bounds);c.dataset.contextLost=String(this.renderer?.gl.isContextLost()||false);this.hits=faces.filter(f=>f.id||!f.architecture||!this.view.transparent);
+   if(this.renderer){const depth=depthRadius(faces,this.bounds.radius);c.dataset.depthRadius=String(depth);this.renderer.draw(faces,w,h,depth,transparent,this.view.edges);}
    else{const g=c.getContext('2d');if(!g)return;g.setTransform(dpr,0,0,dpr,0,0);g.fillStyle='#f1f3ef';g.fillRect(0,0,w,h);for(const f of faces){g.beginPath();f.points.forEach((p,i)=>i?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]));g.closePath();g.globalAlpha=f.architecture&&transparent?.24:1;g.fillStyle=f.color;g.fill();g.strokeStyle=f.selected?'#ac801a':'#78847c';g.lineWidth=f.selected?1.1:.6;if(f.edge_mask){g.beginPath();f.points.forEach((p,i)=>{if(f.edge_mask[i]){g.moveTo(p[0],p[1]);const q=f.points[(i+1)%f.points.length];g.lineTo(q[0],q[1]);}});}if(this.view.edges||f.selected)g.stroke()}g.globalAlpha=1}
    this.options.afterDraw?.(this);c.dataset.renderer=this.renderer?'depth':'basic';c.dataset.walking=String(walking);if(walking)c.dataset.walkPosition=JSON.stringify(this.view.walk.position);else delete c.dataset.walkPosition;
    c.setAttribute('aria-label',walking?'Walk inside · WASD or arrow keys to move · Drag to look · Escape to exit':`3D floor model, ${this.view.projection||'orthographic'}, ${Math.round(this.view.zoom*100)}% zoom. Drag to rotate 360 degrees, Shift-drag or middle-drag to pan. Scroll to zoom.`);
   }
   dispose(){if(this.animation)cancelAnimationFrame(this.animation);this.animation=null;this.keys?.clear();this.observer?.disconnect();this.renderer?.dispose();this.renderer=undefined;this.drag=null}
  }
- const api={Viewer,defaults,cleanEdges,planePoint,rotate,frame,project,gesture,inside,pick,walkBasis,cameraPoint,clipNear,walkProject,rayFor,raycast,walkMove};if(typeof module!=='undefined')module.exports=api;else window.BlockModelViewer=api;
+ const api={depthRadius,cutawayFaces,Viewer,defaults,cleanEdges,planePoint,rotate,frame,project,gesture,inside,pick,walkBasis,cameraPoint,clipNear,walkProject,rayFor,raycast,walkMove};if(typeof module!=='undefined')module.exports=api;else window.BlockModelViewer=api;
 })();
