@@ -21,3 +21,6 @@
 @media(max-width:1150px){.identity select{max-width:165px}.wordmark{font-size:18px}.top{gap:8px;padding:8px}.top-actions{gap:3px}aside{width:265px;padding:15px}#status{max-width:95px;overflow:hidden;text-overflow:ellipsis}}
 @media(max-width:850px){.top{height:auto;min-height:104px}.identity select{max-width:220px}#stages{padding:5px 8px;gap:0;overflow-x:auto}#stages button{padding:5px 8px}.panel-open .stage{margin-right:265px}aside{top:146px;width:265px}.top-actions{justify-content:flex-start}#stages .next-stage{margin-left:5px}.canvas-label{max-width:90%}.protected{display:none}}
 @media(max-width:600px){.panel-open .stage{margin-right:0}aside{width:min(280px,85vw)}#guidance{display:none}.badge{letter-spacing:0}.identity{gap:3px}.identity select{max-width:155px}}
+/* Deployment capability note sits below canvas metadata without reducing canvas space. */
+#preview-availability{position:absolute;top:52px;left:18px;right:18px;z-index:2;width:fit-content;max-width:calc(100% - 36px);padding:4px 8px;border-radius:6px;background:var(--surface);color:var(--muted);font-size:11px;pointer-events:none}
+#preview-availability:empty{display:none}

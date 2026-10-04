@@ -12,3 +12,14 @@ for(const from of ['2d','3d']){
 }
 assert.equal(fits,2);assert.equal(commits,0);assert.equal(JSON.stringify(doc),before);
 console.log('Surface 3D → 2D retains surface mode; explicit Plan navigation exits without mutating geometry.');
+
+// A selected wall face has two distinct 2D presentations. Switching must not edit it.
+doc.features=[{id:'wall',kind:'wall',points:[[0,0],[100,0]],thickness:10}];doc.surface_design.surfaces=[{id:'face',kind:'wall',wall_id:'wall',side:-1}];
+node('#design-open').onclick();const saved=JSON.stringify(doc);
+for(const [id,pressed] of [['viewe','viewe'],['view2','view2'],['viewe','viewe'],['view3','view3'],['view2','view2']]){
+ node('#'+id).events.click[0]({stopImmediatePropagation(){}});
+ assert.equal(node('#'+pressed)['aria-pressed'],'true');
+ for(const other of ['view2','viewe','view3'].filter(v=>v!==pressed))assert.equal(node('#'+other)['aria-pressed'],'false');
+ assert.equal(JSON.stringify(doc),saved);
+}
+console.log('Selected wall: plan/elevation/3D indicators follow the displayed view without scene mutation.');

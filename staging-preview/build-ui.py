@@ -120,6 +120,7 @@ html=html.replace('</body>','<script src="/ps/app/ui-controls.js"></script></bod
 # Existing real Plan/Surface components keep the staging API boundary.
 floor=(APP/'floor-plan.html').read_text().replace('staging-api.js','ui-adapter.js').replace('staging.css','ui-staging.css');floor=re.sub(r'<div class="staging-bar">.*?</div>','',floor);floor=floor.replace('</body>','<script src="/ps/app/ui-controls.js"></script></body>');(APP/'floor-plan.html').write_text(floor)
 floorjs=(APP/'floor-plan.js').read_text().replace('Apartment saved. Shared scene updated.','Synthetic draft saved in this browser. No backend validation.').replace('window.Staging.api(path,body,raw)','window.Staging.planApi(path,body,raw)').replace('pixeloid-','pixeloid-ui-staging-').replace("'/ps/?project='","'/ps/?preview=ui8&project='");floorjs = floorjs.rsplit('})();',1)[0]+'\nwindow.Staging.hasUnsaved=()=>dirty;window.Staging.discardForReset=()=>{dirty=false;saveTicket++;changeSerial++;};\n})();\n'
+floorjs=floorjs.replace('const previewPolicy=()=>({available:true,editable:true});','const previewPolicy=()=>window.Staging.previewPolicy(doc);')
 (APP/'floor-plan.js').write_text(floorjs)
 # Reuse the existing Surface Design assignment flow with a bundled reference provider.
 surface=(APP/'surface-design.js').read_text().replace('pixeloid-','pixeloid-ui-staging-');start=surface.index('async function readReference(');end=surface.index('\nasync function action(',start)
@@ -134,9 +135,10 @@ adapter=adapter.replace("'multi-room-fixtures.json'","'multi-room-fixtures.json?
 # Staging-only live 2D joined footprints; no production endpoint or worker.
 shutil.copytree(ROOT/'staging-preview/vendor',APP/'vendor',dirs_exist_ok=True)
 shutil.copyfile(ROOT/'staging-preview/joined-footprints.js',APP/'joined-footprints.js')
-for page in [OUT/'index.html',APP/'floor-plan.html']:
- text=page.read_text().replace('</head>','<script src="/ps/app/vendor/polygon-clipping.js" defer></script><script src="/ps/app/joined-footprints.js" defer></script></head>')
- page.write_text(text)
+adapter=(APP/'ui-adapter.js').read_text()
+for dependency in ['vendor/polygon-clipping.js','joined-footprints.js']:
+ adapter=adapter.replace("'"+dependency+"'","'"+dependency+"?v="+hashlib.sha256((APP/dependency).read_bytes()).hexdigest()[:12]+"'")
+(APP/'ui-adapter.js').write_text(adapter)
 for page in [OUT/'index.html',APP/'floor-plan.html']:
  def versioned(m):
   path=OUT/m.group(2).removeprefix('/ps/')

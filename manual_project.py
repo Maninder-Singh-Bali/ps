@@ -64,7 +64,9 @@ def preview(store,data):
     plan['drawing']['site']['model'].update(metres_per_pixel=d['calibration']['metres_per_pixel'])
     plan['drawing']['site']['model']['wall_heights'][plan['manual_floor']]=d['wall_height_m']
     from shared_floor import build
-    p=snap.project(plan['project_id']);room=next(r for r in p['rooms'] if r['id']==p['manual_preview_room_id'])
+    p=snap.project(plan['project_id']);candidates=[r for r in p['rooms'] if r.get('plan_id')==plan['id']]
+    if not candidates:raise ValueError('This floor has no room extent for a 3D preview.')
+    room=next((r for r in candidates if r['id']==p.get('manual_preview_room_id')),candidates[0])
     return build(snap,room)
 
 
