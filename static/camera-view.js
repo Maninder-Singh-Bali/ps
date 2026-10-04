@@ -13,16 +13,22 @@
  window.openCameraView=async function(projectId=pid,roomId=rid,options={}){
   const r=state.projects[projectId]?.rooms.find(x=>x.id===roomId);
   if(!r?.bbox||!r.plan_id)return toast('Select a mapped section first.');
-  context={pid:projectId,rid:roomId,revision:r.revision,viewId:Object.hasOwn(options,'viewId')?options.viewId:(window.WorkspaceSelection?.cameraForRoom(roomId)||null)};dirty=false;mode=null;moving=null;pan=null;stopZoom();view=null;serial++;
+  // An explicit New view stays empty; otherwise restore a valid named camera,
+  // including first entry after reload before per-room memory is populated.
+  const newView=Object.hasOwn(options,'viewId')&&!options.viewId;
+  const candidates=[options.viewId,window.WorkspaceSelection?.cameraForRoom?.(roomId),window.WorkspaceSelection?.cameraId,...Object.keys(r.camera_views||{})];
+  const viewId=newView?null:candidates.find(id=>r.camera_views?.[id])||null;
+  context={pid:projectId,rid:roomId,revision:r.revision,viewId};dirty=false;mode=null;moving=null;pan=null;stopZoom();view=null;serial++;
   if(window.InlinePlan?.active()){rid=roomId;InlinePlan.syncSections()}
   const opening=context;
   const [scene,drawing]=await Promise.all([api(route('shared-scene')+'?room_id='+encodeURIComponent(roomId),{},'GET'),api(route('drawing'),{},'GET')]);
-  if(context!==opening)return;
+  if(context!==opening)return false;
   context.drawing=drawing;
   const named=r.camera_views?.[context.viewId];context.viewId=named?.id||null;context.viewRevision=named?.revision;draft=named?structuredClone(named.camera):!Object.hasOwn(options,'viewId')&&scene.saved_camera?structuredClone(scene.saved_camera):null;
   const a=A(r.plan_id);view=options.view?[...options.view]:window.InlinePlan?.active()?InlinePlan.planView():[0,0,a.width,a.height];const field=(id,label,value,min,max,step)=>`<label class="field"><span>${label}</span><input id="camera-${id}" type="number" min="${min}" max="${max}" step="${step}" value="${value}"></label>`;
-  showModal('Camera view · '+esc(r.name),`<div class="workspace-modes" role="group" aria-label="Workspace mode">${button('Furniture','furniture')}<button type="button" class="btn small active" aria-pressed="true">Camera</button></div><div class="camera-workspace"><section class="camera-plan-panel"><div class="camera-navigation" role="toolbar" aria-label="Plan navigation">${button('Place camera','position')}${button('Aim camera','target')}${button('Full plan','fit-plan')}${button('This section','fit-room')}<label><input id="camera-original" type="checkbox"> Original map</label></div><svg id="camera-plan" viewBox="0 0 ${a.width} ${a.height}" aria-label="Camera position and viewing direction on the floor plan"></svg><p id="camera-status" role="status">${draft?'Drag the camera or target. Scroll to zoom · Middle-drag to pan.':'Place the camera, then click where it should look.'}</p></section><section class="camera-settings"><label class="field">Saved view<select id="camera-saved-view" aria-label="Saved camera view"></select></label><label class="field">View name<input id="camera-name" maxlength="120" value="${esc(named?.name||'New view')}"></label><label class="field"><span>Section</span><select id="camera-room">${state.projects[projectId].rooms.filter(x=>x.plan_id===r.plan_id&&x.bbox).map(x=>`<option value="${x.id}" ${x.id===roomId?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label><img id="camera-preview" alt="Perspective preview of the saved walls and furniture blocks" hidden><div id="camera-empty">${esc(emptyMessage())}</div><div class="camera-fields">${field('height','Eye height (m)',draft?.height??scene.model_scale?.eye_height_m??1.5664,.3,2.8,.1)}${field('fov','View width (°)',draft?.horizontal_fov??67.015,30,100,1)}</div><details class="camera-details"><summary>More options</summary><label class="inline-check"><input id="camera-identify" type="checkbox"> Highlight objects</label>${field('target-height','Target height',draft?.target_height??draft?.height??scene.model_scale?.eye_height_m??1.5664,0,3,.1)}${button('Refresh preview','preview')}<div id="camera-objects" class="camera-object-list" aria-label="Furniture visibility"></div></details></section></div>`,button('Close','close')+button('Save camera','save'),'camera');
-  $('#modal').classList.add('camera-dialog');savedViews();draw();if(draft)schedule();
+  showModal('Camera view · '+esc(r.name),`<div class="workspace-modes" role="group" aria-label="Workspace mode">${button('Furniture','furniture')}<button type="button" class="btn small active" aria-pressed="true">Camera</button></div><div class="camera-workspace"><section class="camera-plan-panel"><div class="camera-navigation" role="toolbar" aria-label="Plan navigation">${button('Place camera','position')}${button('Aim camera','target')}${button('Full plan','fit-plan')}${button('This section','fit-room')}<label><input id="camera-original" type="checkbox"> Original map</label></div><svg id="camera-plan" viewBox="0 0 ${a.width} ${a.height}" aria-label="Camera position and viewing direction on the floor plan"></svg><p id="camera-status" role="status">${draft?'Drag the camera or target. Swipe to pan · Pinch to zoom · Shift-drag to pan.':'Place the camera, then click where it should look.'}</p></section><section class="camera-settings"><label class="field">Saved view<select id="camera-saved-view" aria-label="Saved camera view"></select></label><label class="field">View name<input id="camera-name" maxlength="120" value="${esc(named?.name||'New view')}"></label><label class="field"><span>Section</span><select id="camera-room">${state.projects[projectId].rooms.filter(x=>x.plan_id===r.plan_id&&x.bbox).map(x=>`<option value="${x.id}" ${x.id===roomId?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label><img id="camera-preview" alt="Perspective preview of the saved walls and furniture blocks" hidden><div id="camera-empty">${esc(emptyMessage())}</div><div class="camera-fields">${field('height','Eye height (m)',draft?.height??scene.model_scale?.eye_height_m??1.5664,.3,2.8,.1)}${field('fov','View width (°)',draft?.horizontal_fov??67.015,30,100,1)}</div><details class="camera-details"><summary>More options</summary><label class="inline-check"><input id="camera-identify" type="checkbox"> Highlight objects</label>${field('target-height','Target height',draft?.target_height??draft?.height??scene.model_scale?.eye_height_m??1.5664,0,3,.1)}${button('Refresh preview','preview')}<div id="camera-objects" class="camera-object-list" aria-label="Furniture visibility"></div></details></section></div>`,button('Close','close')+button('Save camera','save'),'camera');
+  if(named&&[draft.position,draft.target].some(p=>p[0]*a.width<view[0]||p[0]*a.width>view[0]+view[2]||p[1]*a.height<view[1]||p[1]*a.height>view[1]+view[3]))view=[0,0,a.width,a.height];
+  $('#modal').classList.add('camera-dialog');savedViews();draw();if(draft)schedule();return true;
  };
  function savedViews(){const el=$('#camera-saved-view');if(!el||!context)return;el.innerHTML='<option value="">New view</option>'+floorViews().map(({owner,view:v})=>`<option value="${esc(v.id)}">${esc(owner.name)} · ${esc(v.name)}</option>`).join('');el.value=context.viewId||'';}
  async function selectSaved(id){
@@ -31,7 +37,8 @@
   if(id&&!selected)return;
   const owner=selected?.owner.id||context.rid,project=context.pid;
   window.WorkspaceSelection?.selectRoom(owner);
-  await openCameraView(project,owner,{viewId:id||null,view});
+  const opened=await openCameraView(project,owner,{viewId:id||null,view});
+  if(opened===false)return;
   if(id)window.WorkspaceSelection?.selectCamera(id);
   window.recordWorkspaceRoute?.('cameras');
  }
@@ -65,13 +72,20 @@
   if(corrected)DrawingPreview.finish(svg);window.InlinePlan?.applyFloorVisibility(svg);window.PlanLabels?.attach(svg,state.projects[context.pid].rooms.filter(x=>x.plan_id===a.id&&x.bbox&&(!window.InlinePlan||InlinePlan.floorVisible(x.floor))),a,room().id);
   document.querySelectorAll('[data-camera="position"],[data-camera="target"]').forEach(el=>{el.classList.toggle('active',el.dataset.camera===mode);el.setAttribute('aria-pressed',el.dataset.camera===mode?'true':'false')});
   const point=e=>{const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(svg.getScreenCTM().inverse());return [Math.max(0,Math.min(1,p.x/a.width)),Math.max(0,Math.min(1,p.y/a.height))]};
-  svg.onpointerdown=e=>{stopZoom();if(e.button===1){e.preventDefault();pan={start:[e.clientX,e.clientY],view:[...view],scale:svg.getScreenCTM().a};svg.setPointerCapture(e.pointerId);svg.style.cursor='grabbing';return}if(e.button!==0)return;const saved=e.target.closest?.('[data-saved-camera]');if(saved&&!mode){selectSaved(saved.dataset.savedCamera).catch(err=>toast(err.message));return}const handle=e.target.dataset.handle;if(handle){moving=handle;svg.setPointerCapture(e.pointerId);return}if(!mode)return;const q=point(e);if(mode==='position'){draft={...(draft||{}),position:q,target:draft?.target||q,height:Number($('#camera-height').value),target_height:Number($('#camera-target-height').value),horizontal_fov:Number($('#camera-fov').value)};mode='target';hint('Click where the camera should look.')}else{draft.target=q;mode=null;hint('View changed · not saved.');schedule()}dirty=true;draw()};
+  svg.onpointerdown=e=>{stopZoom();if(e.button===1||(e.button===0&&e.shiftKey)){e.preventDefault();pan={start:[e.clientX,e.clientY],view:[...view],scale:svg.getScreenCTM().a};svg.setPointerCapture(e.pointerId);svg.style.cursor='grabbing';return}if(e.button!==0)return;const saved=e.target.closest?.('[data-saved-camera]');if(saved&&!mode){selectSaved(saved.dataset.savedCamera).catch(err=>toast(err.message));return}const handle=e.target.dataset.handle;if(handle){moving=handle;svg.setPointerCapture(e.pointerId);return}if(!mode)return;const q=point(e);if(mode==='position'){draft={...(draft||{}),position:q,target:draft?.target||q,height:Number($('#camera-height').value),target_height:Number($('#camera-target-height').value),horizontal_fov:Number($('#camera-fov').value)};mode='target';hint('Click where the camera should look.')}else{draft.target=q;mode=null;hint('View changed · not saved.');schedule()}dirty=true;draw()};
   svg.onkeydown=e=>{const saved=e.target.closest?.('[data-saved-camera]');if(saved&&['Enter',' '].includes(e.key)){e.preventDefault();selectSaved(saved.dataset.savedCamera).catch(err=>toast(err.message));}};
   svg.onpointermove=e=>{if(pan){view=[pan.view[0]-(e.clientX-pan.start[0])/pan.scale,pan.view[1]-(e.clientY-pan.start[1])/pan.scale,...pan.view.slice(2)];applyView();return}if(!moving)return;draft[moving]=point(e);dirty=true;draw();hint('View changed · not saved.')};
   svg.onpointerup=()=>{if(pan){pan=null;svg.style.cursor='';return}if(moving){moving=null;if(ready())mode=null;schedule()}};
   svg.onpointercancel=()=>{const edited=!!moving;pan=null;svg.style.cursor='';moving=null;if(edited){if(ready())mode=null;schedule()}};
   svg.onauxclick=e=>{if(e.button===1)e.preventDefault()};
-  svg.onwheel=e=>{e.preventDefault();if(moving||pan)return;const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(svg.getScreenCTM().inverse());animateView(DrawingGeometry.zoom(zoomTarget||view,[p.x,p.y],e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?300:1),a.width))};
+  svg.onwheel=e=>{e.preventDefault();if(moving||pan)return;
+   const matrix=svg.getScreenCTM();if(!matrix)return;
+   const unit=e.deltaMode===1?16:e.deltaMode===2?svg.clientHeight:1;
+   stopZoom();
+   if(e.ctrlKey){const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(matrix.inverse());view=DrawingGeometry.pinchZoom(view,[p.x,p.y],e.deltaY*unit,a.width)}
+   else view=[view[0]+(e.deltaX||0)*unit/matrix.a,view[1]+e.deltaY*unit/matrix.d,...view.slice(2)];
+   applyView();
+  };
   applyView();
  }
  function schedule(){clearTimeout(timer);const ticket=++serial;timer=setTimeout(()=>preview(ticket),250)}

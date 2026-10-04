@@ -1,6 +1,6 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert');
 const elements={},handlers={},timers=new Map(),requests=[],frames=new Map();let tid=0;
-const element=id=>elements[id]??=( {id,value:'',hidden:false,textContent:'',style:{},attributes:{},setAttribute(k,v){this.attributes[k]=v},querySelectorAll(){return []},classList:{add(){}},setPointerCapture(){},getScreenCTM(){return {a:1,inverse(){return {}}}},close(){}} );
+const element=id=>elements[id]??=( {id,value:'',hidden:false,textContent:'',style:{},attributes:{},setAttribute(k,v){this.attributes[k]=v},querySelectorAll(){return []},classList:{add(){}},setPointerCapture(){},getScreenCTM(){return {a:1,d:1,inverse(){return {}}}},close(){}} );
 const room={id:'room',revision:3,plan_id:'plan',bbox:[0,0,1,1]};
 const sandbox={DrawingGeometry:require('../static/drawing-geometry.js'),requestAnimationFrame(fn){frames.set(++tid,fn);return tid},cancelAnimationFrame(id){frames.delete(id)},console,Math,Number,structuredClone,encodeURIComponent,setTimeout(fn){timers.set(++tid,fn);return tid},clearTimeout(id){timers.delete(id)},state:{projects:{project:{rooms:[room]}}},pid:'project',rid:'room',modalType:'camera',window:{},document:{addEventListener(type,fn){(handlers[type]??=[]).push(fn)}},$:selector=>element(selector),A:()=>({id:'plan',width:100,height:100}),url:id=>'/'+id,esc:s=>s,showModal(){element('#camera-height').value='1.5';element('#camera-target-height').value='1.5';element('#camera-fov').value='67';element('#camera-original').checked=true},toast(){},refresh:async()=>{},confirm:()=>true,DOMPoint:class{constructor(x,y){this.x=x;this.y=y}matrixTransform(){return this}},api:async(route,data,method)=>{if(method==='GET')return {saved_camera:null,calibrated:false};requests.push({route,data});return route.endsWith('camera-preview')?{image:'data:image/png;base64,test',typed_segments:2}:{revision:4,camera:data}}};
 vm.createContext(sandbox);vm.runInContext(fs.readFileSync('static/camera-view.js','utf8'),sandbox);
@@ -37,7 +37,19 @@ async function flush(){const pending=[...timers.values()];timers.clear();for(con
  await action('zoom-in');await animate();const zoomed=element('#camera-plan').attributes.viewBox.split(' ').map(Number);assert.ok(zoomed[2]<100);
  const svg=element('#camera-plan');svg.onpointerdown({button:1,clientX:50,clientY:50,pointerId:2,preventDefault(){}});svg.onpointermove({clientX:70,clientY:60});svg.onpointerup({});const panned=svg.attributes.viewBox.split(' ').map(Number);assert.equal(panned[0],zoomed[0]-20);assert.equal(panned[1],zoomed[1]-10);
  await action('fit-plan');await animate();assert.equal(svg.attributes.viewBox,'0 0 100 100');
- let prevented=false;svg.onwheel({deltaY:-150,deltaMode:0,clientX:25,clientY:30,preventDefault(){prevented=true}});await animate();assert.ok(prevented);assert.ok(Number(svg.attributes.viewBox.split(' ')[2])<100);
+ let prevented=false;svg.onwheel({ctrlKey:true,deltaY:-150,deltaMode:0,clientX:25,clientY:30,preventDefault(){prevented=true}});await animate();assert.ok(prevented);assert.ok(Number(svg.attributes.viewBox.split(' ')[2])<100);
+ const beforePan=svg.attributes.viewBox.split(' ').map(Number);
+ svg.onwheel({deltaX:12,deltaY:24,deltaMode:0,preventDefault(){}});
+ let wheelPan=svg.attributes.viewBox.split(' ').map(Number);
+ assert.deepEqual(wheelPan,[beforePan[0]+12,beforePan[1]+24,...beforePan.slice(2)]);
+ svg.onwheel({deltaX:1,deltaY:2,deltaMode:1,preventDefault(){}});
+ assert.deepEqual(svg.attributes.viewBox.split(' ').map(Number),[wheelPan[0]+16,wheelPan[1]+32,...wheelPan.slice(2)]);
+ // A pending button zoom cannot continue and undo a subsequent pan.
+ await action('zoom-in');svg.onwheel({deltaX:5,deltaY:7,deltaMode:0,preventDefault(){}});assert.equal(frames.size,0);
+ const stable=svg.attributes.viewBox;await animate();assert.equal(svg.attributes.viewBox,stable);
+ const panStart=stable.split(' ').map(Number);
+ svg.onpointerdown({button:0,shiftKey:true,clientX:10,clientY:10,pointerId:3,preventDefault(){}});svg.onpointermove({clientX:30,clientY:40});svg.onpointerup();
+ assert.deepEqual(svg.attributes.viewBox.split(' ').map(Number),[panStart[0]-20,panStart[1]-30,...panStart.slice(2)]);
  assert.equal(requests.length,countBefore);await action('preview');assert.equal(JSON.stringify(requests.at(-1).data),cameraBefore);
  // A save/refresh must capture the visible controls even before a change event.
  element('#camera-target-height').value='1.1';element('#camera-fov').value='90';
@@ -74,5 +86,22 @@ async function flush(){const pending=[...timers.values()];timers.clear();for(con
  for(const fn of handlers.change)await fn({target:{id:'camera-saved-view',value:''}});
  assert.equal(selected.length,count);assert.equal(element('#camera-saved-view').value,'saved');
  console.log('Saved camera discovery: floor isolation, cross-room preview and unsaved-change protection passed');
+ sandbox.confirm=()=>true;
+ // Reload with no per-room memory must restore the named camera, not New view.
+ await sandbox.window.openCameraView('project','other-room',{view:[0,0,10,10]});await flush();
+ assert.equal(element('#camera-saved-view').value,'saved');assert.equal(element('#camera-preview').hidden,false);
+ assert.equal(element('#camera-plan').attributes.viewBox,'0 0 100 100');
+ // Explicit New view must remain blank even if the server returns a saved camera.
+ const normalApi=sandbox.api;sandbox.api=async(...args)=>args[0].includes('shared-scene')?{saved_camera:cam}:normalApi(...args);
+ await sandbox.window.openCameraView('project','other-room',{viewId:null});await action('preview');assert.equal(element('#camera-preview').hidden,true);
+ sandbox.api=normalApi;
+ // Delayed earlier room selection must not restore an old camera/route after a newer one.
+ let release;sandbox.api=(...args)=>args[0].includes('shared-scene')&&args[0].includes('other-room')?new Promise(resolve=>release=resolve):normalApi(...args);
+ const slow=handlers.change[0]({target:{id:'camera-saved-view',value:'saved'}});
+ await sandbox.window.openCameraView('project','room',{viewId:null});const selectionCount=selected.length;
+ release({saved_camera:cam});await slow;assert.equal(selected.length,selectionCount);assert.equal(element('#camera-saved-view').value,'');
+ sandbox.api=normalApi;
+ console.log('Camera navigation: two-axis pan, line deltas, pinch, shift-drag, reload, explicit New view and async ordering passed');
+
 
 })().catch(e=>{console.error(e);process.exitCode=1});
