@@ -90,9 +90,9 @@ for name in names:
   text=text.replace('/icons/','/ps/app/icons/').replace("'/floor-plan.html","'/ps/app/floor-plan.html").replace('"/floor-plan.html','"/ps/app/floor-plan.html').replace("'/?project=","'/ps/?project=")
   # Isolate every production local preference in the staging origin namespace.
   text=text.replace('pixeloid-','pixeloid-ui-staging-')
-  text=text.replace('/ps/app/floor-plan.html#','/ps/app/floor-plan.html?preview=ui5#')
-  text=text.replace("link.href='/ps/app/floor-plan.html'", "link.href='/ps/app/floor-plan.html?preview=ui5'")
-  text=text.replace("location.href='/ps/app/floor-plan.html'+(stage==='surfaces'?'?stage=surfaces':'')", "location.href='/ps/app/floor-plan.html?preview=ui5'+(stage==='surfaces'?'&stage=surfaces':'')")
+  text=text.replace('/ps/app/floor-plan.html#','/ps/app/floor-plan.html?preview=ui6#')
+  text=text.replace("link.href='/ps/app/floor-plan.html'", "link.href='/ps/app/floor-plan.html?preview=ui6'")
+  text=text.replace("location.href='/ps/app/floor-plan.html'+(stage==='surfaces'?'?stage=surfaces':'')", "location.href='/ps/app/floor-plan.html?preview=ui6'+(stage==='surfaces'?'&stage=surfaces':'')")
 
  if name=='app.js':
   text=re.sub(r'<div class="manual-plan-choice">.*?</div>','',text)
@@ -102,7 +102,7 @@ for name in names:
   text=text.replace("e.remote?'● Local design · PC on demand':e.connected?`● Renderer connected${e.running||e.pending?' · busy':''}`:'○ Renderer offline'","'SIMULATED · browser only'")
   text=text.replace('Native render','Synthetic sample').replace('Native 1080','Synthetic 1920 × 1080')
  if name=='interior-planner.js':text=text.replace('FLUX image · configured worker workflow','SIMULATED image · bundled fixture').replace('Renderer offline. Generation requires the paired PC.','SIMULATED disconnected state. Reconnect in Testing controls.')
- if name=='furniture-blocks.js':text=text.replace('No conflicts found with the currently mapped features.','Mock check only; placement has no backend validation.').replace('Check missing geometry and walking space yourself.','Review geometry manually.')
+ if name=='furniture-blocks.js':text=text.replace('No conflicts found with the currently mapped features.','Mock check only; placement has no backend validation.').replace('Check missing geometry and walking space yourself.','Review geometry manually.').replace('No mapped conflicts','Mock check · not validated').replace('Check missing geometry and walking space. This is not structural validation.','No backend validation runs in this preview. Review geometry manually.')
  if name=='camera-view.js':text=text.replace("'Saved camera view.'","'Saved camera view. STATIC sample — not rebuilt from this camera.'").replace("'View changed · not saved.'","'View changed · not saved. STATIC sample — not a live rebuild.'")
  if name=='scene-control.js':text=text.replace('The surrounding image is copied from the master and checked pixel by pixel.','This simulation records the mask only; no pixels are regenerated or validated.').replace('Everything outside it stays as it is in this master image.','This is a mask interaction test, not an image edit result.')
  if name=='video-presets.js':text=text.replace('Generation still requires approval and an available phase.','SIMULATED controls; every result is the bundled 2-second clip.').replace('Preview samples at 768 × 448 and crops to 768 × 432. No upscaling. Frames 0–47 are retained; guided endpoint frame 48 is excluded.','SIMULATED preset selection. No sampler runs; the bundled 768 × 432, 48-frame clip is returned.')
@@ -116,7 +116,7 @@ html=html.replace('</body>','<script src="/ps/app/ui-controls.js"></script></bod
 (OUT/'index.html').write_text(html)
 # Existing real Plan/Surface components keep the staging API boundary.
 floor=(APP/'floor-plan.html').read_text().replace('staging-api.js','ui-adapter.js').replace('staging.css','ui-staging.css');floor=re.sub(r'<div class="staging-bar">.*?</div>','',floor);floor=floor.replace('</body>','<script src="/ps/app/ui-controls.js"></script></body>');(APP/'floor-plan.html').write_text(floor)
-floorjs=(APP/'floor-plan.js').read_text().replace('Apartment saved. Shared scene updated.','Synthetic draft saved in this browser. No backend validation.').replace('window.Staging.api(path,body,raw)','window.Staging.planApi(path,body,raw)').replace('pixeloid-','pixeloid-ui-staging-').replace("'/ps/?project='","'/ps/?preview=ui5&project='");floorjs = floorjs.rsplit('})();',1)[0]+'\nwindow.Staging.hasUnsaved=()=>dirty;window.Staging.discardForReset=()=>{dirty=false;saveTicket++;changeSerial++;};\n})();\n'
+floorjs=(APP/'floor-plan.js').read_text().replace('Apartment saved. Shared scene updated.','Synthetic draft saved in this browser. No backend validation.').replace('window.Staging.api(path,body,raw)','window.Staging.planApi(path,body,raw)').replace('pixeloid-','pixeloid-ui-staging-').replace("'/ps/?project='","'/ps/?preview=ui6&project='");floorjs = floorjs.rsplit('})();',1)[0]+'\nwindow.Staging.hasUnsaved=()=>dirty;window.Staging.discardForReset=()=>{dirty=false;saveTicket++;changeSerial++;};\n})();\n'
 (APP/'floor-plan.js').write_text(floorjs)
 # Reuse the existing Surface Design assignment flow with a bundled reference provider.
 surface=(APP/'surface-design.js').read_text();start=surface.index('async function readReference(');end=surface.index('\nasync function action(',start)

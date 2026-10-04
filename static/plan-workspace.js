@@ -39,12 +39,12 @@
   const save=host.querySelector('[data-block="save"],[data-camera="save"]');if(save){save.classList.add('primary');top.append(save)}
   host.querySelector('[data-block="close"],[data-camera="close"]')?.remove();host.querySelector('.inline-editor-footer')?.remove();
   const toolbar=host.querySelector('.block-toolbar');if(toolbar){
-   toolbar.querySelectorAll('[data-block="library"],[data-block="add"],[data-block="propose"],[data-block="suggest"],[data-block="check"]').forEach(el=>el.remove());
+   toolbar.querySelectorAll('[data-block="add"],[data-block="propose"],[data-block="suggest"],[data-block="check"]').forEach(el=>el.remove());
    host.querySelector('.block-structure-status')?.remove();
    top.insertBefore(toolbar,save||null);
   }
   const inspector=host.querySelector('.block-inspector');if(inspector){
-   const feedback=inspector.querySelector('#block-feedback');if(feedback){feedback.classList.add('inline-placement-feedback');host.querySelector('.block-left-panel')?.append(feedback)}
+   const feedback=inspector.querySelector('#block-feedback');if(feedback){feedback.classList.add('inline-placement-feedback');host.querySelector('#block-edit-status')?.after(feedback)}
    const review=inspector.querySelector('.block-review');if(review){review.lastChild.textContent=' Placement checked';top.insertBefore(review,save||null)}
    const dock=host.querySelector('.block-left-panel'),props=inspector.querySelector('.block-object-properties'),transform=inspector.querySelector('.block-transform-panel'),wall=inspector.querySelector('#block-wall-properties');
    const controls=document.createElement('div');controls.className='inline-selection-controls';

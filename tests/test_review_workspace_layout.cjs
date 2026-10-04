@@ -1,0 +1,16 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const source=fs.readFileSync(require.resolve('../static/interior-planner.js'),'utf8');
+const images={approved:{id:'approved',view_revision:1},v1:{id:'v1',view_id:'cam',view_revision:1,status:'review',duration:2},v2:{id:'v2',view_id:'cam',view_revision:1,status:'review',duration:8}};
+const room={id:'room',plan_id:'plan',bbox:[0,0,1,1],name:'Living',camera_views:{cam:{id:'cam',name:'Living view',revision:1}},videos:['v1','v2'],images:[],view_approvals:{cam:{approved_image_id:'approved'}}};
+const listeners={},context={window:{addEventListener(){}},document:{addEventListener:(n,fn)=>(listeners[n]??=[]).push(fn)},renderImages:()=>'',renderVideos:()=>'',P:()=>({rooms:[room],map_confirmed:true}),R:()=>room,A:id=>images[id],pid:'p',rid:'room',planId:'plan',state:{engine:{connected:true}},esc:String,url:id=>'/'+id,heading:()=>'<h1>Video</h1>',badge:x=>x,imageRevisionCurrent:()=>true,WorkspaceSelection:{cameraId:'cam'},ReviewState:{label:a=>a?.status||'Not generated',history:()=>''},VideoPresets:{controls:()=>'<select>Next preset</select>',describe:a=>a.duration+' seconds'},recordWorkspaceRoute:()=>{}};
+context.renderMain=()=>{};vm.createContext(context);vm.runInContext(source,context);
+let html=context.renderVideos();
+assert.match(html,/class="output-context"/);assert.match(html,/aria-label="Create next video"/);assert.match(html,/aria-label="Review selected output"/);
+const next=html.split('aria-label="Create next video"')[1].split('</section>')[0],review=html.split('aria-label="Review selected output"')[1].split('</section>')[0];
+assert.match(next,/data-planner="video"/);assert.match(next,/data-job-view="cam"/);assert.doesNotMatch(next,/approve-video|Saved video/);
+assert.match(review,/Approve version 2/);assert.match(review,/data-id="v2"/);assert.match(review,/8 seconds/);assert.doesNotMatch(review,/Next preset/);
+context.VideoPresets.controls=()=>'<select>Different next preset</select>';html=context.renderVideos();assert.match(html,/Version 2<\/strong>.*8 seconds/);
+for(const fn of listeners.change)fn({target:{dataset:{plannerVersion:'camvideo'},value:'v1'}});
+html=context.renderVideos();assert.match(html,/Approve version 1/);assert.match(html,/data-action="approve-video"[^>]*data-id="v1"/);assert.match(html,/Version 1<\/strong>.*2 seconds/);
+room.view_approvals.cam={};html=context.renderVideos();assert.match(html,/data-planner="video"[^>]*disabled/);assert.match(html,/Approve a current source image first/);
+console.log('Creation/review separation, selected-output identity, stable metadata and source gating passed.');

@@ -2,7 +2,7 @@
 // Labels remain the same screen size through wheel zoom, panning and resizing.
 (() => {
  const bound=new WeakMap();
- let objectsVisible=true;
+ let objectsVisible=false;try{objectsVisible=JSON.parse(localStorage.getItem('pixeloid-all-object-labels')||'false')===true}catch{}
  const names={wall:'Wall',window:'Window',door:'Door',sliding_door:'Sliding door',opening:'Opening',line:'Detail line',detail:'Outline',unknown:'Unclassified object',unclassified:'Unclassified object',sofa:'Sofa',chair:'Chair',table:'Table',bed:'Bed',storage:'Storage',refrigerator:'Refrigerator',comforter:'Comforter',pillar:'Pillar',fixture:'Fixture',appliance:'Appliance',desk:'Desk',plant:'Plant',rug:'Rug',stair:'Staircase'};
  function objectName(item){
   if(item.kind==='sofa')return `${item.seat_count?item.seat_count+'-seater ':''}${item.shape==='l'?'L-shaped ':''}sofa`;
@@ -20,12 +20,14 @@
   return trials.sort((a,b)=>a.score-b.score)[0];
  }
  function drawObjects(svg,group,scale){
-  if(!objectsVisible)return;
+
   const rect=svg.getBoundingClientRect(),viewport={x:rect.left,y:rect.top,w:rect.width,h:rect.height},matrix=svg.getScreenCTM().inverse(),occupied=[...group.querySelectorAll('text')].map(e=>{const b=e.getBoundingClientRect();return{x:b.left,y:b.top,w:b.width,h:b.height}});
   const nodes=[...svg.querySelectorAll('[data-object-label],[data-plan-kind]')].filter(e=>!e.dataset.skipLabel&&(e.dataset.objectLabel||['wall','window','door','sliding_door','opening'].includes(e.dataset.planKind)));
   for(const el of nodes){
+   const contextual=el.dataset.labelActive==='true'||bound.get(svg)?.hover===el;
+   if(!objectsVisible&&!el.dataset.objectLabel&&!contextual)continue;
    const doorArc=el.dataset.planKind==='opening'&&[...el.querySelectorAll('path[d]')].some(p=>/[aA]/.test(p.getAttribute('d')));
-   const label=el.dataset.objectLabel||(doorArc?'Door':names[el.dataset.planKind]),b=el.getBoundingClientRect();
+   const base=el.dataset.objectLabel||(doorArc?'Door':names[el.dataset.planKind]),label=base+(contextual&&el.dataset.labelDetail?' · '+el.dataset.labelDetail:''),b=el.getBoundingClientRect();
    if(!label||!b.width&&!b.height||b.right<rect.left||b.left>rect.right||b.bottom<rect.top||b.top>rect.bottom)continue;
    const anchor={x:(b.left+b.right)/2,y:(b.top+b.bottom)/2,left:b.left,right:b.right,top:b.top,bottom:b.bottom};
    const placed=labelPosition(anchor,label.length*5.4+10,17,occupied,viewport);occupied.push(placed);
@@ -51,11 +53,12 @@
     }
     svg.append(group);drawObjects(svg,group,scale);
    };
+   svg.addEventListener('pointerover',e=>{const el=e.target.closest('[data-object-label],[data-plan-kind]');if(binding.hover!==el){binding.hover=el;binding.draw()}});svg.addEventListener('pointerleave',()=>{binding.hover=null;binding.draw()});
    binding.observe=new MutationObserver(binding.draw);binding.observe.observe(svg,{attributes:true,attributeFilter:['viewBox']});
    binding.resize=new ResizeObserver(binding.draw);binding.resize.observe(svg);
   }
   Object.assign(binding,{rooms,plan,selected});binding.draw();
  }
- window.PlanLabels={attach,objectName,get objectsVisible(){return objectsVisible},setObjects(value){objectsVisible=!!value;document.querySelectorAll('#block-plan,#camera-plan').forEach(svg=>bound.get(svg)?.draw())}};
+ window.PlanLabels={attach,objectName,get objectsVisible(){return objectsVisible},setObjects(value){objectsVisible=!!value;try{localStorage.setItem('pixeloid-all-object-labels',JSON.stringify(objectsVisible))}catch{}document.querySelectorAll('#block-plan,#camera-plan').forEach(svg=>bound.get(svg)?.draw())}};
  if(typeof module!=='undefined')module.exports={labelPosition,overlap};
 })();

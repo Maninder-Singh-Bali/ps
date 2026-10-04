@@ -1,6 +1,6 @@
 # Synthetic UI-testing staging
 
-Production UI source commit: see `preview-manifest.json`. This revision fixes the review of Pages baseline `33141fe7bbf3441880ff94dca58cf728539c44c0`.
+Production UI source commit: see `preview-manifest.json`. The ui6 polish builds on reviewed source `b87d62e11748648e65fa22e2de0074a84e40b7f5` and Pages ui5 `6974eae29710c36b8a096ceff15f4905ea528589`.
 All six workspaces use the production browser components. Staging-only transport, fixtures, testing controls and clear simulation labels are added at build time; deployed production files are never edited.
 
 No live backend is deployed. Synthetic saves, revisions, reviews, masks, camera settings, progress and jobs are stored in each visitor's browser. Testing controls select populated/empty/loading/success/failure/disconnected states and save faults. Reset affects only this synthetic namespace.
