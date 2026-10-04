@@ -1,0 +1,121 @@
+/* Interface-only palette. Never filter/invert media or recolour scene materials. */
+:root {
+  --bg:#f5f6f8; --surface:#ffffff; --raised:#eef1f5; --ink:#202733;
+  --muted:#596576; --line:#d9dfe6; --accent:#245dcc; --soft:#e9f0ff;
+  --focus:#245dcc; --primary:#245dcc; --primary-hover:#194bad;
+  --warning:#785112; --warning-bg:#fbf3df; --error:#a62d36; --error-bg:#fcebee;
+  --success:#286143; --success-bg:#e9f4ed; --canvas:#e9ecf0;
+  --studio-ink:var(--ink); --studio-muted:var(--muted); --studio-line:var(--line);
+  --studio-paper:var(--surface); --studio-ground:var(--bg); --studio-accent:var(--soft);
+}
+:root[data-theme=dark] {
+  --bg:#202225; --surface:#282b2f; --raised:#32363c; --ink:#edf0f4;
+  --muted:#b3bdca; --line:#434952; --accent:#9abdff; --soft:#30415e;
+  --focus:#a8c7ff; --primary:#3165ca; --primary-hover:#3b70d5;
+  --warning:#f0cb87; --warning-bg:#403625; --error:#ffadb3; --error-bg:#482d33;
+  --success:#a3d6b4; --success-bg:#293e32; --canvas:#25282d;
+}
+html,body {background:var(--bg);color:var(--ink)}
+body :is(.sidebar,.topbar,.top,.tools,aside,footer,#stages,#workflow-stages,dialog,
+ .panel,.output-card,.ref-card,.stat,.room-selector,.upload-progress,.project-switch,
+ .plan-toolbar,.room-edit,.subsection,.modal-head,.modal-body,.modal-footer,
+ .furniture-library,.block-left-panel,.block-right-panel,.block-popover-card,
+ .block-object-properties,.block-transform-panel,.inline-sections,.workspace-toolbar,
+ .review-issue-list,.review-advanced,.scene-controls aside,.room-generation-strip,
+ .generation-progress-timing,.generation-placeholder,.generation-room,.camera-input-preview figcaption) {
+  background:var(--surface)!important;color:var(--ink);border-color:var(--line)!important;
+}
+body :is(h1,h2,h3,h4,strong,.wordmark,.manual-plan-home,.output-title,.block-model-controls label) {color:var(--ink)}
+body :is(p,small,.help,.muted,.field>span,.unit-suffix,.protected,#guidance,#status,
+ .eyebrow,.breadcrumb,.workspace-label,.page-heading p,.sidebar-bottom button,
+ .room-row small,.ref-meta,.output-body p,.job-row p,.job-inline p,.viewer-meta,
+ .manual-eyebrow,.manual-plan-home>p,.manual-plan-choice p,.generation-progress-meta,
+ .generation-progress-timing>span,.review-issue-list p,.surface-images label) {color:var(--muted)}
+body :is(details,.panel-head,.subsection,.room-row,.review-item,.job-row,.section-line,
+ .manual-plan-choice,.modal-head,.modal-footer,.block-manual-dimensions,table,td,th) {border-color:var(--line)}
+body :is(button,.btn,select,textarea,input:not([type=checkbox],[type=radio],[type=range],[type=color]),.control) {
+  background-color:var(--surface);color:var(--ink);border-color:var(--line);box-shadow:none;
+}
+body :is(.field input,.field select,.field textarea,.version-select select,.card-controls select,
+ .furniture-library-grid button,.block-list button,.block-model-controls .btn,.inline-editor-top select) {
+  background:var(--surface);color:var(--ink);border-color:var(--line);
+}
+body :is(button,.btn,select):hover:not(:disabled),body :is(.nav-item,.room-row,.manual-floor-plan):hover {
+  background:var(--raised);color:var(--ink);border-color:var(--muted);
+}
+body :is(.primary,.btn.dark,.manual-start) {background:var(--primary)!important;color:#fff!important;border-color:var(--primary)!important}
+body :is(.primary,.btn.dark,.manual-start):hover:not(:disabled) {background:var(--primary-hover)!important}
+body :is(button[aria-pressed=true],button[aria-current=page],.nav-item.active,.btn.active,
+ .room-row.selected,.workspace-section.selected,.inline-wall-tools .selected,.block-left-tabs .selected,
+ .room-preview-switch .selected,.manual-floor-plan,.badge,.tag,.opening-distances) {
+  background:var(--soft);color:var(--accent);border-color:var(--accent);
+}
+body :is(.nav-item,.new-project,.link-button,a,#stages button,.review-locate) {color:var(--accent)}
+body :is(.notice,.split-banner,.engine-pill.offline,.warning,.warn,.dimension-assumption,.generation-phase-notice) {
+  background:var(--warning-bg);color:var(--warning);border-color:var(--warning);
+}
+body :is(.notice,.split-banner,.warning,.warn) :is(p,small,strong) {color:inherit}
+body :is(.error,.job-error,[role=alert],.btn.danger) {color:var(--error)!important}
+body :is(.error,[role=alert]) {background:var(--error-bg);border-color:var(--error)}
+body :is(.engine-pill:not(.offline),.success) {background:var(--success-bg);color:var(--success)}
+body :is(.progress-track,.generation-meter) {background:var(--raised)}
+body :is(.progress-track b,.generation-meter b) {background:var(--primary)}
+body .generation-meter.failed b {background:var(--error)}
+body :is(button,input,select,textarea,a,[tabindex]):focus-visible {
+  outline:2px solid var(--focus);outline-offset:3px;box-shadow:none;
+}
+body :is(button,.btn,input,select,textarea):disabled {opacity:.5;cursor:not-allowed}
+body :is(input,textarea):user-invalid,body [aria-invalid=true] {border-color:var(--error);outline-color:var(--error)}
+body input::placeholder,body textarea::placeholder {color:var(--muted);opacity:1}
+body input:is([type=checkbox],[type=radio],[type=range]) {accent-color:var(--primary)}
+body :is(.stage,.plan-workspace,.scene-preview,.output-media,.video-empty,.camera-input-preview .output-media) {background:var(--canvas)}
+body :is(.canvas-label span,#floating,.block-popover-card,.video-empty span) {background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+body #toast {background:var(--raised);color:var(--ink);border:1px solid var(--line);box-shadow:0 5px 24px #0003}
+dialog {background:var(--surface);color:var(--ink);border-color:var(--line);box-shadow:0 20px 70px #0005}
+dialog::backdrop {background:#10131899;backdrop-filter:blur(2px)}
+/* Only monochrome application icons, never user media. */
+[data-theme=dark] :is(button,.nav-item,.sidebar-bottom) img[src^="/ps/app/icons/"] {filter:brightness(0) invert(.9)}
+body :is(button.primary,.manual-start) img[src^="/ps/app/icons/"] {filter:brightness(0) invert(1)}
+/* Drawn dimensions have a paper halo: legible over charcoal AND an unchanged PDF. */
+#plan :is(.length-label,.endpoint-letter,.snap-hint) {fill:#214f99;stroke:#fff;stroke-width:2px;paint-order:stroke;vector-effect:non-scaling-stroke;stroke-linejoin:round}
+#plan .endpoint {fill:#fff;stroke:#245dcc}
+#plan .endpoint.shared-junction {fill:#245dcc;stroke:#fff}
+#smart-guides path {stroke:#6594d8}
+body:has(#login-form) main {background:var(--surface);border-color:var(--line)}
+
+body #workflow-stages button {color:var(--muted)}
+body #workflow-stages button:hover {background:var(--raised);color:var(--ink)}
+body .sidebar .nav-item.active {background:var(--soft);color:var(--accent)}
+body #plan-editor-inline :is(.block-model-panel,.furniture-library,.block-list button,.block-model-controls .btn) {background:var(--surface);border-color:var(--line);color:var(--ink)}
+body #plan-editor-inline .furniture-library-grid button {background:var(--surface);color:var(--ink)}
+body #plan-editor-inline .furniture-library-grid button:hover {background:var(--raised)}
+body :is(.block-toolbar,.block-model-controls,.block-selection-bar,.plan-edit-bar,.workspace-modes,.block-left-tabs) {background:var(--surface);color:var(--ink);border-color:var(--line)}
+body :is(.block-toolbar,.block-model-controls,.workspace-modes,.block-left-tabs) .selected {background:var(--soft);color:var(--accent);border-color:var(--accent)}
+/* SVG UI annotations only; no selectors target paint/tile fills or reference images. */
+#plan text:not([class]) {fill:#214f99;stroke:#fff;stroke-width:2px;paint-order:stroke;vector-effect:non-scaling-stroke}
+
+#plan .surface-caption {fill:var(--ink);stroke:none;font-weight:500}
+body .block-model-panel,body .object-action-bar {background:var(--surface);border-color:var(--line);color:var(--ink)}
+body .block-model-heading :is(span,select),body .library-heading span,body .block-model-hint {color:var(--muted)}
+body .object-action-bar button {color:var(--ink);background:transparent}
+body .object-action-bar button:hover {background:var(--raised)}
+body .block-workspace .object-action-bar svg {background:none;border:0;fill:none;stroke:currentColor}
+body #block-feedback {background:var(--warning-bg);color:var(--warning)}
+body:has(#login-form) #status {color:var(--error)}
+
+body #inspector :is(input,textarea):invalid {border-color:var(--error);outline-color:var(--error)}
+body :is(.notice,.split-banner,.generation-phase-notice,.warning,.warn) {color:var(--warning)!important}
+body :is(.notice,.split-banner,.warning,.warn) :is(p,small,strong) {color:inherit!important}
+/* Native menus must not retain older per-tool white backgrounds. */
+body select {background-color:var(--surface)!important;color:var(--ink)!important;border-color:var(--line)!important}
+/* Advanced / More share this menu shell; theme the shell as well as its buttons. */
+body .inline-more>div {background:var(--surface);color:var(--ink);border-color:var(--line);box-shadow:0 6px 20px #0003}
+.appearance-controls {display:inline-flex;align-items:center;gap:2px;white-space:nowrap}
+body .appearance-toggle {display:inline-flex;align-items:center;gap:7px;padding:6px 8px;min-height:32px;border:1px solid var(--line);border-radius:7px;font:12px system-ui}
+.theme-track {display:inline-flex;align-items:center;width:30px;height:18px;padding:2px;border-radius:12px;background:var(--line);box-sizing:border-box}
+.theme-track>span {width:14px;height:14px;background:var(--ink);border-radius:50%;transform:translateX(0)}
+[aria-checked=true]>.theme-track {background:var(--primary)}
+[aria-checked=true]>.theme-track>span {background:#fff;transform:translateX(12px)}
+
+/* Preserve the original full-width phase alert; use smaller text only. */
+body #generation-phase-notice {font-size:11px}
