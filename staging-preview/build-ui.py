@@ -81,6 +81,12 @@ pack={'state':{'projects':{p['id']:p},'assets':assets,'jobs':{},'engine':{'conne
 sys.path.insert(0,str(ROOT/'staging-preview'))
 from multi_room_fixture import build as build_multi_room
 (APP/'multi-room-fixtures.json').write_text(json.dumps(build_multi_room(pack,plan_drafts,MEDIA)))
+# User-authorized constructed residence, allowlisted geometry only. No Store is read.
+heritage=json.loads((ROOT/'staging-preview/fixtures/heritage-courtyard.json').read_text())
+(APP/'heritage-fixtures.json').write_text(json.dumps(heritage))
+(MEDIA/'heritage-paper.svg').write_text('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 736 1308"><rect width="736" height="1308" fill="#f4f3ef"/><text x="368" y="60" text-anchor="middle" font-family="sans-serif" fill="#566271" font-size="15">Constructed concept · original plan image excluded</text></svg>')
+(MEDIA/'heritage-camera.svg').write_text('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540"><rect width="960" height="540" fill="#29323b"/><g fill="#e9edf2" text-anchor="middle" font-family="sans-serif"><text x="480" y="245" font-size="25">Saved camera controls are inspectable</text><text x="480" y="290" font-size="19">Image rebuild unavailable in this public copy</text><text x="480" y="330" font-size="17">Inspect baseline geometry in Furnish or Plan 3D</text></g></svg>')
+shutil.copy2(ROOT/'staging-preview/heritage.html',OUT/'heritage.html')
 # Copy production components; omit all PC/settings/storage-management modules.
 html=(SOURCE/'static/index.html').read_text();omit={'studio-access.js','local-setup.js','system-status.js','project-files.js','plan-reading.js','raster-review.js','source-panels.js','construction-area.js','products.js'}
 names=set(re.findall(r'(?:src|href)="/([^"?]+)',html));names|={'furniture-meshes.json'}
@@ -131,6 +137,8 @@ for name in ['ui-adapter.js','ui-controls.js','ui-staging.css']:shutil.copy2(ROO
 fixture_hash=hashlib.sha256((APP/'ui-fixtures.json').read_bytes()).hexdigest()[:12]
 adapter=(APP/'ui-adapter.js').read_text().replace("'ui-fixtures.json'",f"'ui-fixtures.json?v={fixture_hash}'")
 adapter=adapter.replace("'multi-room-fixtures.json'","'multi-room-fixtures.json?v="+hashlib.sha256((APP/'multi-room-fixtures.json').read_bytes()).hexdigest()[:12]+"'")
+(APP/'ui-adapter.js').write_text(adapter)
+adapter=(APP/'ui-adapter.js').read_text().replace("'heritage-fixtures.json'","'heritage-fixtures.json?v="+hashlib.sha256((APP/'heritage-fixtures.json').read_bytes()).hexdigest()[:12]+"'")
 (APP/'ui-adapter.js').write_text(adapter)
 # Staging-only live 2D joined footprints; no production endpoint or worker.
 shutil.copytree(ROOT/'staging-preview/vendor',APP/'vendor',dirs_exist_ok=True)
