@@ -1,0 +1,16 @@
+/* The room-direction editor is a dialog so toggling it never reflows the workbench. */
+html { scrollbar-gutter: stable; }
+.reference-bottom .room-direction-trigger {
+  justify-self: start;
+  justify-content: flex-start;
+  text-align: left;
+  padding: 9px 0;
+  border-color: transparent;
+  background: transparent;
+  color: #718061;
+  font-weight: 500;
+}
+.reference-bottom .room-direction-trigger::before { content: '✎'; margin-right: 2px; }
+.reference-bottom .room-direction-trigger:hover { color: #394d2d; }
+.direction-room-name { color: #7a866c; font-size: 12px; margin: 0 0 18px; }
+#modal #room-notes { min-height: 160px; max-height: 45vh; }

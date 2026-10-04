@@ -6,4 +6,4 @@ window.setWorkflowHighlight=function(stage){
   if(key===target)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');
  });
 };
-if(location.pathname.endsWith('/floor-plan.html'))setWorkflowHighlight(new URLSearchParams(location.search).get('stage')==='surfaces'?'surfaces':'architecture');
+if(location.pathname.endsWith('/ps/app/floor-plan.html'))setWorkflowHighlight(new URLSearchParams(location.search).get('stage')==='surfaces'?'surfaces':'architecture');

@@ -74,8 +74,8 @@ body #toast {background:var(--raised);color:var(--ink);border:1px solid var(--li
 dialog {background:var(--surface);color:var(--ink);border-color:var(--line);box-shadow:0 20px 70px #0005}
 dialog::backdrop {background:#10131899;backdrop-filter:blur(2px)}
 /* Only monochrome application icons, never user media. */
-[data-theme=dark] :is(button,.nav-item,.sidebar-bottom) img[src^="/ps/app/icons/"] {filter:brightness(0) invert(.9)}
-body :is(button.primary,.manual-start) img[src^="/ps/app/icons/"] {filter:brightness(0) invert(1)}
+[data-theme=dark] :is(button,.nav-item,.sidebar-bottom) img[src^="/icons/"] {filter:brightness(0) invert(.9)}
+body :is(button.primary,.manual-start) img[src^="/icons/"] {filter:brightness(0) invert(1)}
 /* Drawn dimensions have a paper halo: legible over charcoal AND an unchanged PDF. */
 #plan :is(.length-label,.endpoint-letter,.snap-hint) {fill:#214f99;stroke:#fff;stroke-width:2px;paint-order:stroke;vector-effect:non-scaling-stroke;stroke-linejoin:round}
 #plan .endpoint {fill:#fff;stroke:#245dcc}

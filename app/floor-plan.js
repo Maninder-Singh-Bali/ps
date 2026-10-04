@@ -17,7 +17,7 @@ function clearGuides(){smart=null;snapTarget=null;snapped=false;}
 function guideOptions(e,extra={}){return {tolerance:pxScale()*8,enabled:$('#snap').checked&&!e.altKey,face:$('#snap-faces').checked,previous:smart?.key,...extra};}
 let thickness=.15,traceFace='centre',constraint='free',typed='',showReview=true,overlay='corrected',chainLast=null,chainHeight=null;
 const id=()=> 'new'+crypto.randomUUID().replaceAll('-',''),mpp=()=>doc?.calibration?.metres_per_pixel||0,units=()=>doc?.units||'m',fmt=m=>units()==='ft'?`${Math.floor(m/.3048)}′ ${((m/.0254)%12).toFixed(1)}″`:units()==='in'?`${(m/.0254).toFixed(3)} in`:`${m.toFixed(3)} m`,length=px=>mpp()?fmt(px*mpp()):`${px.toFixed(1)} px`,inputLength=px=>mpp()?(px*mpp()/(units()==='ft'?.3048:units()==='in'?.0254:1)).toFixed(3):px.toFixed(2),parsePx=v=>mpp()?G.parseLength(v,units())/mpp():(Number(v)>0?Number(v):(()=>{throw Error('Enter a positive pixel length until calibrated.');})());
-let footprintKey='',footprintResult=null,footprintTimer=null,footprintPending=false;let previewSerial=0;let csrf=null;async function api(path,body,raw=false){return window.Staging.api(path,body,raw);}
+let footprintKey='',footprintResult=null,footprintTimer=null,footprintPending=false;let previewSerial=0;let csrf=null;async function api(path,body,raw=false){return window.Staging.planApi(path,body,raw);}
 function toast(s){$('#toast').textContent=s;$('#toast').hidden=false;clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('#toast').hidden=true,6500);}
 function snapshot(){return clone(doc);}function commit(fn,refreshInspector=true){if(!doc)return;const before=snapshot();try{fn();for(const f of doc.features){if(!f.points.flat().every(Number.isFinite)||G.dist(...f.points)<.001||!(f.thickness>0))throw Error('Use finite coordinates, a positive length and thickness.');if(f.head_m!==undefined&&f.head_m<=(f.kind==='window'?(f.sill_m??.9):(f.base_m??0)))throw Error('Head must be above sill.');}const newSource=doc.features.some(f=>O.isOpening(f)&&!f.host_wall_id&&!before.features.some(q=>q.id===f.id));if(newSource)doc.features=H.repair(doc.features,doc.wall_height_m).features;doc.features=G.hosted(doc.features);}catch(e){doc=before;throw e;}history.push(before);if(history.length>100)history.shift();future=[];changeSerial++;dirty=true;if(refreshInspector)render();else{status();draw();}if(mode==='3d')setMode('3d');}
 function travel(redo=false){attachment=null;clearGuides();const from=redo?future:history,to=redo?history:future;if(!from.length)return;to.push(snapshot());const rev=doc.revision;doc=from.pop();doc.revision=rev;changeSerial++;dirty=true;clearSelection();start=null;joinSource=null;snapTarget=null;snapped=false;render();if(mode==='3d')setMode('3d');}
@@ -271,7 +271,7 @@ async function save(){
   doc.revision=result.revision;doc.updated=result.updated;
   if(serial===changeSerial){dirty=false;doc=result;}
   status();try{await list();}catch(e){if(current())toast('Saved, but the plan list could not refresh: '+e.message);return;}
-  if(current())toast(doc.active_project_id?'Apartment saved. Shared scene updated.':'Draft saved. Active scene unchanged.');
+  if(current())toast(doc.active_project_id?'Synthetic draft saved in this browser. No backend validation.':'Draft saved. Active scene unchanged.');
  }catch(e){if(current()){$('#status').textContent='Save failed';toast(e.message);}}
  finally{if(savingKey===key)savingKey=null;if(current())$('#save').disabled=false;}
 }
@@ -306,3 +306,5 @@ let lastSize=null;new ResizeObserver(()=>{if(!doc)return;const size=[$('#plan').
 SurfaceDesign.install({footprints:()=>{resolveFootprint(G.hosted(doc.features));return footprintResult;},api,doc:()=>doc,svg,wall:hostForSelection,clearSelection,commit,render,toast,mode:setMode,is3d:()=>mode==='3d',fit});
 (async()=>{try{const rows=await list(),key=location.hash.slice(1)||rows[0]?.id;if(key){await open(key);if(new URLSearchParams(location.search).get('stage')==='surfaces')$('#design-open').click();}else{$('#welcome').hidden=false;$('#status').textContent='No draft open';inspector();}}catch(e){toast(e.message);}})();
 })();
+
+window.Staging.discardForReset=()=>{dirty=false;saveTicket++;changeSerial++;};

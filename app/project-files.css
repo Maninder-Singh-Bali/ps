@@ -1,0 +1,10 @@
+.folder-input{display:flex;align-items:center;gap:8px}
+.folder-input input{flex:1;min-width:0}
+.folder-input .btn{flex:none}
+.storage-tree{padding:14px 16px;background:#f3f4ed;border:1px solid #e2e5d9;border-radius:8px;font-size:12px;margin:16px 0}
+.storage-tree strong{font-weight:600}
+.storage-tree ul{list-style:none;padding:0;margin:10px 0 0}
+.storage-tree li{padding:5px 0;color:#475640}
+.storage-tree span{display:block;font-size:11px;color:#879176;margin-top:2px;line-height:1.5}
+.storage-change summary{cursor:pointer;font-size:13px;margin:20px 0 15px;color:#697857}
+#storage-progress{margin-top:20px;font-size:12px}

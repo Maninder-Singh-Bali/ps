@@ -1,12 +1,12 @@
-# Pixeloid synthetic HTTPS staging preview
+# Synthetic UI-testing staging
 
-This isolated static site uses newly invented apartment geometry only. It contains no private project data, production backend, authentication tokens, renderer or PC management routes. No sign-in is needed. Changes are stored only in the visitor's browser, under a staging-specific localStorage key. Reset demo clears only that key.
+Production UI baseline: `2903e030cc0b2302a5153fe9a3cd121179049d03`.
+All six workspaces use the production browser components. Staging-only transport, fixtures, testing controls and clear simulation labels are added at build time; deployed production files are never edited.
 
-- Working browser code: Plan editing, wall/opening geometry, selection/merge, snapping, numeric units, elevation, undo/redo, 2D Surface Design and theme switch.
-- Mocked: draft API and browser-local persistence. Edited wall fills use a simplified rectangle approximation instead of the production Python polygon resolver.
-- Offline fixture: original 3D scene produced by the real geometry backend during build. It is read-only, not live. Changing geometry or surfaces blocks its use as a current Plan 3D preview. Furnish/Cameras show the baseline explicitly, with local orbit/zoom only.
-- Unavailable: live backend validation/rebuilding, shared server saves, imports/uploads, product lookup, furniture placement, camera persistence, image/video/reference generation, approvals and worker/PC management.
+No live backend is deployed. Synthetic saves, revisions, reviews, masks, camera settings, progress and jobs are stored in each visitor's browser. Testing controls select populated/empty/loading/success/failure/disconnected states and save faults. Reset affects only this synthetic namespace.
 
-Staging never modifies the Mac/PC deployment or any real project's generation allowances. It has no inference path. Hosting requests fetch static files only.
+Two invented floors include openings, shared corners and a production-generated rounded corner. Furniture uses the production catalogue and client meshes. References, images, textures and a two-second MP4 are programmatically drawn fixtures, not generated output. All dimensions are assumptions.
 
-Source baseline: code-only commit 2903e030cc0b2302a5153fe9a3cd121179049d03. Preview-only adaptations are isolated from the deployed application. `preview-manifest.json` lists the static files and hashes.
+Limitations: joined-wall fill after edits is a simple browser approximation; 3D architecture and camera image previews are static baseline fixtures. Furniture proxies still move through the real browser renderer. No production shared-scene rebuild, collision/structural validation, real upload/product lookup, inference, worker controls, service management, production approval or generation allowance operations exist. Unsupported buttons are disabled with a reason.
+
+Mock frontend tests are not evidence that production backend, shared geometry, inference or video generation works. No private project files, original plans, outputs, credentials or PC addresses are included.

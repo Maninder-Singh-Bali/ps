@@ -75,16 +75,7 @@ for(const g of guides){const ends=g.axis===0?[[g.value,0],[g.value,c.H]]:[[0,g.v
 if(drawing&&drawing.points.length)body+=`<path d="M${drawing.points.join(' L')}" fill="none" stroke="#245dcc" stroke-width="${2*px}"/>`;
 h.svg.innerHTML=html+'</defs>'+body;document.querySelector('#guidance').textContent='Shift-click: select items · Drag: place · Alt: no snap · Swipe: pan · Pinch: zoom';document.querySelector('#floating').textContent='Surface design · '+(kind==='wall'?'wall elevation':kind==='ceiling'?'reflected ceiling plan':'floor finishes')+' · geometry and dimensions are design assumptions';return true;}
 function cancel(){gesture=null;guides=[];drawing=null;pendingKind=null;draw();inspector();}
-async function readReference(texture=false){
- const target=texture?finishTarget():selectedItems()[0];if(!target)throw Error('Select an item first.');
- const origin=doc(),targetId=target.id,input=document.querySelector('#design-reference-file');
- input.onchange=async()=>{try{const file=input.files[0];if(!file)return;const error=validateReferenceFile(file,'reference');if(error)throw Error(error);
- const reference=await h.api('/'+origin.id+'/reference',file,true);
- if(doc()!==origin)throw Error('Reference uploaded to the original plan; return there to assign it.');
- const current=[...data().items,...data().surfaces].find(q=>q.id===targetId);if(!current)throw Error('The selected item was removed; reference was not assigned.');
- update(()=>{const owner=texture?(current.finish||={}):current;owner.reference={...owner.reference,...reference,source_name:file.name};});
- h.toast('Original reference retained. Thumbnail used for display; dimensions unchanged.');
- }catch(err){h.toast(err.message);}input.value='';};input.click();}
+async function readReference(texture=false){const target=texture?finishTarget():selectedItems()[0];if(!target)throw Error('Select an item first.');const reference=await window.Staging.reference();update(()=>{const owner=texture?(target.finish||={}):target;owner.reference={...owner.reference,...reference};});h.toast('Bundled synthetic reference assigned; dimensions unchanged.');}
 
 async function action(a){const s=surface(),o=selectedItems()[0];if(['wall','ceiling','floor'].includes(a))return chooseMode(a);if(a==='close')return close();if(a==='3d'){h.mode('3d');return;}if(a==='add-wall')return addWall();if(a==='reattach'){const id=document.querySelector('#design-wall').value,side=Number(document.querySelector('#design-side').value);update(()=>{s.wall_id=id;s.side=side;});fit();return;}if(a==='boundary'||a==='hole'){if(a==='hole'&&!s)throw Error('Choose a surface first.');drawing={type:a,points:[]};selected.clear();h.mode('2d');draw();inspector();return;}
 if(a==='place'){pendingKind=document.querySelector('#design-type').value;inspector();return;}if(a==='add')return addItem(document.querySelector('#design-type').value);

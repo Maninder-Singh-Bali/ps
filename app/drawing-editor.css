@@ -1,0 +1,52 @@
+#modal.drawing-dialog{width:min(1500px,97vw);max-height:95vh;overflow:hidden}#modal.drawing-dialog #modal-content{display:flex;flex-direction:column;max-height:94vh}#modal.drawing-dialog .modal-body{overflow:auto;min-height:0}#modal.drawing-dialog .modal-head,#modal.drawing-dialog .modal-footer{flex:none}.drawing-layout{display:grid;grid-template-columns:minmax(380px,1fr) 310px;gap:22px}.drawing-aside{border-left:1px solid #e4e4d9;padding-left:20px;max-height:69vh;overflow:auto}.drawing-aside h3{margin:8px 0 14px;font-size:15px}.drawing-aside .field{margin:13px 0}.drawing-aside .field small{font-size:11px;line-height:1.5;color:#79856b}.drawing-mode-tabs,.drawing-tools{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.drawing-mode-tabs{margin-bottom:16px}.drawing-mode-tabs>span{margin-left:auto;font-size:11px;color:#7b8472}.drawing-tools{margin-bottom:10px}.drawing-tools label,.drawing-check{font-size:12px;color:#67755b;display:flex;align-items:center;gap:5px}.drawing-tools .selected{background:#f7e7b5;border-color:#d7b450}.drawing-canvas{background:#edece5;padding:12px;border:1px solid #ddded0;border-radius:8px}#drawing-svg{display:block;width:100%;height:min(55vh,650px);touch-action:none;user-select:none;background:white}.drawing-art path,.drawing-art line,.drawing-art rect,.drawing-art circle,.drawing-art ellipse,.drawing-art polyline,.drawing-art polygon{fill:none;stroke:#58695f;stroke-width:.8;vector-effect:non-scaling-stroke}.drawing-art .wall{stroke:#233f30;stroke-width:1.2}.drawing-art .opening{stroke:#947649}.drawing-art .window{stroke:#4c877f}.drawing-art text{font:7px Arial;fill:#5f6e60}.drawing-element{cursor:move}.drawing-element:hover *{stroke:#c59b29!important;stroke-width:3px}.drawing-selection{fill:none;stroke:#d7aa2f;stroke-width:1;stroke-dasharray:4 3;vector-effect:non-scaling-stroke;pointer-events:none}#drawing-handles circle{fill:#f5d875;stroke:#8b6516;stroke-width:1.5;vector-effect:non-scaling-stroke;cursor:crosshair}.drawing-selected-tools{margin-top:10px}.drawing-selected-tools>span{font-size:12px;margin-right:auto}.site-compass{width:130px;height:130px;display:block;margin:0 auto;font:12px Arial}.sun-times{display:flex;gap:10px;margin-top:12px}.sun-times>span{flex:1;background:#faf3dc;padding:10px;font-size:11px;border-radius:7px}.sun-times strong{display:block;font-size:20px;margin-top:3px;font-weight:500}.mini-compass{display:inline-flex;align-items:center;gap:8px;font-size:11px}.mini-compass .site-compass{width:64px;height:64px}.drawing-aside input{min-width:0}.drawing-aside .row-two{min-width:0}@media(max-width:1000px){.drawing-layout{grid-template-columns:1fr}.drawing-aside{border-left:none;border-top:1px solid #e5e5dc;padding:15px 0;max-height:none}#drawing-svg{height:50vh}}
+
+.drawing-aside{overflow-x:hidden;min-width:0}.drawing-aside .row-two{grid-template-columns:repeat(2,minmax(0,1fr))}.drawing-aside input{box-sizing:border-box;width:100%}.drawing-aside input[type=checkbox]{width:auto}
+
+.drawing-active>:not(.drawing-hit),.drawing-active g>:not(.drawing-hit){stroke:#ce9b16!important}.drawing-hit{cursor:pointer}#drawing-size-fields input{width:90px;margin-left:4px}.drawing-element:hover .drawing-hit{stroke:transparent!important}#modal>#toast{z-index:10000;position:fixed;bottom:28px;left:50%;transform:translateX(-50%);max-width:min(700px,85vw)}
+
+#drawing-validation:not([hidden]){padding:12px 16px;border:1px solid #bb573b;background:#fff0e9;color:#802e19;border-radius:6px;margin-bottom:12px}#modal [aria-invalid=true]{outline:2px solid #b84b34;outline-offset:2px}
+
+.drawing-layout{grid-template-columns:minmax(380px,1fr) 270px;gap:16px}
+.drawing-layout>section{min-width:0}.drawing-mode-tabs{margin-bottom:10px}
+.drawing-workspace{display:flex;gap:7px;align-items:stretch}
+.drawing-tool-rail{display:flex;flex-direction:column;gap:3px;flex:0 0 38px;padding:5px 3px;background:#f2f1ea;border:1px solid #deded3;border-radius:7px;align-items:center}
+.drawing-tool-rail .drawing-icon{width:32px;height:32px;min-height:32px;padding:6px;border:1px solid transparent;background:transparent;border-radius:5px;color:#52614a}
+.drawing-icon svg{display:block;width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.drawing-tool-rail .drawing-icon:hover{background:#e5e4da}.drawing-tool-rail .drawing-icon.selected{background:#f8df8c;border-color:#d4a92b;color:#51431a}
+.drawing-icon:focus-visible{outline:2px solid #a57900;outline-offset:1px}.tool-divider{width:24px;height:1px;background:#d6d6ca;margin:4px 0}
+.drawing-canvas{flex:1;min-width:0;position:relative;padding:8px;overflow:hidden}
+.drawing-shape-label{position:absolute;z-index:2;pointer-events:none;background:#3e4937;color:white;padding:4px 8px;border-radius:4px;font-size:11px;line-height:16px;white-space:nowrap;box-shadow:0 2px 5px #0002}
+.drawing-shape-label[hidden]{display:none}#drawing-selected:empty,#drawing-hint:empty{display:none}
+.drawing-art .wall-solid{fill:#a4afa1;fill-opacity:.55;stroke:#40573d;stroke-width:1;stroke-linejoin:miter}.drawing-art .drawing-active .wall-solid{fill:#dbc774}
+#drawing-handles .wall-thickness-handle{fill:#f5d875;stroke:#8b6516;stroke-width:1.5;vector-effect:non-scaling-stroke;cursor:ew-resize}
+.drawing-aside{padding-left:14px;max-height:69vh}.drawing-aside h3{margin:0 0 8px;font-size:14px}
+.drawing-aside .field{margin:8px 0}.drawing-aside .field>span{font-size:11px;margin-bottom:4px}
+.drawing-aside input{height:33px;min-height:0;padding:6px 8px;font-size:12px}.drawing-aside input[type=checkbox]{height:auto;padding:0}
+.north-controls{display:grid;grid-template-columns:76px 1fr;align-items:center;gap:12px}.north-controls .site-compass{width:76px;height:76px;margin:0}
+.north-angle{display:flex;align-items:center;gap:6px;font-size:12px;margin-top:6px}.north-angle input{width:72px}
+.north-presets{display:flex;gap:5px;margin:3px 0 10px}.north-presets .btn{flex:1;padding:5px;min-height:28px}
+.location-entry{display:flex;gap:4px}.location-entry input{min-width:0;flex:1}.location-entry .btn{padding:4px 8px;min-height:30px}
+.sunlight-toggle{margin:14px 0 2px}.drawing-aside .row-two{gap:8px}
+#site-timezone{font-size:11px;color:#78806e;margin:0 0 8px}#site-timezone:empty,#maps-link-status:empty,#sun-results:empty{display:none}
+#maps-link-status,#sun-results{font-size:11px;line-height:1.4}#maps-link-status{margin:5px 0}
+.sun-presets{display:flex;gap:6px}.sun-presets .btn{flex:1;display:flex;align-items:center;justify-content:space-between;gap:6px;padding:7px;font-size:11px;background:#fbf4dc}.sun-presets strong{font-size:12px}
+@media(max-width:1000px){.drawing-layout{grid-template-columns:1fr}.drawing-aside{padding:12px 0 0;max-height:none}#drawing-site{max-width:420px}.drawing-tool-rail{gap:2px}.drawing-tool-rail .drawing-icon{height:29px;min-height:29px}#drawing-svg{min-height:355px}}
+
+.drawing-library-furniture path,.drawing-library-furniture rect,.drawing-library-furniture circle,.drawing-library-furniture ellipse,.drawing-library-furniture line{fill:#edf1e8;stroke:#40554a;stroke-width:1;vector-effect:non-scaling-stroke}
+
+/* Optional source-backed structure review; ordinary plan editing is unchanged. */
+.structure-draft-panel{padding:10px 14px;background:#f1f6ee;border:1px solid #c6d8bc;border-radius:8px;margin-bottom:10px}
+.structure-draft-panel details{font-size:12px;max-height:180px;overflow:auto}
+.structure-draft-panel p{margin:6px 0}
+#drawing-svg .structure-draft-art .wall{stroke:#008a72;fill:#00b395;stroke-width:.45}
+#drawing-svg .structure-draft-art .opening{stroke:#c16c00;fill:none;stroke-width:.9}
+#drawing-svg .structure-draft-art .window{stroke:#0078db;fill:none;stroke-width:.9}
+#modal.drawing-review-dialog .drawing-mode-tabs{display:none}
+#modal.drawing-review-dialog .drawing-aside{padding:0;border:0;max-height:65vh}
+#modal.drawing-review-dialog .structure-draft-panel{height:auto}
+#modal.drawing-review-dialog .structure-draft-panel details{max-height:46vh}
+#modal.drawing-review-dialog .structure-draft-panel .drawing-tools{display:grid;gap:10px;margin-top:14px}
+#modal.drawing-review-dialog .structure-draft-panel label{display:block}
+#modal.drawing-review-dialog .structure-draft-panel select{width:100%;margin-top:5px}
+#modal.drawing-review-dialog #drawing-svg{height:calc(95vh - 250px);min-height:260px}
+#drawing-svg .structure-previous-art .wall{stroke:#be3029;fill:#e44435}

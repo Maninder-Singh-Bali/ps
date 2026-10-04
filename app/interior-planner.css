@@ -1,0 +1,14 @@
+/* Four stages; existing specialist editors remain available in Advanced. */
+body[data-view="references"] .workspace-modes{display:none}
+body[data-view="references"] .block-left-panel{width:240px;max-width:28vw}
+body[data-view="references"] .block-workspace.with-library{grid-template-columns:240px minmax(200px,1fr) minmax(260px,1fr)}
+body[data-view="references"] .block-transform-panel,
+body[data-view="references"] .block-object-properties{display:none}
+#surface-panel{padding:10px;overflow:auto;max-height:calc(100vh - 190px)}
+#surface-panel header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+#surface-panel input,#surface-panel select,#surface-panel textarea{max-width:100%;width:100%}
+.surface-images{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0}
+.surface-images img{width:65px;height:65px;object-fit:contain}
+.surface-images input{width:auto!important}
+.block-manual-dimensions{border-top:1px solid var(--line,#ddd);margin-top:12px;padding-top:6px}
+body[data-view="images"] .stats,body[data-view="videos"] .stats{display:none}

@@ -1,0 +1,8 @@
+.pending-reference{border:1px solid #dcb843;background:#fffcf1;overflow:hidden}
+.pending-reference img{opacity:.78}
+.pending-reference .ref-body>strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.pending-reference .upload-item-status{font-size:11px;color:#776b43;margin:6px 0}
+.pending-reference .progress-track{height:3px}
+.anchor-layout>.pending-reference{max-width:210px;margin-top:8px}
+.reference-just-added{outline:2px solid #d9b540;outline-offset:2px}
+.dropzone[role="button"]{cursor:pointer}
