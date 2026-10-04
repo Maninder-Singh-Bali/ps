@@ -30,7 +30,7 @@ for i in [1,2]:
   d['features']=json.loads(subprocess.check_output([node,'-e',code],input=json.dumps(d['features']).encode(),cwd=SOURCE))
  if i==1:
   d['surface_design']['surfaces'][0]['finish'].update(tile_width=.6,tile_length=.6,grout=.004,grout_color='#ddd4c5',rotation=0,offset_x=0,offset_y=0,layout='grid',bookmatch=False)
-  d['surface_design']['items'][0]['reference']={'dimension_status':'assumed','aspect_locked':False}
+  d['surface_design']['items'][0]['reference']={'dimension_status':'assumed','aspect_locked':True}
   d['surface_design']['items'] += [{'id':'demo-pendant','surface_id':'ceiling','kind':'pendant','x':3,'y':2.4,'width':.45,'height':.45,'depth':.2,'drop':.6,'rotation':0,'reference':{'dimension_status':'assumed'}},{'id':'demo-rug','surface_id':'floor','kind':'rug','x':3,'y':2.8,'width':2,'height':1.5,'depth':.02,'rotation':0,'reference':{'dimension_status':'assumed'}}]
  d=plan_drafts.validate(d,d);d['opening_attachment_revision']=1;docs[d['id']]=d;scenes[d['id']]=plan_drafts.preview(d);footprints[d['id']]=plan_drafts.footprint(d)
  (MEDIA/f'floor-{i}.svg').write_text(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 700"><rect width="940" height="700" fill="white"/><text x="470" y="35" text-anchor="middle" font-family="sans-serif" fill="#617083" font-size="20">SYNTHETIC FLOOR {i} · invented dimensions</text></svg>')

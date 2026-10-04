@@ -1,8 +1,8 @@
 # Direct item editing and proportions lock
 
-The Surface editor now exposes its item catalogue directly. Drag an item to move it, drag its round rotation handle to rotate, and drag any of its four square corner handles to resize. Normal corner resizing anchors the opposite corner. Option/Alt + corner drag keeps the item centre fixed. The visible **Lock proportions** checkbox preserves the current width/height ratio for both corner drags and exact size entry, including items without reference images. Turning the lock on does not resize the item. Unlock it for independent width/height changes. The setting uses the existing saved Surface reference metadata and survives save/reload.
+The Surface editor now exposes its item catalogue directly. Drag an item to move it, drag its round rotation handle to rotate, and drag any of its four square corner handles to resize. Normal corner resizing anchors the opposite corner. Option/Alt + corner drag keeps the item centre fixed. The on-canvas **Lock proportions** icon beside the upper-right corner preserves the current width/height ratio for both corner drags and exact size entry, including items without reference images. Turning the lock on does not resize the item. Unlock it for independent width/height changes. The setting uses the existing saved Surface reference metadata and survives save/reload.
 
-Furniture also opens its catalogue by default and uses direct body movement and an on-object rotation handle instead of Move/Rotate modes. Its existing proportional corner resizing now supports Option/Alt centre anchoring. Furniture retains its existing modular seat/row edge controls; the new explicit lock switch is in the Surface item inspector.
+Furniture also opens its catalogue by default and uses direct body movement and an on-object rotation handle instead of Move/Rotate modes. Its existing proportional corner resizing now supports Option/Alt centre anchoring. Furniture retains its existing modular seat/row edge controls; the explicit lock icon is on selected Surface items.
 
 The viewer coalesces resize notifications, cancels pending work on disposal and limits the high-DPI drawing buffer to approximately two million pixels. This bounds rendering resource use. It does not prove the cause of the user's repeat browser crash: the existing crashed tab could not supply diagnostic logs and was left untouched. The earlier one-attempt Surface preview failure guard remains in place.
 
@@ -28,3 +28,11 @@ An isolated browser-local synthetic preview verified:
 ## Limits
 
 This is synthetic frontend verification, not evidence of live backend geometry rebuilding or image/video generation. Static 3D previews cannot rebuild edited structure; unsupported rebuilds remain clearly reported without retry loops. No inference, model operations, PC endpoints, private project data or generation allowances were used or changed. The Mac/PC deployment was not restarted. The user's crashed tab and browser-local data were not reset. These checks do not guarantee recovery of edits that were unsaved before the browser crash.
+
+## Canvas lock follow-up
+
+Moved the lock control beside each selected Surface item, next to its upper-right corner; removed the inspector checkbox. The icon shows a closed/open padlock and supports pointer click, Enter and Space with a visible keyboard focus indicator. Toggling leaves size and placement unchanged, uses the existing undo history and persists on save/reload. New items and fresh synthetic fixture items start locked; saved explicit per-item choices remain intact.
+
+Browser checks on isolated synthetic wall and ceiling items verified click/Space/Enter toggles, undo, saved/reloaded state, no remaining inspector checkbox, and constant icon size while zooming. Existing corner/centre scaling and failure-recovery regression suites passed. No private data or Mac/PC deployment was changed.
+
+![Canvas lock beside a ceiling pendant](direct-edit/canvas-lock.png)

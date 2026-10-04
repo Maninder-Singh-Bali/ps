@@ -45,7 +45,7 @@ def build(pack,plan_drafts,media):
             if code=='living':
                 d['surface_design']['surfaces'].append({'id':prefix+'living-wall','kind':'wall','wall_id':prefix+'west','side':-1,'room_id':rid,'label':'Living · west face'})
                 for key,host,kind,x,y,wide,high,depth,drop in [('art','living-wall','painting',2,1.5,.6,.8,.04,0),('lamp','living-ceiling','pendant',2.7,2.2,.45,.45,.2,.5)]:
-                    d['surface_design']['items'].append({'id':prefix+key,'surface_id':prefix+host,'kind':kind,'x':x,'y':y,'width':wide,'height':high,'depth':depth,'drop':drop,'rotation':0,'reference':{'image':'data:image/png;base64,'+base64.b64encode((media/(('art' if key=='art' else 'lamp')+'.png')).read_bytes()).decode(),'dimension_status':'assumed','aspect_locked':False}})
+                    d['surface_design']['items'].append({'id':prefix+key,'surface_id':prefix+host,'kind':kind,'x':x,'y':y,'width':wide,'height':high,'depth':depth,'drop':drop,'rotation':0,'reference':{'image':'data:image/png;base64,'+base64.b64encode((media/(('art' if key=='art' else 'lamp')+'.png')).read_bytes()).decode(),'dimension_status':'assumed','aspect_locked':True}})
             project['rooms'].append(r)
         d=plan_drafts.validate(d,d);d['opening_attachment_revision']=1;result['docs'][did]=d;result['scenes'][did]=plan_drafts.preview(d);result['footprints'][did]=plan_drafts.footprint(d)
         asset=result['state']['assets'][aid];asset.update(width=1260,height=960,manual_document=d,name=f'Multi-room · Floor {level}',display_name=f'Multi-room · Floor {level}')
