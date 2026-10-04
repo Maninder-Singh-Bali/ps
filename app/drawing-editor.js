@@ -55,13 +55,22 @@
  // Inline geometry shares the editor's screen-sized strokes; an SVG <image>
  // scales its own viewport (and its strokes) again when the outer plan zooms.
  window.DrawingPreview={
-  markup(doc,editable=false){
+  markup(doc,editable=false,options={}){
    // Large, entirely unclassified vector sheets are reference art, not editable
    // architecture. Keep their original vector asset as one background image;
    // reviewed walls/openings remain individual editable features above it.
    const referenceOnly=doc.base_asset_id&&doc.elements.length>3000&&!Object.keys(doc.edits).length&&doc.elements.every(e=>e.kind==='detail');
    const art=referenceOnly?`<image href="${url(doc.base_asset_id)}" width="${doc.width}" height="${doc.height}" pointer-events="none"/>`:doc.elements.filter(e=>!e.absorbed_by&&!doc.edits[e.id]?.hidden).map(e=>`<g data-plan-kind="${esc(e.kind)}" ${editable?`data-plan-element="${esc(e.id)}"`:''} transform="${trans(doc.edits[e.id])}">${e.svg}</g>`).join('');
-   return `<g class="drawing-art" pointer-events="${editable?'auto':'none'}">${art}${doc.features.map(e=>`<g data-plan-feature="true" ${e.fillet?'data-skip-label="true"':''} ${editable?`data-plan-element="${esc(e.id)}"`:''} data-plan-kind="${esc(e.kind)}">${feature(e)}</g>`).join('')}</g>`
+   // Ground finishes are geometry too: keep pool water, planted beds and floor
+   // holes visible on corrected maps without drawing elevated mounting planes.
+   const ground=(options.showGround===false||doc.surface_design_floor&&window.InlinePlan&&!window.InlinePlan.floorVisible(doc.surface_design_floor)?[]:doc.surface_design?.surfaces||[]).filter(s=>s.kind==='floor'&&Math.abs(s.elevation_m||0)<.025).map(s=>{
+    const rings=[s.boundary,...(s.holes||[])];
+    if(!rings.every(r=>Array.isArray(r)&&r.length>=3&&r.every(p=>Array.isArray(p)&&p.length===2&&p.every(Number.isFinite))))return '';
+    const color=/^#[0-9a-f]{6}$/i.test(s.finish?.color||'')?s.finish.color:'#e5e1d7';
+    const path=rings.map(r=>'M'+r.map(p=>p.join(',')).join(' L')+' Z').join(' ');
+    return `<path data-plan-kind="floor" data-ground-surface="${esc(s.id)}" d="${path}" fill="${color}" fill-rule="evenodd" stroke="none" pointer-events="none"><title>${esc(s.label||'Floor surface')}</title></path>`;
+   }).join('');
+   return `<g class="drawing-ground" pointer-events="none">${ground}</g><g class="drawing-art" pointer-events="${editable?'auto':'none'}">${art}${doc.features.map(e=>`<g data-plan-feature="true" ${e.fillet?'data-skip-label="true"':''} ${editable?`data-plan-element="${esc(e.id)}"`:''} data-plan-kind="${esc(e.kind)}">${feature(e)}</g>`).join('')}</g>`
   },
   finish(root){root.querySelectorAll('[data-plan-kind="wall"]:not([data-plan-feature])').forEach(solidWall)}
  };
