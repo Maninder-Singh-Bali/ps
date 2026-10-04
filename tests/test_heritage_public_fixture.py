@@ -8,8 +8,8 @@ class HeritagePublicFixture(unittest.TestCase):
   cls.raw=(ROOT/'staging-preview/fixtures/heritage-courtyard.json').read_text();cls.pack=json.loads(cls.raw);cls.doc=cls.pack['docs']['heritage-floor-1'];cls.project=cls.pack['state']['projects']['synthetic-ui']
  def test_complete_geometry_and_hosts(self):
   fs=self.doc['features'];walls={f['id'] for f in fs if f['kind']=='wall'};openings=[f for f in fs if f['kind'] in ('door','window','sliding_door')]
-  self.assertEqual(len(walls),54);self.assertEqual(len(openings),26);self.assertTrue(all(f['host_wall_id'] in walls for f in openings))
-  rooms=self.project['rooms'];self.assertEqual(len(rooms),32);self.assertEqual(sum(len(r['block_layout']['items']) for r in rooms),64)
+  self.assertEqual(len(walls),55);self.assertEqual(len(openings),26);self.assertTrue(all(f['host_wall_id'] in walls for f in openings))
+  rooms=self.project['rooms'];self.assertEqual(len(rooms),32);self.assertEqual(sum(len(r['block_layout']['items']) for r in rooms),91)
   design=self.doc['surface_design'];hosts={s['id'] for s in design['surfaces']};self.assertEqual(len(design['items']),59);self.assertTrue(all(o['surface_id'] in hosts for o in design['items']))
   roomids={r['id'] for r in rooms};self.assertTrue(all(s.get('room_id') in roomids for s in design['surfaces'] if s.get('room_id')))
  def test_no_private_media_paths_or_connections(self):
@@ -27,4 +27,16 @@ class HeritagePublicFixture(unittest.TestCase):
   chairs=[v for v in room['block_layout']['items'] if v['kind']=='chair']
   self.assertEqual(len(chairs),6)
   for chair in chairs:self.assertEqual(chair['angle'],270 if 'west' in chair['id'] else 90)
+ def test_annotation_corrections_and_pool_infill_exported(self):
+  import surface_design
+  surface_design.validate(self.doc['surface_design'])
+  surfaces=self.doc['surface_design']['surfaces'];water=next(s for s in surfaces if s['label'].startswith('Pool ·'))
+  self.assertIn(water['void_host_id'],{s['id'] for s in surfaces})
+  scene=self.pack['scenes']['heritage-floor-1']
+  self.assertTrue(any(f.get('object_key')=='design:surface:'+water['id'] for f in scene['surfaces']))
+  r=next(r for r in self.project['rooms'] if r['id']=='room-1')
+  self.assertEqual(sum(v['seat_count'] for v in r['block_layout']['items'] if v['id'].startswith('living-right-sofa-')),12)
+  self.assertEqual(len([v for v in r['block_layout']['items'] if v['id'].startswith('living-centre-seating-chair-')]),4)
+  door=next(f for f in self.doc['features'] if f['id']=='bed3-entry')
+  self.assertEqual(door['host_wall_id'],'bed3-entry-header');self.assertEqual(door['hinge'],'b')
 if __name__=='__main__':unittest.main()
