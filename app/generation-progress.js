@@ -39,7 +39,7 @@ if(typeof document!=='undefined'){
   function latestRoomJob(){return Object.values(state?.jobs||{}).filter(j=>j.project_id===pid&&j.room_id===rid&&['reference','image'].includes(j.kind)).sort((a,b)=>b.created-a.created)[0]}
   window.openGenerationProgress=function(job){
     monitoredJob=job.id;
-    showModal(job.kind==='video'?'Video generation':job.kind==='reference'?'Reference image generation':'Room image generation',`<p class="generation-room">${esc(P()?.rooms.find(r=>r.id===job.room_id)?.name||'Room')} · ${job.kind==='video'?esc(VideoPresets.describe(job)):'SIMULATED sample'}</p><div id="generation-modal-status" role="status" aria-live="polite"></div><div id="generation-preview" class="generation-preview"><div class="generation-placeholder"><span class="generation-orbit" aria-hidden="true"></span><strong>${job.kind==='video'?'Your clip':'Your image'} will appear here</strong><p>You can close this window and keep working.</p></div></div>`,btn('Close','close-modal','','ghost'),'generation');
+    showModal(job.kind==='video'?'Video generation':job.kind==='reference'?'Reference image generation':'Room image generation',`<p class="generation-room">${esc(P()?.rooms.find(r=>r.id===job.room_id)?.name||'Room')} · ${job.kind==='video'?esc(VideoPresets.describe(job)):'SIMULATED sample'}</p><div id="generation-modal-status" role="status" aria-live="polite"></div><div id="generation-job-actions" class="actions"></div><div id="generation-preview" class="generation-preview"><div class="generation-placeholder"><span class="generation-orbit" aria-hidden="true"></span><strong>${job.kind==='video'?'Your clip':'Your image'} will appear here</strong><p>You can close this window and keep working.</p></div></div>`,btn('Close','close-modal','','ghost'),'generation');
     $('#modal').classList.add('generation-dialog');
     updateGenerationProgress(job);
   };
@@ -60,6 +60,7 @@ if(typeof document!=='undefined'){
     const status=$('#generation-modal-status');
     // Elapsed time changes without recreating the preview or resetting image loading.
     status.innerHTML=generationProgressMarkup(job,asset);
+    const actions=$('#generation-job-actions'),action=m.busy?'cancel-job':['failed','cancelled','interrupted'].includes(job.status)?'recover-job':null;if(actions&&actions.dataset.state!==String(action)){actions.dataset.state=String(action);actions.innerHTML=action?`<button class="btn small" data-action="${action}" data-id="${esc(job.id)}">${m.busy?'Cancel job':'Recover this job'}</button>`:'';}
     const preview=$('#generation-preview');
     if(m.ready&&preview.dataset.asset!==asset.id){
       preview.dataset.asset=asset.id;

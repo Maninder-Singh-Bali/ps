@@ -173,7 +173,7 @@ async function goStage(stage){
  if(stage==='surfaces'){if(!window.SurfaceDesign.active())$('#design-open').click();if(window.SurfaceDesign.active()){const address=new URL(location.href);address.searchParams.set('stage','surfaces');window.history.replaceState(null,'',address);}return;}
  if(!doc?.active_project_id){await showActivation();return;}
  if(!flushFocusedValue())return;if(dirty){await save();if(dirty)return;}
- window.setWorkflowHighlight(stage);location.href='/ps/?preview=ui4&project='+encodeURIComponent(doc.active_project_id)+'&stage='+stage;
+ window.setWorkflowHighlight(stage);location.href='/ps/?preview=ui5&project='+encodeURIComponent(doc.active_project_id)+'&stage='+stage;
 }
 $('#stages').onclick=e=>{if(e.target.dataset.stage)goStage(e.target.dataset.stage).catch(e=>toast(e.message));};
 $('#use-plan').onclick=()=>showActivation().catch(e=>toast(e.message));
@@ -306,5 +306,5 @@ let lastSize=null;new ResizeObserver(()=>{if(!doc)return;const size=[$('#plan').
 SurfaceDesign.install({footprints:()=>{resolveFootprint(G.hosted(doc.features));return footprintResult;},api,doc:()=>doc,svg,wall:hostForSelection,clearSelection,commit,render,toast,mode:setMode,is3d:()=>mode==='3d',fit});
 (async()=>{try{const rows=await list(),key=location.hash.slice(1)||rows[0]?.id;if(key){await open(key);if(new URLSearchParams(location.search).get('stage')==='surfaces')$('#design-open').click();}else{$('#welcome').hidden=false;$('#status').textContent='No draft open';inspector();}}catch(e){toast(e.message);}})();
 
-window.Staging.discardForReset=()=>{dirty=false;saveTicket++;changeSerial++;};
+window.Staging.hasUnsaved=()=>dirty;window.Staging.discardForReset=()=>{dirty=false;saveTicket++;changeSerial++;};
 })();

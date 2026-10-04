@@ -119,3 +119,8 @@ body .appearance-toggle {display:inline-flex;align-items:center;gap:7px;padding:
 
 /* Preserve the original full-width phase alert; use smaller text only. */
 body #generation-phase-notice {font-size:11px}
+/* Monochrome UI icon assets only; source drawings and media remain unchanged. */
+html[data-theme="dark"] .tools button>img,
+html[data-theme="dark"] .toolbar button>img,
+html[data-theme="dark"] footer button>img,
+html[data-theme="dark"] header button>img{filter:invert(.85)}
