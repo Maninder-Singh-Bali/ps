@@ -226,3 +226,10 @@ body.surface-editing .tools{display:none}
 .surface-editing #inspector .pair{gap:4px}
 .surface-editing #inspector .surface-tabs{margin:3px 0;padding:3px 0}
 .surface-editing #inspector>.field{margin:5px 0}
+
+/* Direct item editing: catalogue choices stay visible; rotate handles live on objects. */
+.surface-item-catalogue{border:0!important;padding:0!important;margin:10px 0!important}
+.surface-item-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.surface-item-grid button{font-size:11px;padding:7px 5px;cursor:grab}
+#surface-gizmo .direct-move{display:block}
+#surface-gizmo .direct-rotate{position:absolute;left:calc(50% + 42px);top:50%;transform:translate(-50%,-50%);font-size:22px;width:28px;height:28px;line-height:26px;text-align:center;border:1px solid #9ac2ff;border-radius:50%;background:#284569;color:white;text-shadow:none}

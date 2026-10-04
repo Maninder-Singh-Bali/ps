@@ -85,6 +85,7 @@
  }
  // Clip every wall triangle against one vertical section plane. Testing triangle
  // centroids independently left half-rectangles and floating caps in cutaway mode.
+ function drawingScale(w,h,dpr=1){return Math.min(dpr,2,Math.sqrt(2097152/Math.max(1,w*h)));}
  function depthRadius(faces,fallback=1){let extent=Math.max(1,fallback);for(const f of faces)for(const p of f.points)if(Number.isFinite(p[2]))extent=Math.max(extent,Math.abs(p[2]));return extent;}
  function cutawayFaces(faces,view,bounds){
   if(!view.cutaway||view.walk)return faces;
@@ -100,7 +101,7 @@
   });
  }
  class Viewer {
-  constructor(canvas,view,onSelect,options={}){this.options=options;this.keys=new Set();this.canvas=canvas;this.view=view;this.onSelect=onSelect;this.faces=[];this.hits=[];this.bind();this.observer=new ResizeObserver(()=>this.draw());this.observer.observe(canvas)}
+  constructor(canvas,view,onSelect,options={}){this.options=options;this.keys=new Set();this.canvas=canvas;this.view=view;this.onSelect=onSelect;this.faces=[];this.hits=[];this.bind();this.observer=new ResizeObserver(()=>{if(this.resizeFrame||this.disposed)return;this.resizeFrame=requestAnimationFrame(()=>{this.resizeFrame=null;if(!this.disposed)this.draw()})});this.observer.observe(canvas)}
   update(faces,focus=null){this.faces=cleanEdges(faces);this.bounds=focus||frame(faces.filter(f=>!f.ceiling));this.draw()}
   enterWalk(walk){this.view.projection='perspective';this.view.walk=walk;this.keys.clear();this.draw();this.canvas.focus()}
   leaveWalk(){delete this.view.walk;this.keys.clear();this.draw()}
@@ -121,7 +122,7 @@
    c.onwheel=e=>{e.preventDefault();if(this.view.walk)return;this.zoom(Math.exp(-clamp(e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?c.clientHeight:1),-180,180)*.002))};
    c.onkeydown=e=>{if(e.key==='Escape'&&this.drag?.edit){const d=this.drag;this.drag=null;this.options.endEdit?.(d.edit,true);if(c.hasPointerCapture(d.id))c.releasePointerCapture(d.id);e.preventDefault();e.stopPropagation();return}if(this.view.walk){const key=e.key.toLowerCase();if(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(key)){e.preventDefault();e.stopPropagation();if(!this.keys.has(key)){this.view.walk=walkMove(this.view.walk,Number(['w','arrowup'].includes(key))-Number(['s','arrowdown'].includes(key)),Number(['d','arrowright'].includes(key))-Number(['a','arrowleft'].includes(key)),.05,this.faces);this.draw()}this.keys.add(key);if(!this.animation)this.animation=requestAnimationFrame(t=>this.tick(t));return}if(key==='escape'){this.leaveWalk();this.options.onModeChange?.();return}}if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','+','=','-','0'].includes(e.key)){e.preventDefault();e.stopPropagation();if(e.key==='0')this.reset();else if(['+','=','-'].includes(e.key))this.zoom(e.key==='-'?1/1.2:1.2);else{this.view.yaw=angle(this.view.yaw+(e.key==='ArrowRight'?-.15:e.key==='ArrowLeft'?.15:0));this.view.pitch=angle(this.view.pitch+(e.key==='ArrowDown'?.1:e.key==='ArrowUp'?-.1:0));this.draw()}}};
   }
-  draw(){const c=this.canvas;if(!c.isConnected){this.dispose();return}const w=c.clientWidth,h=c.clientHeight;if(!w||!h||!this.bounds)return;const dpr=window.devicePixelRatio||1;if(c.width!==Math.round(w*dpr))c.width=Math.round(w*dpr);if(c.height!==Math.round(h*dpr))c.height=Math.round(h*dpr);
+  draw(){if(this.disposed)return;const c=this.canvas;if(!c.isConnected){this.dispose();return}const w=c.clientWidth,h=c.clientHeight;if(!w||!h||!this.bounds)return;const dpr=drawingScale(w,h,window.devicePixelRatio||1);if(c.width!==Math.round(w*dpr))c.width=Math.round(w*dpr);if(c.height!==Math.round(h*dpr))c.height=Math.round(h*dpr);
    const walking=!!this.view.walk,transparent=walking?false:this.view.transparent;
    const visible=this.visibleFaces(),faces=visible.map(f=>({...f,points:walking?walkProject(f.points,this.view.walk,w,h,this.bounds.radius):f.points.map(p=>project(p,this.view,this.bounds,w,h))})).filter(f=>f.points.length>=3).sort((a,b)=>(Number(!!b.floor)-Number(!!a.floor))||a.points.reduce((s,p)=>s+p[2],0)/a.points.length-b.points.reduce((s,p)=>s+p[2],0)/b.points.length);
    if(this.renderer===undefined){try{this.renderer=new DepthRenderer(c)}catch(_){this.renderer=null}}
@@ -131,7 +132,7 @@
    this.options.afterDraw?.(this);c.dataset.renderer=this.renderer?'depth':'basic';c.dataset.walking=String(walking);if(walking)c.dataset.walkPosition=JSON.stringify(this.view.walk.position);else delete c.dataset.walkPosition;
    c.setAttribute('aria-label',walking?'Walk inside · WASD or arrow keys to move · Drag to look · Escape to exit':`3D floor model, ${this.view.projection||'orthographic'}, ${Math.round(this.view.zoom*100)}% zoom. Drag to rotate 360 degrees, Shift-drag or middle-drag to pan. Scroll to zoom.`);
   }
-  dispose(){if(this.animation)cancelAnimationFrame(this.animation);this.animation=null;this.keys?.clear();this.observer?.disconnect();this.renderer?.dispose();this.renderer=undefined;this.drag=null}
+  dispose(){this.disposed=true;if(this.resizeFrame)cancelAnimationFrame(this.resizeFrame);this.resizeFrame=null;if(this.animation)cancelAnimationFrame(this.animation);this.animation=null;this.keys?.clear();this.observer?.disconnect();this.renderer?.dispose();this.renderer=undefined;this.drag=null}
  }
- const api={depthRadius,cutawayFaces,Viewer,defaults,cleanEdges,planePoint,rotate,frame,project,gesture,inside,pick,walkBasis,cameraPoint,clipNear,walkProject,rayFor,raycast,walkMove};if(typeof module!=='undefined')module.exports=api;else window.BlockModelViewer=api;
+ const api={drawingScale,depthRadius,cutawayFaces,Viewer,defaults,cleanEdges,planePoint,rotate,frame,project,gesture,inside,pick,walkBasis,cameraPoint,clipNear,walkProject,rayFor,raycast,walkMove};if(typeof module!=='undefined')module.exports=api;else window.BlockModelViewer=api;
 })();
