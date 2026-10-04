@@ -2,8 +2,8 @@
 /* Staging-only transport. Production modules never receive a network API. */
 (()=>{
  const nativeFetch=window.fetch.bind(window),base=new URL('.',document.currentScript.src),KEY='pixeloid.synthetic-ui.v2',CONFIG=KEY+'.controls',clone=structuredClone;
- const ready=nativeFetch(new URL('ui-fixtures.json?v=f649a01d9baf',base)).then(r=>{if(!r.ok)throw Error('Synthetic fixtures unavailable');return r.json()});
- const multiReady=nativeFetch(new URL('multi-room-fixtures.json?v=643b26bc69fa',base)).then(r=>r.json());
+ const ready=nativeFetch(new URL('ui-fixtures.json?v=0c809d77a4ec',base)).then(r=>{if(!r.ok)throw Error('Synthetic fixtures unavailable');return r.json()});
+ const multiReady=nativeFetch(new URL('multi-room-fixtures.json?v=962aa98b6c19',base)).then(r=>r.json());
  let settings;try{settings=JSON.parse(localStorage.getItem(CONFIG)||'{}')}catch{settings={}}
  settings={mode:'populated',save:'normal',delay:2000,...settings};
  const storageKey=()=>KEY+(settings.scenario==='multi-room'?'.multi-room':'');
