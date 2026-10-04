@@ -81,10 +81,24 @@ def clean(items):
             h=v['elevation_m']
             if type(h) not in (int,float) or not math.isfinite(h) or not 0<=h<=5:raise ValueError('Mounting height must be between 0 and 5 metres.')
             row['elevation_m']=float(h)
+        mount=v.get('host_attachment')
+        if mount is not None:
+            if not isinstance(mount,dict) or mount.get('kind') not in ('floor','wall','ceiling'):raise ValueError('Invalid host attachment.')
+            attachment={'kind':mount['kind'],'floor':str(mount.get('floor',''))[:100]}
+            if mount['kind']=='wall':
+                normal=mount.get('normal');host=str(mount.get('wall_id',''))
+                if not host or len(host)>100 or not isinstance(normal,list) or len(normal)!=2 or any(type(n) not in (int,float) or not math.isfinite(n) for n in normal) or not math.isclose(math.hypot(*normal),1,abs_tol=.01):raise ValueError('Wall attachment requires a host and a unit normal.')
+                attachment.update(wall_id=host,normal=normal)
+            if mount['kind']=='ceiling':
+                drop=mount.get('drop',0)
+                if type(drop) not in (int,float) or not math.isfinite(drop) or not 0<=drop<=5:raise ValueError('Invalid ceiling drop.')
+                attachment['drop']=drop
+            row['host_attachment']=attachment
         size=v.get('physical_size')
         if size:
             if not isinstance(size,dict) or any(type(size.get(k)) not in (int,float) or not math.isfinite(size[k]) or not 0<size[k]<100 for k in ('width','depth')):raise ValueError('Enter valid furniture width and depth in metres.')
             row['physical_size']={'width':size['width'],'depth':size['depth'],'unit':'m'}
+            if isinstance(size.get('height'),(int,float)) and math.isfinite(size['height']) and 0<size['height']<=5:row['physical_size']['height']=size['height']
         out.append(row)
     return out
 
@@ -281,6 +295,29 @@ def validate_items(store,pid,rid,data):
     if not room.get('plan_id') or not room.get('bbox'):raise ValueError('Map this section on the original plan first.')
     if data.get('revision')!=room['revision']:raise ValueError('The section changed. Reopen Furniture blocks.')
     items=clean(data.get('items',[]));linked=set()
+    plan=store.asset(room['plan_id']);doc=plan.get('manual_document') or {};mpp=doc.get('calibration',{}).get('metres_per_pixel')
+    for item in items:
+        mount=item.get('host_attachment')
+        if not mount:continue # Legacy placements retain their existing review status.
+        if mount['floor']!=room['floor']:raise ValueError('Object attachment belongs to a different floor.')
+        height=doc.get('wall_height_m',plan.get('drawing',{}).get('site',{}).get('model',{}).get('wall_height_m',3))
+        base=item.get('elevation_m',0);top=base+item.get('height_m',.8)
+        if base<0 or top>height+.002:raise ValueError('Object must fit between floor and ceiling.')
+        if mount['kind']=='floor' and abs(base)>.002:raise ValueError('Floor-mounted objects keep their base on the floor.')
+        if mount['kind']=='ceiling' and abs(top+mount['drop']-height)>.002:raise ValueError('Ceiling attachment must preserve its height and drop.')
+        if mount['kind']=='wall':
+            from drawing_scene import load
+            walls=[w for w in load(store,plan)[0] if w['kind']=='wall' and w.get('source_id',w.get('id'))==mount['wall_id']]
+            if not walls:raise ValueError('The attached wall is missing. Reattach the object explicitly.')
+            x,y=item['x']*plan['width'],item['y']*plan['height'];n=mount['normal'];valid=False
+            for wall in walls:
+                a,b=wall['points'];L=math.dist(a,b)
+                if L<=0:continue
+                u=[(b[i]-a[i])/L for i in (0,1)];t=(x-a[0])*u[0]+(y-a[1])*u[1];distance=(x-a[0])*n[0]+(y-a[1])*n[1]
+                half=item['width']*plan['width']/2;expected=(wall.get('thickness',1.5)+item['depth']*plan['height'])/2
+                if abs(sum(u[i]*n[i] for i in (0,1)))<.01 and half-.1<=t<=L-half+.1 and abs(distance-expected)<=max(.2,.02/mpp if mpp else .2):valid=True
+            if not valid:raise ValueError('Keep the object aligned with and inside its host wall face.')
+
     for item in items:
         aid=item.get('asset_id')
         if not aid:continue

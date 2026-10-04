@@ -233,4 +233,21 @@ class FurnitureBlocks(unittest.TestCase):
   status=self.request('check')['architecture'];self.assertFalse(status['study_reviewed']);self.assertEqual(status['typed_wall_count'],0)
   self.assertTrue(any('endpoints' in t for t in status['notes']))
 
+
+
+ def test_host_constraints_roundtrip_and_explicit_drop(self):
+  item={**self.item,'asset_id':None,'height_m':.5,'elevation_m':2.1,'host_attachment':{'kind':'ceiling','floor':'Lower','drop':.4},'physical_size':{'width':1,'depth':.6,'height':.5,'unit':'m'}}
+  self.request('save',[item]);saved=Store(self.st.root).room(self.pid,self.r['id'])['block_layout']['items'][0]
+  self.assertEqual(saved['host_attachment'],item['host_attachment']);self.assertEqual(saved['physical_size']['height'],.5)
+  for bad,reason in [({**item,'elevation_m':1},'Ceiling attachment'),({**item,'elevation_m':0,'host_attachment':{'kind':'floor','floor':'Upper'}},'different floor'),({**item,'elevation_m':.2,'host_attachment':{'kind':'floor','floor':'Lower'}},'base on the floor')]:
+   with self.assertRaisesRegex(ValueError,reason):self.request('save',[bad])
+  resized={**saved,'height_m':.8,'elevation_m':1.8};self.request('save',[resized]);self.assertEqual(self.r['block_layout']['items'][0]['physical_size'],item['physical_size'])
+
+ def test_wall_host_survives_move_and_rejects_detached_position(self):
+  self.a['drawing']['features']=self.wall_draft()['features']
+  item={**self.item,'asset_id':None,'kind':'decor','x':23/400,'y':.5,'width':.1,'depth':.02,'height_m':.6,'elevation_m':1,'angle':90,'host_attachment':{'kind':'wall','floor':'Lower','wall_id':'newwall','normal':[1,0]}}
+  self.request('save',[item]);item['y']=.6;item['height_m']=.7;self.request('save',[item])
+  self.assertEqual(Store(self.st.root).room(self.pid,self.r['id'])['block_layout']['items'][0]['host_attachment'],item['host_attachment'])
+  with self.assertRaisesRegex(ValueError,'host wall face'):self.request('save',[{**item,'x':.1}])
+
 if __name__=='__main__':unittest.main()

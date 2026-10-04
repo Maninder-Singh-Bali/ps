@@ -1,0 +1,17 @@
+const assert=require('node:assert/strict');
+const {defaults,cleanEdges,planePoint,Viewer}=require('../static/model-viewer.js');
+assert.equal(defaults().transparent,false);assert.equal(defaults().edges,false);
+assert.deepEqual(planePoint({origin:[2,3,5],direction:[0,0,-1]},[0,0,0],[0,0,1]),[2,3,0]);
+assert.deepEqual(planePoint({origin:[2,3,5],direction:[-1,0,0]},[0,0,0],[1,0,0]),[0,3,5]);
+assert.equal(planePoint({origin:[2,3,5],direction:[1,0,0]},[0,0,0],[0,0,1]),null);
+const faces=[{color:'#aaaaaa',points:[[0,0,0],[2,0,0],[2,2,0]]},{color:'#aaaaaa',points:[[0,0,0],[2,2,0],[0,2,0]]}],before=JSON.stringify(faces),clean=cleanEdges(faces);
+assert.equal(clean.flatMap(f=>f.edge_mask).filter(Boolean).length,4);assert.equal(JSON.stringify(faces),before);
+global.ResizeObserver=class{observe(){}disconnect(){}};
+let moved=0,committed=0,cancelled=0,selected=0;
+const canvas={style:{},clientWidth:400,clientHeight:300,focus(){},setPointerCapture(){},releasePointerCapture(){},hasPointerCapture(){return true},getBoundingClientRect(){return{left:0,top:0}}};
+const view=defaults(),v=new Viewer(canvas,view,()=>selected++,{beginEdit:()=>({id:'canonical'}),moveEdit:()=>moved++,endEdit:(d,c)=>c?cancelled++:committed++});v.draw=()=>{};v.bounds={center:[0,0,0],radius:10};
+const ev=(x,y)=>({clientX:x,clientY:y,button:0,pointerId:1,preventDefault(){}}),original=JSON.stringify(view);
+canvas.onpointerdown(ev(10,10));canvas.onpointermove(ev(40,40));canvas.onpointermove(ev(50,50));canvas.onpointerup(ev(50,50));assert.equal(moved,2);assert.equal(committed,1);assert.equal(selected,0);assert.equal(JSON.stringify(view),original);
+canvas.onpointerdown(ev(10,10));canvas.onpointermove(ev(40,40));canvas.onkeydown({key:'Escape',preventDefault(){},stopPropagation(){}});canvas.onpointerup(ev(40,40));assert.equal(cancelled,1);assert.equal(committed,1);
+console.log('Shared viewer editing: plane constraints, one commit, Escape rollback, orbit separation and coplanar seams passed.');
+v.faces=[{id:'front',architecture:true,surfaceKind:'joined_wall',points:[[0,3,0],[2,3,0],[2,3,2]]},{id:'object',points:[[0,0,0],[1,0,0],[1,0,1]]}];v.view.yaw=0;v.view.pitch=.4;v.view.cutaway=false;assert.equal(v.visibleFaces().length,2);v.view.cutaway=true;assert.equal(v.visibleFaces().length,1);assert.equal(v.visibleFaces()[0].id,'object');

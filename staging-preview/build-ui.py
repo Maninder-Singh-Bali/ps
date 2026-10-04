@@ -90,9 +90,9 @@ for name in names:
   text=text.replace('/icons/','/ps/app/icons/').replace("'/floor-plan.html","'/ps/app/floor-plan.html").replace('"/floor-plan.html','"/ps/app/floor-plan.html').replace("'/?project=","'/ps/?project=")
   # Isolate every production local preference in the staging origin namespace.
   text=text.replace('pixeloid-','pixeloid-ui-staging-')
-  text=text.replace('/ps/app/floor-plan.html#','/ps/app/floor-plan.html?preview=ui6#')
-  text=text.replace("link.href='/ps/app/floor-plan.html'", "link.href='/ps/app/floor-plan.html?preview=ui6'")
-  text=text.replace("location.href='/ps/app/floor-plan.html'+(stage==='surfaces'?'?stage=surfaces':'')", "location.href='/ps/app/floor-plan.html?preview=ui6'+(stage==='surfaces'?'&stage=surfaces':'')")
+  text=text.replace('/ps/app/floor-plan.html#','/ps/app/floor-plan.html?preview=ui7#')
+  text=text.replace("link.href='/ps/app/floor-plan.html'", "link.href='/ps/app/floor-plan.html?preview=ui7'")
+  text=text.replace("location.href='/ps/app/floor-plan.html'+(stage==='surfaces'?'?stage=surfaces':'')", "location.href='/ps/app/floor-plan.html?preview=ui7'+(stage==='surfaces'?'&stage=surfaces':'')")
 
  if name=='app.js':
   text=re.sub(r'<div class="manual-plan-choice">.*?</div>','',text)
@@ -116,7 +116,7 @@ html=html.replace('</body>','<script src="/ps/app/ui-controls.js"></script></bod
 (OUT/'index.html').write_text(html)
 # Existing real Plan/Surface components keep the staging API boundary.
 floor=(APP/'floor-plan.html').read_text().replace('staging-api.js','ui-adapter.js').replace('staging.css','ui-staging.css');floor=re.sub(r'<div class="staging-bar">.*?</div>','',floor);floor=floor.replace('</body>','<script src="/ps/app/ui-controls.js"></script></body>');(APP/'floor-plan.html').write_text(floor)
-floorjs=(APP/'floor-plan.js').read_text().replace('Apartment saved. Shared scene updated.','Synthetic draft saved in this browser. No backend validation.').replace('window.Staging.api(path,body,raw)','window.Staging.planApi(path,body,raw)').replace('pixeloid-','pixeloid-ui-staging-').replace("'/ps/?project='","'/ps/?preview=ui6&project='");floorjs = floorjs.rsplit('})();',1)[0]+'\nwindow.Staging.hasUnsaved=()=>dirty;window.Staging.discardForReset=()=>{dirty=false;saveTicket++;changeSerial++;};\n})();\n'
+floorjs=(APP/'floor-plan.js').read_text().replace('Apartment saved. Shared scene updated.','Synthetic draft saved in this browser. No backend validation.').replace('window.Staging.api(path,body,raw)','window.Staging.planApi(path,body,raw)').replace('pixeloid-','pixeloid-ui-staging-').replace("'/ps/?project='","'/ps/?preview=ui7&project='");floorjs = floorjs.rsplit('})();',1)[0]+'\nwindow.Staging.hasUnsaved=()=>dirty;window.Staging.discardForReset=()=>{dirty=false;saveTicket++;changeSerial++;};\n})();\n'
 (APP/'floor-plan.js').write_text(floorjs)
 # Reuse the existing Surface Design assignment flow with a bundled reference provider.
 surface=(APP/'surface-design.js').read_text();start=surface.index('async function readReference(');end=surface.index('\nasync function action(',start)

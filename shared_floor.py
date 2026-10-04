@@ -162,7 +162,7 @@ def build(store,room,preview_items=None,camera_override=None):
             object_key=r['id']+':'+item['id']
             for part in mesh(item,plan):
                 face([[*xy(v[:2]),v[2]] for v in part['points']],part['color'],'block',object_key)
-            products.append({'object_key':object_key,'asset_id':item.get('asset_id'),'block_id':item['id'],'room_id':r['id'],'label':item['label'],'centre':[item['x'],item['y']],'facing':item['angle'],'size_confirmed':False,'reviewed':not block_readiness(store,r)})
+            products.append({'object_key':object_key,'asset_id':item.get('asset_id'),'block_id':item['id'],'room_id':r['id'],'label':item['label'],'centre':[item['x'],item['y']],'facing':item['angle'],'proxy_dimensions':{'width':item['width'],'depth':item['depth'],'plan_units':'normalized','height_m':item.get('height_m'),'elevation_m':item.get('elevation_m',0)},'host_attachment':item.get('host_attachment'),'additional_design_instructions':item.get('prompt',''),'size_confirmed':False,'reviewed':not block_readiness(store,r)})
         for item in current_layout(r).get('items',[]):
             if item.get('block_id'):continue
             ref=store.asset(item['asset_id'])

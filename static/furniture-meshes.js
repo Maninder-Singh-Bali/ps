@@ -82,7 +82,7 @@
     if(['block','furniture'].includes(s.kind))continue;
     const chosen=!!s.source_id&&(selection.wall===s.source_id||selection.multi?.includes('w:'+s.source_id));
     const color=chosen?s.color.map((c,i)=>Math.round(c*.4+[244,203,100][i]*.6)):s.color;
-    faces.push({id:s.source_id,sourceId:s.source_id,roomId:room_id,floorName:scene.floor,selected:chosen,points:s.points.map(point),surfaceKind:s.kind,architecture:s.kind!=='floor',floor:s.kind==='floor',color:`rgb(${color.join(',')})`});
+    faces.push({id:s.source_id,sourceId:s.source_id,roomId:room_id,floorName:scene.floor,selected:chosen,ceiling:s.ceiling,surface_design:s.surface_design,object_key:s.object_key,edge_mask:s.edge_mask,points:s.points.map(point),surfaceKind:s.kind==='joined_wall'?'wall':s.kind,architecture:s.kind!=='floor',floor:s.kind==='floor',color:`rgb(${color.join(',')})`});
    }
    // Ceiling underside follows the slab above, including open-to-below courtyards.
    const lid=floors[index+1]?.scene||scene,lb=lid.bounds,lx=(lb[2]-lb[0])*plan.width/lid.width,ly=(lb[3]-lb[1])*plan.height/lid.depth;

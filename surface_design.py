@@ -149,10 +149,31 @@ def mesh(d,origin):
                             if f.get('bookmatch') and ix%2:fx=1-fx
                             color=list(image.getpixel((min(image.width-1,int(fx*image.width)),min(image.height-1,int(fy*image.height)))))
                         flat(rotate(translate(cell,ox,oy),angle,origin=(0,0)),world,z,color,identifier,ceiling)
+    # Later explicit finishes replace coincident earlier coverage. Keep all
+    # declared voids open, including when a room extent overlaps a shared slab.
+    horizontal={}
+    voids={}
+    for s in ss.values():
+        if s['kind'] not in ('floor','ceiling'):continue
+        key=(s['kind'],s.get('elevation_m',0))
+        boundary=Polygon([[x*m,y*m] for x,y in s['boundary']],[[[x*m,y*m] for x,y in h] for h in s.get('holes',[])])
+        horizontal[s['id']]=(key,boundary)
+        for hole in s.get('holes',[]):
+            voids.setdefault(key,[]).append(Polygon([[x*m,y*m] for x,y in hole]))
     for s in ss.values():
         ctx=context(d,s)
         if not ctx or s['kind'] in hidden:continue
         region,world=ctx
+        if s['id'] in horizontal:
+            key,coverage=horizontal[s['id']]
+            for hole in voids.get(key,[]):coverage=coverage.difference(hole)
+            later=False
+            for q in ss.values():
+                if q['id']==s['id']:later=True;continue
+                if later and q['id'] in horizontal and horizontal[q['id']][0]==key:
+                    coverage=coverage.difference(horizontal[q['id']][1])
+            origin_xy=world(0,0,0)
+            region=translate(coverage,-origin_xy[0],-origin_xy[1])
         if s.get('finish'):textured(region,world,0,s['finish'],s['id'],s['kind']=='ceiling')
         elif s['kind']=='ceiling':flat(region,world,0,[241,239,232],s['id'],True)
         elif s['kind']=='floor':flat(region,world,0,[226,220,210],s['id'])

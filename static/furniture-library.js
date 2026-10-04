@@ -151,7 +151,6 @@
   const out=structuredClone(item);out.width=width;out.depth=depth;
   out.sofa_modules={main_seats:m.main_seats,return_seats:m.return_seats,leg_width:size/W,leg_depth:size/H,pitch_width:size/W,pitch_depth:size/H};
   out.seat_count=m.main_seats+m.return_seats;
-  if(out.physical_size){out.physical_size.width*=width/item.width;out.physical_size.depth*=depth/item.depth}
   return out;
  }
  function chairInstances(item,plan){
@@ -176,7 +175,6 @@
   const copy=structuredClone(item);copy.width*=factor;copy.depth*=factor;
   if(copy.width<.005||copy.depth<.005||copy.width>1||copy.depth>1)throw Error('This scale exceeds the supported block size.');
   if(copy.height_m!=null){copy.height_m*=factor;if(copy.height_m<.01||copy.height_m>5)throw Error('Scaled height must be between 0.01 and 5 metres.')}
-  if(copy.physical_size){copy.physical_size.width*=factor;copy.physical_size.depth*=factor}
   scaleModules(copy,factor,factor);
   return copy;
  }
@@ -222,7 +220,6 @@
   out.x=(cx+ox*c-oy*s)/plan.width;out.y=(cy+ox*s+oy*c)/plan.height;
   if(out.x<0||out.x>1||out.y<0||out.y>1)return structuredClone(item);
   out.width=w/plan.width;out.depth=d/plan.height;
-  if(out.physical_size){out.physical_size.width*=w/W;out.physical_size.depth*=d/D}
   return out;
  }
  function snapToWall(item,plan,walls,tolerance){

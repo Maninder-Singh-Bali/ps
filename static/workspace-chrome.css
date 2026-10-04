@@ -147,3 +147,67 @@ body.studio-dashboard #main{scroll-padding:18px;padding-bottom:24px}
  body.studio-plan>.top .top-actions{flex-wrap:wrap;min-width:0;gap:5px}
  body.studio-plan>.top .identity{min-width:0;flex-wrap:wrap}
 }
+
+/* Editing workspaces: no reserved utility rail. */
+body.studio-dashboard .sidebar{display:none}
+body.studio-dashboard #main{margin-left:0;width:100%}
+.workspace-utilities{position:relative;flex:none;font-size:12px}
+.workspace-utilities>summary{cursor:pointer;padding:5px 8px;border:1px solid var(--line);border-radius:5px;white-space:nowrap}
+.workspace-utilities .sidebar-bottom{position:absolute;right:0;top:100%;z-index:100;display:flex;flex-direction:column;align-items:stretch;width:200px;padding:8px;background:var(--surface);border:1px solid var(--line);border-radius:6px;box-shadow:0 5px 14px #0003}
+.workspace-utilities .sidebar-bottom button{display:flex;align-items:center;gap:8px;min-height:34px;color:var(--ink);background:var(--raised);border:1px solid var(--line)}
+.workspace-utilities .local-note{display:none}
+.block-model-panel{position:relative}
+.block-model-controls{display:flex;flex-wrap:wrap;align-items:center;gap:4px;font-size:11px}
+.block-model-controls label{display:inline-flex;align-items:center;gap:3px;margin:0;white-space:nowrap}
+.block-model-controls button[aria-pressed=true]{color:var(--accent);background:var(--soft);border-color:var(--accent)}
+#plan-editor-inline .inline-editor-top,.inline-editor-top .block-toolbar{align-items:center;gap:6px}
+#plan-editor-inline .inline-editor-top :is(.block-map-toggle,.block-review){display:inline-flex;align-items:center;gap:5px;line-height:1.3;margin:0;white-space:nowrap}
+#plan-editor-inline .inline-editor-top input[type=checkbox]{margin:0;width:14px;height:14px;flex:none;vertical-align:middle}
+#plan-editor-inline .inline-editor-top :is(button,select){min-height:30px}
+#plan-editor-inline .block-workspace.catalogue-open{grid-template-columns:220px minmax(0,1fr) minmax(0,1fr)!important}
+#plan-editor-inline .catalogue-open .block-left-panel{display:none!important}
+#furniture-catalogue{width:100%;min-width:0;max-height:none;height:100%;padding:6px;overflow:hidden;display:flex;flex-direction:column;border-radius:5px}
+#furniture-catalogue h2{font-size:13px}
+#furniture-catalogue .furniture-library{display:flex;flex-direction:column;min-height:0;flex:1;margin-top:6px}
+#furniture-catalogue .library-heading{grid-template-columns:1fr;flex:none;gap:4px}
+#furniture-catalogue .furniture-library-grid{overflow:auto;min-height:0;flex:1;grid-template-columns:repeat(2,minmax(0,1fr));align-content:start}
+#furniture-catalogue .furniture-library-grid button{min-height:66px;font-size:11px}
+#furniture-catalogue .help{font-size:11px;line-height:1.3;margin:4px 0}
+.object-reference{margin-top:9px;border-top:1px solid var(--line);padding-top:8px}
+.reference-heading{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+.reference-heading img,.reference-empty{width:48px;height:48px;object-fit:contain;flex:none;border:1px solid var(--line);border-radius:4px;background:var(--raised);color:var(--ink)}
+.reference-empty{display:grid;place-items:center;font-size:10px}
+.reference-heading strong{margin:0}.reference-heading small{display:block}
+.object-reference :is(input,select,textarea){width:100%;min-width:0;box-sizing:border-box;color:var(--ink);background:var(--surface)}
+.object-reference .field{margin:6px 0}.object-reference details{margin-top:6px}
+#plan-editor-inline .block-workspace{min-height:0}
+#plan-editor-inline .block-model-controls .btn{padding:3px 6px;min-height:27px}
+@media(max-width:850px){#plan-editor-inline .block-workspace.catalogue-open{grid-template-columns:190px minmax(0,1fr)!important}.workspace-utilities .sidebar-bottom{right:0}}
+
+body.surface-editing .tools{display:none}
+#surface-tools{width:72px;display:flex;flex-direction:column;gap:7px;padding:8px;box-sizing:border-box;border-right:1px solid var(--line);background:var(--surface)}
+#surface-tools button{font-size:11px;min-height:38px;padding:3px}
+#surface-tools button[aria-pressed=true],.surface-tabs button[aria-pressed=true]{background:var(--soft);border-color:var(--accent);color:var(--accent)}
+.surface-editing #inspector{font-size:12px}
+.surface-editing #inspector .field{margin:7px 0}
+.surface-editing #inspector .pair{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.surface-editing #inspector .pair .field{margin:0;min-width:0}
+.surface-editing #inspector :is(input,select,textarea){min-width:0;width:100%;box-sizing:border-box}
+.surface-editing #inspector input[type=checkbox]{width:auto}
+.surface-editing #inspector .surface-material>summary,.surface-editing #inspector .surface-item-catalogue>summary{display:none}
+.surface-editing #inspector .surface-material[hidden],.surface-editing #inspector .surface-item-catalogue[hidden]{display:none}
+.surface-editing #inspector .design-reference{width:64px;height:64px;object-fit:contain}
+.surface-editing #inspector .actions{gap:5px;flex-wrap:wrap}
+#surface-gizmo{position:absolute;transform:translate(-50%,-50%);pointer-events:none;color:#2366d8;text-shadow:0 0 2px white;font-size:48px;line-height:1}
+#surface-gizmo[hidden]{display:none}
+.block-workspace svg.model-gizmo{background:transparent!important;border:0!important;min-height:0!important;max-height:none!important;z-index:2}
+
+.surface-editing #inspector [hidden]{display:none!important}
+.surface-editing #inspector .surface-material{margin-top:6px;padding-top:6px}
+.surface-editing #inspector .surface-advanced{margin-top:12px}
+#surface-tools{overflow:auto}
+
+.selected-furniture-inspector .block-fields .field,.selected-furniture-inspector .reference-inspector .field{margin:0;gap:3px}.selected-furniture-inspector .block-fields{gap:7px}.selected-furniture-inspector input,.selected-furniture-inspector select{min-height:30px;padding:5px 7px}.surface-editing #inspector .pair .field{margin:0;gap:3px}
+#plan-editor-inline .block-model-controls{height:auto;min-height:32px;flex:0 0 auto;padding-bottom:2px}#plan-editor-inline .block-model-controls label{margin-left:0}#plan-editor-inline .block-model-controls #model-placement-hint:empty{display:none}
+
+.surface-editing #inspector h2{margin:0 0 10px}.surface-editing #inspector>.field{margin:8px 0}.surface-editing #inspector>.actions{margin:8px 0}.surface-editing #inspector .surface-tabs{padding:6px 0;margin:6px 0}.surface-editing #inspector .surface-item-catalogue{padding:6px 0;margin:6px 0}.surface-editing #inspector h3{margin:8px 0;font-size:12px}.surface-editing #inspector .surface-reference .design-reference{width:44px;height:44px}.surface-editing #inspector .surface-reference{gap:8px}

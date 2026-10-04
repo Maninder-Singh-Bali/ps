@@ -14,7 +14,7 @@ const original={...sofa,asset_id:'linked-image',physical_size:{width:2,depth:1,u
 const snapshot=JSON.stringify(original),scaled=library.scale(original,1.2),copy=library.duplicate(original,plan,'copy');
 assert.equal(JSON.stringify(original),snapshot);
 assert.equal(scaled.width,original.width*1.2);assert.equal(scaled.depth,original.depth*1.2);
-assert.equal(scaled.height_m,original.height_m*1.2);assert.equal(scaled.physical_size.width,2.4);
+assert.equal(scaled.height_m,original.height_m*1.2);assert.deepEqual(scaled.physical_size,original.physical_size,'Proxy scaling never rewrites source product evidence');
 assert.equal(copy.id,'copy');assert.equal(copy.asset_id,null);assert.equal(copy.seat_count,original.seat_count);
 assert.equal(copy.width,original.width);assert.notEqual(copy.x,original.x);
 assert.throws(()=>library.scale(original,0));assert.throws(()=>library.scale(original,NaN));assert.throws(()=>library.scale(original,1000));

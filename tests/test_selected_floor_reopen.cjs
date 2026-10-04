@@ -11,7 +11,7 @@ async function reopen(confirmed, selectedRoom = null) {
     assets:{a:{id:'a',project_id:'p',construction_selection:{confirmed,floor:'Selected floor'}}},jobs:{}};
   const c = {pid:'p',rid:selectedRoom,planId:null,state:null,pollBusy:false,
     lastSignature:'',drawMode:false,modalType:'',window:{},
-    document:{activeElement:{tagName:'BODY'}}, localStorage:{setItem(){},getItem(){return JSON.stringify({roomId:selectedRoom})}},
+    URLSearchParams,location:{search:''},document:{activeElement:{tagName:'BODY'}}, localStorage:{setItem(){},getItem(){return JSON.stringify({roomId:selectedRoom})}},
     fetch:async()=>({ok:true,json:async()=>data}),renderShell(){},renderMain(){},updateJobs(){},
     toast(message){throw Error(message)}};
   c.P=()=>c.state?.projects[c.pid]; c.R=()=>c.P()?.rooms.find(r=>r.id===c.rid);

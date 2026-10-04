@@ -28,4 +28,13 @@ class SurfaceDesignTests(unittest.TestCase):
   with self.assertRaises(ValueError):sd.validate(raw)
  def test_tiles_clip_and_scale(self):
   self.s={'id':'f','kind':'floor','boundary':[[0,0],[200,0],[200,100],[0,100]],'holes':[],'finish':{'kind':'tile','tile_width':1,'tile_length':.5,'grout':0,'color':'#ffffff','grout_color':'#000000'}};self.d['surface_design']={'version':1,'surfaces':[self.s],'items':[]};faces=sd.mesh(self.d,[0,0]);white=[f for f in faces if f['color']==[255,255,255]];self.assertEqual(len(white),8);self.assertAlmostEqual(sum(Polygon([p[:2] for p in f['points']]).area for f in white),2)
+ def test_room_finish_replaces_overlap_and_preserves_shared_void(self):
+  base={'id':'base','kind':'ceiling','boundary':[[0,0],[400,0],[400,400],[0,400]],'holes':[[[100,100],[200,100],[200,200],[100,200]]],'elevation_m':3}
+  room={'id':'room','kind':'ceiling','boundary':[[0,0],[300,0],[300,300],[0,300]],'elevation_m':3,'finish':{'kind':'paint','color':'#ffffff'}}
+  self.d['surface_design']={'version':1,'surfaces':[base,room],'items':[]}
+  faces=sd.mesh(self.d,[0,0]);polygons=[Polygon([p[:2] for p in f['points']]) for f in faces]
+  self.assertAlmostEqual(sum(p.area for p in polygons),15)
+  from shapely.ops import unary_union
+  self.assertAlmostEqual(unary_union(polygons).area,15)
+  self.assertFalse(unary_union(polygons).contains(Point(1.5,1.5)))
 if __name__=='__main__':unittest.main()

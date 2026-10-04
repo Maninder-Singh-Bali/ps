@@ -36,9 +36,9 @@ def from_plan(plan,rooms=(),architecture=()):
             elements.append({'id':key,'source':copy.deepcopy(source),'floor':room.get('floor'),
                 'category':item.get('kind','furniture'),'subtype':item.get('preset_id'),'origin':'editable_proxy',
                 'position':[item.get('x'),item.get('y')],'orientation_degrees':item.get('angle',0),
-                'geometry':{'type':'library_proxy','units':'normalized plan x/y; elevation in metres','width':item.get('width'),'depth':item.get('depth')},
+                'geometry':{'type':'library_proxy','units':'normalized plan x/y; elevation in metres','width':item.get('width'),'depth':item.get('depth'),'height_m':item.get('height_m'),'elevation_m':item.get('elevation_m',0)},
                 'dimensions':copy.deepcopy(item.get('physical_size')),'dimension_provenance':'explicit furniture dimensions' if item.get('physical_size') else 'library estimate',
-                'relationships':{'room_id':room['id'],'product_asset_id':item.get('asset_id')},
+                'relationships':{'room_id':room['id'],'product_asset_id':item.get('asset_id'),'host_attachment':copy.deepcopy(item.get('host_attachment'))},
                 'review_state':'user_reviewed' if room.get('block_layout',{}).get('reviewed') else 'draft',
                 'lighting_origin':('user_design' if item.get('preset_id') in LIGHT_ASSETS else None),
                 'proxy':copy.deepcopy(item),'manual_history':copy.deepcopy(item.get('history',[]))})
