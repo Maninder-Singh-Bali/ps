@@ -305,6 +305,6 @@ window.addEventListener('hashchange',()=>{const key=location.hash.slice(1);if(ke
 let lastSize=null;new ResizeObserver(()=>{if(!doc)return;const size=[$('#plan').clientWidth,$('#plan').clientHeight];if(size[0]&&size[1]&&lastSize){const centre=[view[0]+view[2]/2,view[1]+view[3]/2];view[3]=view[2]*size[1]/size[0];view[1]=centre[1]-view[3]/2;draw();}if(size[0]&&size[1])lastSize=size;}).observe($('.stage'));
 SurfaceDesign.install({footprints:()=>{resolveFootprint(G.hosted(doc.features));return footprintResult;},api,doc:()=>doc,svg,wall:hostForSelection,clearSelection,commit,render,toast,mode:setMode,is3d:()=>mode==='3d',fit});
 (async()=>{try{const rows=await list(),key=location.hash.slice(1)||rows[0]?.id;if(key){await open(key);if(new URLSearchParams(location.search).get('stage')==='surfaces')$('#design-open').click();}else{$('#welcome').hidden=false;$('#status').textContent='No draft open';inspector();}}catch(e){toast(e.message);}})();
-})();
 
 window.Staging.discardForReset=()=>{dirty=false;saveTicket++;changeSerial++;};
+})();
