@@ -26,3 +26,4 @@
 }
 @media(max-width:850px){#plan-editor-inline .camera-workspace{display:block}#plan-editor-inline #camera-plan{height:360px;flex:none}#plan-editor-inline .camera-settings{overflow:visible}}
 .sidebar .nav-item{color:var(--text,#dce1e8)}
+html[data-theme="dark"] .sidebar .nav-item img,html[data-theme="dark"] .sidebar-bottom button img{filter:invert(.85)}
