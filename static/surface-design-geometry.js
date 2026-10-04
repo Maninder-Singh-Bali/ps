@@ -7,8 +7,23 @@ const kinds={painting:[.6,.8,.03],mirror:[.6,.9,.025],sconce:[.16,.3,.15],switch
 function context(d,s){const m=d.calibration?.metres_per_pixel;if(!m)throw Error('Calibrate the drawing first.');if(s.kind==='wall'){const w=d.features.find(w=>w.id===s.wall_id&&w.kind==='wall');if(!w)return {missing:true};const L=dist(...w.points)*m,u=w.points[1].map((v,i)=>(v-w.points[0][i])*m/L);return {wall:w,L,H:w.height_m??d.wall_height_m,u,n:[-u[1]*s.side,u[0]*s.side],origin:w.points[0].map(v=>v*m),m};}const xs=s.boundary.map(p=>p[0]),ys=s.boundary.map(p=>p[1]),origin=[Math.min(...xs)*m,Math.min(...ys)*m];return {origin,L:(Math.max(...xs)-Math.min(...xs))*m,H:(Math.max(...ys)-Math.min(...ys))*m,m};}
 function hull(ps){const sorted=ps.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1]),cross=(a,b,c)=>(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);const part=xs=>{const out=[];for(const p of xs){while(out.length>1&&cross(out.at(-2),out.at(-1),p)<=0)out.pop();out.push(p);}return out;};return part(sorted).slice(0,-1).concat(part(sorted.reverse()).slice(0,-1));}
 function corners(o){if(o.run){const r=o.rotation*Math.PI/180,h=o.height/2;return hull(o.run.flatMap(p=>[[-h,-h],[h,-h],[h,h],[-h,h]].map(q=>[p[0]+q[0],p[1]+q[1]]))).map(p=>[o.x+p[0]*Math.cos(r)-p[1]*Math.sin(r),o.y+p[0]*Math.sin(r)+p[1]*Math.cos(r)]);}const r=o.rotation*Math.PI/180,c=Math.cos(r),s=Math.sin(r);return [[-1,-1],[1,-1],[1,1],[-1,1]].map(([x,y])=>[o.x+x*o.width/2*c-y*o.height/2*s,o.y+x*o.width/2*s+y*o.height/2*c]);}
+// Selection uses a hull; collision checks use the occupied strips of a profile.
+// Match the production buffer's flat ends and bounded mitre joins. A closed
+// cove/arch must not turn the empty space between its runs into solid geometry.
+function footprints(o){
+ if(!o.run)return [corners(o)];
+ const h=o.height/2,r=(o.rotation||0)*Math.PI/180,c=Math.cos(r),s=Math.sin(r),parts=[],segments=[];
+ const transform=ps=>ps.map(([x,y])=>[o.x+x*c-y*s,o.y+x*s+y*c]);
+ for(let i=1;i<o.run.length;i++){const a=o.run[i-1],b=o.run[i],L=dist(a,b);if(L<1e-9)continue;const u=[(b[0]-a[0])/L,(b[1]-a[1])/L],n=[-u[1]*h,u[0]*h];segments.push({a,b,u,n});parts.push([a.map((v,j)=>v+n[j]),b.map((v,j)=>v+n[j]),b.map((v,j)=>v-n[j]),a.map((v,j)=>v-n[j])]);}
+ const closed=segments.length>1&&dist(segments[0].a,segments.at(-1).b)<1e-8;
+ for(let i=0;i<segments.length-(closed?0:1);i++){const a=segments[i],b=segments[(i+1)%segments.length];if(dist(a.b,b.a)>1e-8)continue;const cross=(v,w)=>v[0]*w[1]-v[1]*w[0],den=cross(a.u,b.u);if(Math.abs(den)<1e-9)continue;
+  for(const sign of [-1,1]){const p=a.b.map((v,j)=>v+sign*a.n[j]),q=b.a.map((v,j)=>v+sign*b.n[j]),t=cross(q.map((v,j)=>v-p[j]),b.u)/den,tip=p.map((v,j)=>v+t*a.u[j]);if(dist(tip,a.b)<=5*h)parts.push([p,tip,q]);else{const L=dist(tip,a.b),axis=tip.map((v,j)=>(v-a.b[j])/L),signed=v=>v.reduce((sum,x,j)=>sum+(x-a.b[j])*axis[j],0)-5*h,poly=[p,tip,q],clipped=[];for(let k=0;k<poly.length;k++){const u=poly[k],v=poly[(k+1)%poly.length],du=signed(u),dv=signed(v);if(du<=0)clipped.push(u);if((du<0)!==(dv<0))clipped.push(u.map((x,j)=>x+(v[j]-x)*du/(du-dv)));}if(clipped.length>=3)parts.push(clipped);}}
+ }
+ return parts.map(transform);
+}
 function inside(p,poly){let yes=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const a=poly[i],b=poly[j],v=[b[0]-a[0],b[1]-a[1]],q=[p[0]-a[0],p[1]-a[1]];if(Math.abs(v[0]*q[1]-v[1]*q[0])<1e-7&&q[0]*v[0]+q[1]*v[1]>=-1e-7&&q[0]*v[0]+q[1]*v[1]<=v[0]*v[0]+v[1]*v[1]+1e-7)return true;if((a[1]>p[1])!==(b[1]>p[1])&&p[0]<(b[0]-a[0])*(p[1]-a[1])/(b[1]-a[1])+a[0])yes=!yes;}return yes;}
 function overlaps(a,b){for(const p of [a,b])for(let i=0;i<p.length;i++){const q=p[(i+1)%p.length],n=[q[1]-p[i][1],p[i][0]-q[0]],A=a.map(v=>v[0]*n[0]+v[1]*n[1]),B=b.map(v=>v[0]*n[0]+v[1]*n[1]);if(Math.max(...A)<=Math.min(...B)+1e-8||Math.max(...B)<=Math.min(...A)+1e-8)return false;}return true;}
+function edgesCross(a,b){const side=(p,q,r)=>(q[0]-p[0])*(r[1]-p[1])-(q[1]-p[1])*(r[0]-p[0]);return a.some((p,i)=>b.some((r,j)=>{const q=a[(i+1)%a.length],t=b[(j+1)%b.length];return side(p,q,r)*side(p,q,t)<-1e-12&&side(r,t,p)*side(r,t,q)<-1e-12;}));}
 function openingRects(d,s){const c=context(d,s);if(c.missing||s.kind!=='wall')return [];return d.features.filter(o=>o.host_wall_id===s.wall_id).map(o=>({id:o.id,x:(o.offset+o.width/2)*c.m,y:((o.kind==='window'?(o.sill_m??.9):(o.base_m??0))+(o.head_m??(o.kind==='window'?2.4:2.2)))/2,width:o.width*c.m,height:(o.head_m??(o.kind==='window'?2.4:2.2))-(o.kind==='window'?(o.sill_m??.9):(o.base_m??0)),rotation:0}));}
 // View-only context. Never split host walls or change surface/item coordinates.
 function roomPolygon(d,r){const b=r.bbox;return (r.area_polygon||[[b[0],b[1]],[b[0]+b[2],b[1]],[b[0]+b[2],b[1]+b[3]],[b[0],b[1]+b[3]]]).map(p=>[p[0]*d.width,p[1]*d.height]);}
@@ -34,7 +49,16 @@ function wallPartitions(d,s){
  }
  return result.sort((a,b)=>a.x-b.x);
 }
-function conflicts(d,s,o){const c=context(d,s);if(c.missing)return ['Host wall missing — item retained; select a new host explicitly.'];const ps=corners(o),issues=[];if(s.kind==='wall'){if(ps.some(p=>p[0]<-1e-6||p[1]<-1e-6||p[0]>c.L+1e-6||p[1]>c.H+1e-6))issues.push('Outside wall face');for(const q of openingRects(d,s))if(overlaps(ps,corners(q)))issues.push('Opening conflict: '+q.id);}else{const world=ps.map(p=>p.map((v,i)=>(v+c.origin[i])/c.m));if(world.some(p=>!inside(p,s.boundary))||(s.holes||[]).some(h=>world.some(p=>inside(p,h))||h.some(p=>inside(p,world))))issues.push('Outside surface or over a void');}for(const q of d.surface_design?.items||[])if(q.surface_id===s.id&&q.id!==o.id&&overlaps(ps,corners(q)))issues.push('Overlaps '+q.kind);return issues;}
+function conflicts(d,s,o){
+ const c=context(d,s);if(c.missing)return ['Host wall missing — item retained; select a new host explicitly.'];
+ const parts=footprints(o),issues=[];
+ if(s.kind==='wall'){
+  if(parts.flat().some(p=>p[0]<-1e-6||p[1]<-1e-6||p[0]>c.L+1e-6||p[1]>c.H+1e-6))issues.push('Outside wall face');
+  for(const q of openingRects(d,s))if(parts.some(ps=>overlaps(ps,corners(q))))issues.push('Opening conflict: '+q.id);
+ }else if(parts.some(ps=>{const world=ps.map(p=>p.map((v,i)=>(v+c.origin[i])/c.m));return world.some(p=>!inside(p,s.boundary))||edgesCross(world,s.boundary)||(s.holes||[]).some(h=>world.some(p=>inside(p,h))||h.some(p=>inside(p,world))||edgesCross(world,h));}))issues.push('Outside surface or over a void');
+ for(const q of d.surface_design?.items||[])if(q.surface_id===s.id&&q.id!==o.id&&parts.some(ps=>footprints(q).some(qs=>overlaps(ps,qs))))issues.push('Overlaps '+q.kind);
+ return issues;
+}
 function world(d,s,o,p=[0,0],depth=0){const c=context(d,s);if(c.missing)return null;const r=o.rotation*Math.PI/180,x=o.x+p[0]*Math.cos(r)-p[1]*Math.sin(r),y=o.y+p[0]*Math.sin(r)+p[1]*Math.cos(r);if(s.kind==='wall'){const offset=c.wall.thickness*c.m/2+.003+depth;return [c.origin[0]+c.u[0]*x+c.n[0]*offset,c.origin[1]+c.u[1]*x+c.n[1]*offset,y];}return [c.origin[0]+x,c.origin[1]+y,s.kind==='ceiling'?(s.elevation_m??2.5)-(o.drop||0)-depth:(s.elevation_m||0)+.005+depth];}
 function snap(d,s,o,tol){const c=context(d,s),xs=[0,c.L/2,c.L],ys=[0,c.H/2,c.H],others=[...openingRects(d,s),...(d.surface_design?.items||[]).filter(q=>q.surface_id===s.id&&q.id!==o.id)];for(const q of others){const ps=corners(q);xs.push(Math.min(...ps.map(p=>p[0])),q.x,Math.max(...ps.map(p=>p[0])));ys.push(Math.min(...ps.map(p=>p[1])),q.y,Math.max(...ps.map(p=>p[1])));}const out=copy(o),guides=[];for(const [axis,refs] of [[0,xs],[1,ys]]){const ps=corners(out),positions=[Math.min(...ps.map(p=>p[axis])),out[axis?'y':'x'],Math.max(...ps.map(p=>p[axis]))];let best=null;for(const ref of refs)for(const pos of positions){const delta=ref-pos;if(Math.abs(delta)<=tol&&(!best||Math.abs(delta)<Math.abs(best.delta)))best={delta,ref};}if(best){out[axis?'y':'x']+=best.delta;guides.push({axis,value:best.ref});}}return {item:out,guides};}
 function align(items,mode){const out=copy(items);if(out.length<2)throw Error('Shift-click at least two items on this face.');if(mode==='space'){if(out.length<3)throw Error('Select at least three items to distribute.');out.sort((a,b)=>a.x-b.x);const first=out[0],last=out.at(-1),gap=(last.x+last.width/2-(first.x-first.width/2)-out.reduce((s,o)=>s+o.width,0))/(out.length-1);let edge=first.x-first.width/2;for(const o of out){o.x=edge+o.width/2;edge+=o.width+gap;}return out;}const axis=['left','right','centre-x'].includes(mode)?'x':'y',edge=mode==='left'||mode==='bottom'?-1:mode==='right'||mode==='top'?1:0,extent=o=>{const ps=corners(o).map(p=>p[axis==='x'?0:1]);return edge<0?Math.min(...ps):edge>0?Math.max(...ps):o[axis];},target=extent(out[0]);for(const o of out)o[axis]+=target-extent(o);return out;}
@@ -48,5 +72,5 @@ function resize(o,delta,corner=2,fromCentre=false){
  const x=fromCentre?0:sx*(out.width-o.width)/2,y=fromCentre?0:sy*(out.height-o.height)/2;out.x+=x*c-y*s;out.y+=x*s+y*c;return out;
 }
 function translate(items,dx,dy){return items.map(o=>({...copy(o),x:o.x+dx,y:o.y+dy}));}
-const api={roomPolygon,roomWallSpans,roomWallSide,wallPartitions,copy,kinds,context,corners,inside,overlaps,openingRects,conflicts,world,snap,align,resize,translate};if(typeof module!=='undefined')module.exports=api;else window.SurfaceDesignGeometry=api;
+const api={roomPolygon,roomWallSpans,roomWallSide,wallPartitions,copy,kinds,context,corners,footprints,inside,overlaps,openingRects,conflicts,world,snap,align,resize,translate};if(typeof module!=='undefined')module.exports=api;else window.SurfaceDesignGeometry=api;
 })();

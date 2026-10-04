@@ -113,14 +113,22 @@ class RemoteEngine(Engine):
             if job['status']=='cancelled':return
             try:
                 # Repeating this exact ID + body reconnects; it cannot add inference.
-                if job['kind']=='video':
+                if job['kind']=='video' or job.get('single_submission'):
                     try:result=self.remote.get('/v1/jobs/'+job['remote_job_id'])
                     except WorkerResponseError as exc:
                         if exc.status_code!=400 or not str(exc).startswith('Worker job not found.'):raise
                         # A saved client request is not proof the PC admitted it. Recheck
                         # approval/scene before a first or uncertain submission retry.
                         assert_dispatch(self.store,job)
-                        self.assert_video_source(job)
+                        if job['kind']=='video':self.assert_video_source(job)
+                        elif job['kind']=='image':
+                            from interior_style import view_context
+                            import scene_control
+                            project=self.store.project(job['project_id'])
+                            room=view_context(self.store.room(project['id'],job['room_id']),job.get('view_id'))
+                            if room['revision']!=job['input_revision']:raise ValueError('Room inputs changed before image submission.')
+                            scene_control.assert_scene(self.store,project,room,job.get('scene_ticket'))
+                            scene_control.assert_edit(room,job)
                         if job.get('single_submission'):
                             if job.get('remote_submission_intent'):
                                 raise ValueError('Single-attempt submission was already attempted; worker has no matching job. No second submission allowed.')
